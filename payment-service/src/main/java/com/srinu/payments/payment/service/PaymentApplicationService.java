@@ -25,13 +25,16 @@ public class PaymentApplicationService {
     private final CustomerClient customers;
     private final GatewayClient gateway;
     private final PaymentStateService state;
+    private final RiskPolicyService risk;
 
     public PaymentApplicationService(PaymentRepository repo, CustomerClient customers,
-                                     GatewayClient gateway, PaymentStateService state) {
+                                     GatewayClient gateway, PaymentStateService state,
+                                     RiskPolicyService risk) {
         this.repo = repo;
         this.customers = customers;
         this.gateway = gateway;
         this.state = state;
+        this.risk = risk;
     }
 
     public PaymentResponse create(String customerId, PaymentRequest req) {
@@ -48,6 +51,9 @@ public class PaymentApplicationService {
             log.warn("event=PAYMENT_OWNERSHIP_REJECTED customerId={} account={}", customerId, mask(req.accountNumber()));
             throw new PaymentAuthorizationException("Payment account does not belong to authenticated customer");
         }
+
+        // Risk checks happen after identity/account ownership validation but before durable PROCESSING state or bank calls.
+        risk.validate(customerId, req.accountNumber(), req.amount());
 
         final Payment payment;
         try {
