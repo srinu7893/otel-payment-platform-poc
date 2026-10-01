@@ -44,5 +44,66 @@ jobs:
       - name: Validate Docker Compose
         run: docker compose config --quiet
 
-      - name: Build frontend container
-        run: docker build -t otel-payment-platform-frontend:ci ./frontend
+      - name: Build full-stack containers
+        run: docker compose build
+
+      - name: Start full stack
+        run: docker compose up -d
+
+      - name: Wait for backend health
+        shell: bash
+        run: |
+          set -euo pipefail
+          ports=(8079 8084 8082 8081 8080 8083 8088)
+          for port in "${ports[@]}"; do
+            echo "Waiting for service on port ${port}..."
+            for attempt in {1..60}; do
+              if curl --fail --silent "http://localhost:${port}/actuator/health" >/dev/null; then
+                echo "Port ${port} healthy"
+                break
+              fi
+              if [ "$attempt" -eq 60 ]; then
+                echo "Service on port ${port} did not become healthy"
+                docker compose ps
+                docker compose logs --no-color
+                exit 1
+              fi
+              sleep 2
+            done
+          done
+
+      - name: Smoke test login, payment and P2P transfer
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOGIN=$(curl --fail --silent -X POST http://localhost:8088/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -H 'X-Correlation-Id: ci-login-001' \
+            -d '{"username":"demo","password":"demo123"}')
+          TOKEN=$(echo "$LOGIN" | jq -r '.accessToken')
+          test -n "$TOKEN"
+          test "$TOKEN" != "null"
+
+          curl --fail --silent -X POST http://localhost:8088/api/v1/payments \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' \
+            -H 'X-Correlation-Id: ci-payment-001' \
+            -d '{"idempotencyKey":"ci-pay-001","accountNumber":"ACC1001","merchant":"CI Demo Store","amount":25.00}' \
+            | tee /tmp/payment.json
+          test "$(jq -r '.status' /tmp/payment.json)" = "COMPLETED"
+
+          curl --fail --silent -X POST http://localhost:8088/api/v1/transfers \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' \
+            -H 'X-Correlation-Id: ci-transfer-001' \
+            -d '{"idempotencyKey":"ci-transfer-001","senderAccount":"ACC1001","receiverAccount":"ACC2001","amount":10.00,"currency":"INR"}' \
+            | tee /tmp/transfer.json
+          test "$(jq -r '.status' /tmp/transfer.json)" = "COMPLETED"
+
+      - name: Show stack status
+        if: always()
+        run: docker compose ps
+
+      - name: Tear down full stack
+        if: always()
+        run: docker compose down -v
