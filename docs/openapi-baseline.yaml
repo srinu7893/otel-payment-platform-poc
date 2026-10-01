@@ -1,0 +1,227 @@
+openapi: 3.0.3
+info:
+  title: OTel Payment Platform API
+  version: 0.1.0
+  description: Public API Gateway contract for the pre-OpenTelemetry enterprise POC baseline.
+servers:
+  - url: http://localhost:8088
+    description: Local Docker API Gateway
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string, format: password }
+    LoginResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        tokenType: { type: string, example: Bearer }
+        expiresInSeconds: { type: integer, example: 1800 }
+        customerId: { type: string }
+        roles:
+          type: array
+          items: { type: string }
+    PaymentRequest:
+      type: object
+      required: [idempotencyKey, accountNumber, merchant, amount]
+      properties:
+        idempotencyKey: { type: string }
+        accountNumber: { type: string }
+        merchant: { type: string }
+        amount: { type: number, format: decimal, minimum: 0.01 }
+    PaymentResponse:
+      type: object
+      properties:
+        paymentId: { type: string, format: uuid }
+        status: { type: string, example: COMPLETED }
+        amount: { type: number }
+        merchant: { type: string }
+        accountNumber: { type: string, description: Masked account identifier }
+        failureCode: { type: string, nullable: true }
+        message: { type: string }
+        createdAt: { type: string, format: date-time }
+    TransferRequest:
+      type: object
+      required: [idempotencyKey, senderAccount, receiverAccount, amount, currency]
+      properties:
+        idempotencyKey: { type: string }
+        senderAccount: { type: string }
+        receiverAccount: { type: string }
+        amount: { type: number, minimum: 0.01 }
+        currency: { type: string, example: INR }
+    RefundRequest:
+      type: object
+      required: [idempotencyKey]
+      properties:
+        idempotencyKey: { type: string }
+    ApiError:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        code: { type: string }
+        message: { type: string }
+        path: { type: string }
+        correlationId: { type: string }
+        fieldErrors:
+          type: object
+          additionalProperties: { type: string }
+paths:
+  /api/v1/auth/login:
+    post:
+      summary: Authenticate a demo user and issue a JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '401': { description: Invalid credentials }
+  /api/v1/customers/{customerId}:
+    get:
+      summary: Get a customer profile
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Customer profile }
+        '401': { description: Authentication required }
+  /api/v1/payments:
+    get:
+      summary: List payments visible to the caller
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: page, schema: { type: integer, default: 0 } }
+        - { in: query, name: size, schema: { type: integer, default: 20, maximum: 100 } }
+        - { in: query, name: status, schema: { type: string } }
+      responses:
+        '200': { description: Paginated payments }
+    post:
+      summary: Create a merchant payment
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentRequest' }
+      responses:
+        '200':
+          description: Payment accepted/finalized
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentResponse' }
+        '403': { description: Account ownership violation }
+        '422': { description: Risk limit exceeded }
+  /api/v1/payments/{paymentId}:
+    get:
+      summary: Get one payment
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: paymentId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Payment }
+        '404': { description: Payment not found }
+  /api/v1/payments/{paymentId}/cancel:
+    post:
+      summary: Cancel an eligible payment
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: paymentId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Cancelled payment }
+        '409': { description: Invalid state transition }
+  /api/v1/payments/{paymentId}/refunds:
+    post:
+      summary: Create an idempotent full refund
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: paymentId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefundRequest' }
+      responses:
+        '200': { description: Refund state }
+        '404': { description: Payment not found }
+        '409': { description: Payment not refundable }
+  /api/v1/payments/{paymentId}/refund:
+    get:
+      summary: Get refund for a payment
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: paymentId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Refund }
+        '404': { description: Refund not found }
+  /api/v1/transfers:
+    get:
+      summary: List P2P transfers visible to the caller
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Paginated transfers }
+    post:
+      summary: Create a P2P transfer
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferRequest' }
+      responses:
+        '200': { description: Transfer state }
+        '403': { description: Sender ownership violation }
+        '422': { description: Risk limit exceeded }
+  /api/v1/transfers/{transferId}:
+    get:
+      summary: Get one transfer
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: transferId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Transfer }
+        '404': { description: Transfer not found }
+  /api/v1/notifications:
+    get:
+      summary: List notifications visible to the caller
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Paginated notification records }
+  /api/v1/ops/health:
+    get:
+      summary: Aggregate backend health for SUPPORT/ADMIN
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Overall and per-service health }
+        '403': { description: SUPPORT or ADMIN role required }
