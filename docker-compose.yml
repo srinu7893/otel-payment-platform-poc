@@ -2,12 +2,12 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: payments
-      POSTGRES_USER: payments
-      POSTGRES_PASSWORD: payments
+      POSTGRES_DB: ${POSTGRES_DB:-payments}
+      POSTGRES_USER: ${POSTGRES_USER:-payments}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-payments}
     ports: ["5432:5432"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U payments -d payments"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-payments} -d ${POSTGRES_DB:-payments}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -15,8 +15,8 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     environment:
-      RABBITMQ_DEFAULT_USER: payments
-      RABBITMQ_DEFAULT_PASS: payments
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-payments}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-payments}
     ports: ["5672:5672", "15672:15672"]
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
@@ -27,10 +27,10 @@ services:
   auth-service:
     build: ./auth-service
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments
-      SPRING_DATASOURCE_USERNAME: payments
-      SPRING_DATASOURCE_PASSWORD: payments
-      JWT_SECRET: change-this-demo-secret-change-this-demo-secret
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
+      JWT_SECRET: ${JWT_SECRET:-change-this-demo-secret-change-this-demo-secret}
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,9 +39,9 @@ services:
   customer-service:
     build: ./customer-service
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments
-      SPRING_DATASOURCE_USERNAME: payments
-      SPRING_DATASOURCE_PASSWORD: payments
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,9 +50,9 @@ services:
   mock-bank-service:
     build: ./mock-bank-service
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments
-      SPRING_DATASOURCE_USERNAME: payments
-      SPRING_DATASOURCE_PASSWORD: payments
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,15 +69,18 @@ services:
   payment-service:
     build: ./payment-service
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments
-      SPRING_DATASOURCE_USERNAME: payments
-      SPRING_DATASOURCE_PASSWORD: payments
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
       SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_USERNAME: payments
-      SPRING_RABBITMQ_PASSWORD: payments
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-payments}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-payments}
       CLIENTS_GATEWAY_BASE_URL: http://gateway-service:8081
       CLIENTS_CUSTOMER_BASE_URL: http://customer-service:8084
-      JWT_SECRET: change-this-demo-secret-change-this-demo-secret
+      JWT_SECRET: ${JWT_SECRET:-change-this-demo-secret-change-this-demo-secret}
+      RISK_MAX_TRANSACTION_AMOUNT: ${RISK_MAX_TRANSACTION_AMOUNT:-50000.00}
+      RISK_MAX_DAILY_CUSTOMER_AMOUNT: ${RISK_MAX_DAILY_CUSTOMER_AMOUNT:-100000.00}
+      RISK_MAX_DAILY_ACCOUNT_AMOUNT: ${RISK_MAX_DAILY_ACCOUNT_AMOUNT:-100000.00}
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,13 +95,13 @@ services:
   notification-service:
     build: ./notification-service
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments
-      SPRING_DATASOURCE_USERNAME: payments
-      SPRING_DATASOURCE_PASSWORD: payments
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
       SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_USERNAME: payments
-      SPRING_RABBITMQ_PASSWORD: payments
-      JWT_SECRET: change-this-demo-secret-change-this-demo-secret
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-payments}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-payments}
+      JWT_SECRET: ${JWT_SECRET:-change-this-demo-secret-change-this-demo-secret}
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,7 +112,7 @@ services:
   api-gateway:
     build: ./api-gateway
     environment:
-      JWT_SECRET: change-this-demo-secret-change-this-demo-secret
+      JWT_SECRET: ${JWT_SECRET:-change-this-demo-secret-change-this-demo-secret}
       SERVICES_AUTH_URL: http://auth-service:8079
       SERVICES_CUSTOMER_URL: http://customer-service:8084
       SERVICES_PAYMENT_URL: http://payment-service:8080
