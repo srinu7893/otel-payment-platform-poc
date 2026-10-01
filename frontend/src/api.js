@@ -41,6 +41,10 @@ export function login(username, password) {
   });
 }
 
+export function getCustomer(token, customerId) {
+  return request(`/v1/customers/${customerId}`, { headers: authHeaders(token) });
+}
+
 export function listPayments(token, { page = 0, size = 20, status } = {}) {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   if (status) params.set('status', status);
@@ -63,6 +67,19 @@ export function cancelPayment(token, paymentId) {
   return request(`/v1/payments/${paymentId}/cancel`, {
     method: 'POST',
     headers: authHeaders(token)
+  });
+}
+
+export function listTransfers(token, { page = 0, size = 20 } = {}) {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  return request(`/v1/transfers?${params.toString()}`, { headers: authHeaders(token) });
+}
+
+export function createTransfer(token, payload) {
+  return request('/v1/transfers', {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(payload)
   });
 }
 
