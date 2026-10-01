@@ -36,6 +36,13 @@ public class PaymentEventPublisher {
                 mask(senderAccount), mask(receiverAccount), amount, currency, "TRANSFER_COMPLETED"));
     }
 
+    public void refundCompleted(UUID refundId, UUID paymentId, UUID bankTransactionId,
+                                String customerId, BigDecimal amount) {
+        stage("REFUND", refundId, "PAYMENT_REFUNDED", "payment.refunded",
+            new RefundCompletedEvent(refundId, paymentId, bankTransactionId,
+                customerId, amount, "PAYMENT_REFUNDED"));
+    }
+
     private void stage(String aggregateType, UUID aggregateId, String eventType,
                        String routingKey, Object event) {
         try {
@@ -64,4 +71,6 @@ public class PaymentEventPublisher {
     public record TransferCompletedEvent(UUID transferId, UUID bankTransactionId, String customerId,
                                          String senderAccount, String receiverAccount, BigDecimal amount,
                                          String currency, String eventType) {}
+    public record RefundCompletedEvent(UUID refundId, UUID paymentId, UUID bankTransactionId,
+                                       String customerId, BigDecimal amount, String eventType) {}
 }
