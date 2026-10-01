@@ -13,6 +13,7 @@ import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,6 +57,20 @@ class NotificationRabbitIntegrationTest {
         assertThat(record.getChannel()).isEqualTo("EMAIL_SIMULATED");
         assertThat(record.getStatus()).isEqualTo("SENT");
         assertThat(record.getAttempts()).isEqualTo(1);
+    }
+
+    @Test
+    void poisonEventIsRetriedAndDeadLetteredInsteadOfLoopingForever() {
+        String poison = "{not-valid-json";
+        UUID eventId = UUID.randomUUID();
+        publishPaymentEvent(poison, eventId, "rabbit-it-poison-001");
+
+        var deadLetter = rabbitTemplate.receive(RabbitConfig.DLQ, 12_000);
+
+        assertThat(deadLetter).as("poison event should be routed to the notification DLQ").isNotNull();
+        assertThat(new String(deadLetter.getBody(), StandardCharsets.UTF_8)).isEqualTo(poison);
+        assertThat(deadLetter.getMessageProperties().getHeaders()).containsKey("x-death");
+        assertThat(deadLetter.getMessageProperties().getHeader("eventId")).isEqualTo(eventId.toString());
     }
 
     private void publishPaymentEvent(String payload, UUID eventId, String correlationId) {
