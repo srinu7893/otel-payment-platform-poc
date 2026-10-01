@@ -1,0 +1,6 @@
+server: { port: 8084 }
+spring:
+  application: { name: customer-service }
+  datasource: { url: "jdbc:postgresql://localhost:5432/payments", username: payments, password: payments }
+  jpa: { hibernate: { ddl-auto: update }, open-in-view: false }
+management.endpoints.web.exposure.include: health,info,metrics
