@@ -72,7 +72,7 @@ jobs:
             done
           done
 
-      - name: Smoke test login, payment and P2P transfer
+      - name: Smoke test login, payment, failures and P2P transfer
         shell: bash
         run: |
           set -euo pipefail
@@ -107,6 +107,22 @@ jobs:
             -H 'X-Correlation-Id: ci-payment-001' \
             -d '{"idempotencyKey":"ci-pay-001","accountNumber":"ACC1001","merchant":"CI Demo Store","amount":25.00}'
           test "$(jq -r '.status' /tmp/payment.json)" = "COMPLETED"
+          PAYMENT_ID=$(jq -r '.paymentId' /tmp/payment.json)
+
+          api_call "payment idempotent replay" /tmp/payment-replay.json -X POST http://localhost:8088/api/v1/payments \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' \
+            -H 'X-Correlation-Id: ci-payment-replay-001' \
+            -d '{"idempotencyKey":"ci-pay-001","accountNumber":"ACC1001","merchant":"CI Demo Store","amount":25.00}'
+          test "$(jq -r '.status' /tmp/payment-replay.json)" = "COMPLETED"
+          test "$(jq -r '.paymentId' /tmp/payment-replay.json)" = "$PAYMENT_ID"
+
+          api_call "insufficient funds payment" /tmp/payment-insufficient.json -X POST http://localhost:8088/api/v1/payments \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' \
+            -H 'X-Correlation-Id: ci-payment-insufficient-001' \
+            -d '{"idempotencyKey":"ci-pay-insufficient-001","accountNumber":"ACC1001","merchant":"CI Expensive Store","amount":999999.00}'
+          test "$(jq -r '.status' /tmp/payment-insufficient.json)" = "FAILED"
 
           api_call "transfer" /tmp/transfer.json -X POST http://localhost:8088/api/v1/transfers \
             -H "Authorization: Bearer $TOKEN" \
