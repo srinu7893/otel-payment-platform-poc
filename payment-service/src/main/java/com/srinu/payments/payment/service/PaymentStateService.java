@@ -10,6 +10,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +50,10 @@ public class PaymentStateService {
         var payment = payments.findById(paymentId)
             .orElseThrow(() -> new PaymentApplicationService.PaymentNotFoundException(paymentId));
 
+        if (isTerminal(payment.getStatus())) {
+            return payment;
+        }
+
         switch (result.status()) {
             case "COMPLETED" -> {
                 payment.markCompleted(result.bankTransactionId());
@@ -65,21 +71,45 @@ public class PaymentStateService {
     public Payment markReconciliationRequired(UUID paymentId, String code) {
         var payment = payments.findById(paymentId)
             .orElseThrow(() -> new PaymentApplicationService.PaymentNotFoundException(paymentId));
-        payment.markReconciliationRequired(code);
-        return payments.save(payment);
+        if (!isTerminal(payment.getStatus())) {
+            payment.markReconciliationRequired(code);
+            return payments.save(payment);
+        }
+        return payment;
     }
 
     @Transactional
     public Payment noteReconciliationAttempt(UUID paymentId) {
         var payment = payments.findById(paymentId)
             .orElseThrow(() -> new PaymentApplicationService.PaymentNotFoundException(paymentId));
-        payment.noteReconciliationAttempt();
-        return payments.save(payment);
+        if (!isTerminal(payment.getStatus())) {
+            payment.noteReconciliationAttempt();
+            return payments.save(payment);
+        }
+        return payment;
     }
 
     @Transactional(readOnly = true)
-    public List<Payment> reconciliationBatch(int batchSize) {
-        return payments.findAllByStatus(PaymentStatus.RECONCILIATION_REQUIRED,
-            PageRequest.of(0, Math.max(1, Math.min(batchSize, 100)))).getContent();
+    public List<Payment> reconciliationBatch(int batchSize, Instant staleProcessingBefore) {
+        int safeBatch = Math.max(1, Math.min(batchSize, 100));
+        var selected = new ArrayList<Payment>(safeBatch);
+
+        var required = payments.findAllByStatus(PaymentStatus.RECONCILIATION_REQUIRED,
+            PageRequest.of(0, safeBatch)).getContent();
+        selected.addAll(required);
+
+        int remaining = safeBatch - selected.size();
+        if (remaining > 0) {
+            selected.addAll(payments.findAllByStatusAndUpdatedAtBefore(
+                PaymentStatus.PROCESSING, staleProcessingBefore, PageRequest.of(0, remaining)).getContent());
+        }
+        return List.copyOf(selected);
+    }
+
+    private boolean isTerminal(PaymentStatus status) {
+        return status == PaymentStatus.COMPLETED
+            || status == PaymentStatus.DECLINED
+            || status == PaymentStatus.FAILED
+            || status == PaymentStatus.CANCELLED;
     }
 }
