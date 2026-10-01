@@ -36,6 +36,15 @@ public class GatewayClient {
             .body(TransferGatewayResult.class);
     }
 
+    public RefundGatewayResult refund(UUID refundId, UUID originalPaymentId, String accountNumber, BigDecimal amount) {
+        return client.post()
+            .uri("/api/v1/refund-authorizations")
+            .header(CORRELATION_HEADER, correlationId())
+            .body(new RefundGatewayRequest(refundId, originalPaymentId, accountNumber, amount))
+            .retrieve()
+            .body(RefundGatewayResult.class);
+    }
+
     private String correlationId() {
         String value = MDC.get("correlationId");
         return value == null ? UUID.randomUUID().toString() : value;
@@ -46,4 +55,6 @@ public class GatewayClient {
     public record TransferGatewayRequest(UUID paymentId, String senderAccount, String receiverAccount,
                                          BigDecimal amount, String currency) {}
     public record TransferGatewayResult(UUID bankTransactionId, String status, String message) {}
+    public record RefundGatewayRequest(UUID refundId, UUID originalPaymentId, String accountNumber, BigDecimal amount) {}
+    public record RefundGatewayResult(UUID bankTransactionId, String status, String message) {}
 }
