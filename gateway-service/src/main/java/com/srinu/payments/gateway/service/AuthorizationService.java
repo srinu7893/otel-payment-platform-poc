@@ -19,7 +19,8 @@ public class AuthorizationService {
 
     public AuthorizationResponse authorize(AuthorizationRequest request) {
         long started = System.currentTimeMillis();
-        log.info("event=GATEWAY_AUTH_STARTED paymentId={} account={} amount={}", request.paymentId(), request.accountNumber(), request.amount());
+        log.info("event=GATEWAY_AUTH_STARTED paymentId={} account={} amount={}",
+            request.paymentId(), mask(request.accountNumber()), request.amount());
         try {
             var bank = bankClient.debit(request.paymentId(), request.accountNumber(), request.amount());
             log.info("event=GATEWAY_AUTH_COMPLETED paymentId={} bankStatus={} durationMs={}", request.paymentId(), bank.status(), System.currentTimeMillis()-started);
@@ -31,5 +32,10 @@ public class AuthorizationService {
             log.error("event=GATEWAY_BANK_FAILURE paymentId={} durationMs={} error={}", request.paymentId(), System.currentTimeMillis()-started, ex.getMessage());
             return new AuthorizationResponse("FAILED", "Bank unavailable");
         }
+    }
+
+    private String mask(String account) {
+        if (account == null || account.length() <= 4) return "****";
+        return "****" + account.substring(account.length() - 4);
     }
 }
