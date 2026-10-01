@@ -7,6 +7,7 @@ import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -28,18 +29,28 @@ public class SecurityConfig {
 
     @Bean
     JwtDecoder jwtDecoder(SecretKey key) {
-        return NimbusJwtDecoder.withSecretKey(key).build();
+        return NimbusJwtDecoder.withSecretKey(key)
+            .macAlgorithm(MacAlgorithm.HS256)
+            .build();
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, Converter<Jwt, AbstractAuthenticationToken> converter) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                            Converter<Jwt, AbstractAuthenticationToken> converter,
+                                            SecurityErrorHandler securityErrors) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                 .requestMatchers("/api/v1/payments/**", "/api/v1/transfers/**").hasAnyRole("CUSTOMER", "SUPPORT", "ADMIN")
                 .anyRequest().authenticated())
-            .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter)));
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint(securityErrors)
+                .accessDeniedHandler(securityErrors))
+            .oauth2ResourceServer(oauth -> oauth
+                .authenticationEntryPoint(securityErrors)
+                .accessDeniedHandler(securityErrors)
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(converter)));
         return http.build();
     }
 
