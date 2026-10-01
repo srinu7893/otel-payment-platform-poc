@@ -1,7 +1,40 @@
 package com.srinu.payments.payment.client;
-import org.springframework.beans.factory.annotation.Value; import org.springframework.stereotype.Component; import org.springframework.web.client.RestClient; import java.math.BigDecimal; import java.util.UUID;
-@Component public class GatewayClient {
- private final RestClient client; public GatewayClient(RestClient.Builder b,@Value("${clients.gateway.base-url}") String url){client=b.baseUrl(url).build();}
- public GatewayResult authorize(UUID paymentId,String account,BigDecimal amount){return client.post().uri("/api/v1/authorizations").body(new GatewayRequest(paymentId,account,amount)).retrieve().body(GatewayResult.class);}
- public record GatewayRequest(UUID paymentId,String accountNumber,BigDecimal amount){} public record GatewayResult(String status,String message){}
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Component
+public class GatewayClient {
+    private final RestClient client;
+
+    public GatewayClient(RestClient.Builder builder, @Value("${clients.gateway.base-url}") String url) {
+        this.client = builder.baseUrl(url).build();
+    }
+
+    public GatewayResult authorize(UUID paymentId, String account, BigDecimal amount) {
+        return client.post()
+            .uri("/api/v1/authorizations")
+            .body(new GatewayRequest(paymentId, account, amount))
+            .retrieve()
+            .body(GatewayResult.class);
+    }
+
+    public TransferGatewayResult transfer(UUID paymentId, String senderAccount, String receiverAccount,
+                                          BigDecimal amount, String currency) {
+        return client.post()
+            .uri("/api/v1/transfer-authorizations")
+            .body(new TransferGatewayRequest(paymentId, senderAccount, receiverAccount, amount, currency))
+            .retrieve()
+            .body(TransferGatewayResult.class);
+    }
+
+    public record GatewayRequest(UUID paymentId, String accountNumber, BigDecimal amount) {}
+    public record GatewayResult(String status, String message) {}
+    public record TransferGatewayRequest(UUID paymentId, String senderAccount, String receiverAccount,
+                                         BigDecimal amount, String currency) {}
+    public record TransferGatewayResult(UUID bankTransactionId, String status, String message) {}
 }
