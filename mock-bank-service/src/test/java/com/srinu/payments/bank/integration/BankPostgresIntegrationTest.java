@@ -1,8 +1,10 @@
 package com.srinu.payments.bank.integration;
 
 import com.srinu.payments.bank.api.DebitRequest;
+import com.srinu.payments.bank.api.RefundRequest;
 import com.srinu.payments.bank.api.TransferRequest;
 import com.srinu.payments.bank.repository.AccountRepository;
+import com.srinu.payments.bank.service.BankRefundService;
 import com.srinu.payments.bank.service.BankTransactionService;
 import com.srinu.payments.bank.service.BankTransferService;
 import org.junit.jupiter.api.Test;
@@ -35,6 +37,9 @@ class BankPostgresIntegrationTest {
 
     @Autowired
     private BankTransactionService debitService;
+
+    @Autowired
+    private BankRefundService refundService;
 
     @Test
     @Transactional
@@ -74,5 +79,25 @@ class BankPostgresIntegrationTest {
         assertThat(second.status()).isEqualTo("COMPLETED");
         assertThat(second.transactionId()).isEqualTo(first.transactionId());
         assertThat(after).isEqualByComparingTo(before.subtract(amount));
+    }
+
+    @Test
+    @Transactional
+    void repeatedRefundWithSameRefundIdCreditsBalanceOnlyOnce() {
+        UUID refundId = UUID.randomUUID();
+        UUID originalPaymentId = UUID.randomUUID();
+        var amount = new BigDecimal("30.00");
+        var before = accounts.findById("ACC1001").orElseThrow().getBalance();
+
+        var first = refundService.refund(new RefundRequest(refundId, originalPaymentId, "ACC1001", amount));
+        var second = refundService.refund(new RefundRequest(refundId, originalPaymentId, "ACC1001", amount));
+
+        accounts.flush();
+        var after = accounts.findById("ACC1001").orElseThrow().getBalance();
+
+        assertThat(first.status()).isEqualTo("COMPLETED");
+        assertThat(second.status()).isEqualTo("COMPLETED");
+        assertThat(second.transactionId()).isEqualTo(first.transactionId());
+        assertThat(after).isEqualByComparingTo(before.add(amount));
     }
 }
