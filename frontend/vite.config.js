@@ -6,15 +6,10 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/auth-api': {
-        target: 'http://localhost:8079',
+      '/api': {
+        target: 'http://localhost:8088',
         changeOrigin: true,
-        rewrite: path => path.replace(/^\/auth-api/, '')
-      },
-      '/payment-api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/payment-api/, '')
+        rewrite: path => path.replace(/^\/api/, '/api')
       }
     }
   }
