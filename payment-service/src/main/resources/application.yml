@@ -53,6 +53,11 @@ clients:
   customer:
     base-url: http://localhost:8084
 
+risk:
+  max-transaction-amount: ${RISK_MAX_TRANSACTION_AMOUNT:100000.00}
+  max-daily-customer-amount: ${RISK_MAX_DAILY_CUSTOMER_AMOUNT:200000.00}
+  max-daily-account-amount: ${RISK_MAX_DAILY_ACCOUNT_AMOUNT:200000.00}
+
 outbox:
   relay:
     enabled: true
