@@ -1,0 +1,3 @@
+package com.srinu.payments.payment.messaging;
+import org.springframework.amqp.rabbit.core.RabbitTemplate; import org.springframework.stereotype.Component; import java.math.BigDecimal; import java.util.UUID;
+@Component public class PaymentEventPublisher { private final RabbitTemplate rabbit; public PaymentEventPublisher(RabbitTemplate r){rabbit=r;} public void completed(UUID id,BigDecimal amount){rabbit.convertAndSend("payments.events","payment.completed",new PaymentCompleted(id,amount));} public record PaymentCompleted(UUID paymentId,BigDecimal amount) implements java.io.Serializable{} }
