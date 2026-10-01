@@ -38,30 +38,21 @@ Deploy agreed components to GCP and connect Cloud Logging / Monitoring / BigQuer
 - linked demo account: ACC1001
 
 ## Build
-
 ```bash
 mvn clean package
 ```
 
-## Run infrastructure and services
-
+## Run
 ```bash
 docker compose up --build
 ```
 
-## Example login
-
+## Login
 ```bash
-curl -X POST http://localhost:8079/api/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"demo","password":"demo123"}'
+curl -X POST http://localhost:8079/api/v1/auth/login -H 'Content-Type: application/json' -d '{"username":"demo","password":"demo123"}'
 ```
 
-## Example payment
-
+## Create payment
 ```bash
-curl -X POST http://localhost:8080/api/v1/payments \
-  -H 'Content-Type: application/json' \
-  -H 'X-Correlation-Id: demo-001' \
-  -d '{"idempotencyKey":"pay-001","accountNumber":"ACC1001","merchant":"Demo Store","amount":50.00}'
+curl -X POST http://localhost:8080/api/v1/payments -H 'Content-Type: application/json' -H 'X-Correlation-Id: demo-001' -d '{"idempotencyKey":"pay-001","accountNumber":"ACC1001","merchant":"Demo Store","amount":50.00}'
 ```
