@@ -114,11 +114,15 @@ services:
       SERVICES_CUSTOMER_URL: http://customer-service:8084
       SERVICES_PAYMENT_URL: http://payment-service:8080
       SERVICES_NOTIFICATION_URL: http://notification-service:8083
+      SERVICES_GATEWAY_URL: http://gateway-service:8081
+      SERVICES_BANK_URL: http://mock-bank-service:8082
     depends_on:
       - auth-service
       - customer-service
       - payment-service
       - notification-service
+      - gateway-service
+      - mock-bank-service
     ports: ["8088:8088"]
 
   frontend:
