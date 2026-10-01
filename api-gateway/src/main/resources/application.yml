@@ -1,0 +1,41 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: auth-service
+              uri: ${services.auth-url:http://localhost:8079}
+              predicates:
+                - Path=/api/v1/auth/**
+            - id: customer-service
+              uri: ${services.customer-url:http://localhost:8084}
+              predicates:
+                - Path=/api/v1/customers/**
+            - id: payment-service
+              uri: ${services.payment-url:http://localhost:8080}
+              predicates:
+                - Path=/api/v1/payments/**
+            - id: notification-service
+              uri: ${services.notification-url:http://localhost:8083}
+              predicates:
+                - Path=/api/v1/notifications/**
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:change-this-demo-secret-change-this-demo-secret}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway
+  endpoint:
+    health:
+      probes:
+        enabled: true
