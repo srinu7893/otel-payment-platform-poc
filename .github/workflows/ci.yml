@@ -72,7 +72,7 @@ jobs:
             done
           done
 
-      - name: Smoke test login, payment, outbox, refund, failures and P2P transfer
+      - name: Smoke test login, payment, outbox, refund, risk, failures and P2P transfer
         shell: bash
         run: |
           set -euo pipefail
@@ -88,6 +88,23 @@ jobs:
             echo
             if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
               echo "${name} failed; dumping relevant service logs"
+              docker compose logs --no-color api-gateway auth-service payment-service gateway-service mock-bank-service notification-service
+              exit 1
+            fi
+          }
+
+          api_expect_status() {
+            local expected="$1"
+            local name="$2"
+            local output="$3"
+            shift 3
+            local status
+            status=$(curl --silent --show-error --output "$output" --write-out '%{http_code}' "$@")
+            echo "${name} HTTP ${status} (expected ${expected})"
+            cat "$output"
+            echo
+            if [ "$status" != "$expected" ]; then
+              echo "${name} returned unexpected status"
               docker compose logs --no-color api-gateway auth-service payment-service gateway-service mock-bank-service notification-service
               exit 1
             fi
@@ -182,8 +199,16 @@ jobs:
             -H "Authorization: Bearer $TOKEN" \
             -H 'Content-Type: application/json' \
             -H 'X-Correlation-Id: ci-payment-insufficient-001' \
-            -d '{"idempotencyKey":"ci-pay-insufficient-001","accountNumber":"ACC1001","merchant":"CI Expensive Store","amount":999999.00}'
+            -d '{"idempotencyKey":"ci-pay-insufficient-001","accountNumber":"ACC1001","merchant":"CI Expensive Store","amount":6000.00}'
           test "$(jq -r '.status' /tmp/payment-insufficient.json)" = "FAILED"
+
+          api_expect_status "422" "risk limit payment" /tmp/payment-risk.json -X POST http://localhost:8088/api/v1/payments \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' \
+            -H 'X-Correlation-Id: ci-payment-risk-001' \
+            -d '{"idempotencyKey":"ci-pay-risk-001","accountNumber":"ACC1001","merchant":"CI Risk Store","amount":100001.00}'
+          test "$(jq -r '.code' /tmp/payment-risk.json)" = "RISK_LIMIT_EXCEEDED"
+          test "$(jq -r '.fieldErrors.rule' /tmp/payment-risk.json)" = "MAX_TRANSACTION_AMOUNT"
 
           api_call "transfer" /tmp/transfer.json -X POST http://localhost:8088/api/v1/transfers \
             -H "Authorization: Bearer $TOKEN" \
