@@ -10,12 +10,19 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:payments}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     open-in-view: false
+    properties:
+      hibernate:
+        default_schema: auth
+  flyway:
+    enabled: true
+    create-schemas: true
+    schemas: auth
+    default-schema: auth
 
 security:
   jwt:
-    # POC default only. Override JWT_SECRET in Docker/GCP and never commit a production secret.
     secret: ${JWT_SECRET:otel-payment-poc-local-secret-key-32bytes-minimum!}
 
 management:
