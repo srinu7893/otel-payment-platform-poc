@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,7 @@ import java.util.UUID;
 @Component
 public class PaymentEventPublisher {
     private static final Logger log = LoggerFactory.getLogger(PaymentEventPublisher.class);
+    private static final String CORRELATION_HEADER = "X-Correlation-Id";
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
 
@@ -36,8 +38,16 @@ public class PaymentEventPublisher {
     private void publish(String routingKey, Object event) {
         try {
             String body = objectMapper.writeValueAsString(event);
-            rabbitTemplate.convertAndSend("payments.events", routingKey, body);
-            log.info("event=DOMAIN_EVENT_PUBLISHED routingKey={} payloadType={}", routingKey, event.getClass().getSimpleName());
+            String correlationId = MDC.get("correlationId");
+            if (correlationId == null) correlationId = UUID.randomUUID().toString();
+            String finalCorrelationId = correlationId;
+            rabbitTemplate.convertAndSend("payments.events", routingKey, body, message -> {
+                message.getMessageProperties().setHeader(CORRELATION_HEADER, finalCorrelationId);
+                message.getMessageProperties().setHeader("eventType", event.getClass().getSimpleName());
+                return message;
+            });
+            log.info("event=DOMAIN_EVENT_PUBLISHED routingKey={} payloadType={} correlationId={}",
+                routingKey, event.getClass().getSimpleName(), correlationId);
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Unable to serialize domain event", ex);
         }
