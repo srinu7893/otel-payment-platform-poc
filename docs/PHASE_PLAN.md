@@ -29,10 +29,10 @@ When an existing feature changes, mark it `NEEDS UPDATE`, describe the required 
 
 | Status | Feature | Acceptance criteria |
 | --- | --- | --- |
-| DONE | Auth Service | DB users, BCrypt, JWT, CUSTOMER/SUPPORT/ADMIN roles |
+| DONE | Auth Service | DB users, BCrypt, HS256 JWT, CUSTOMER/SUPPORT/ADMIN roles |
 | DONE | Customer Service | CRUD, linked demo account, active state |
 | DONE | Merchant Payment | Create/get/list/cancel, idempotency, ownership |
-| DONE | P2P Transfer | Sender ownership, debit/credit, ledger, idempotency |
+| DONE | P2P Transfer | Sender ownership, debit/credit, ledger, idempotency; end-to-end smoke verified |
 | DONE | Mock Bank | Account CRUD, debit, transfer, deterministic failures |
 | DONE | Notification Service | RabbitMQ, email/SMS simulation, retry, DLQ |
 | PLANNED | Refund/Reversal | Controlled payment and transfer compensation |
@@ -43,10 +43,10 @@ When an existing feature changes, mark it `NEEDS UPDATE`, describe the required 
 
 | Status | Feature | Work |
 | --- | --- | --- |
-| DONE | JWT issuance/validation | Edge + resource-service validation |
+| DONE | JWT issuance/validation | Explicit HS256 at issuer and API Gateway; resource validation where currently enabled |
 | DONE | P2P sender ownership | Source account tied to authenticated customer |
-| IN PROGRESS | Consistent service authorization | Customer/Notification/Support/Admin policies standardized |
-| PLANNED | Standard JSON 401/403 | Common edge/service error contract |
+| NEEDS UPDATE | Consistent service authorization | Customer Service currently relies on edge/internal trust; define service-to-service identity/private-ingress strategy before locking internal APIs |
+| IN PROGRESS | Standard JSON 401/403 | Edge Gateway standardized; service-level security handlers/tests still to finish |
 | PLANNED | Refresh/revocation design | Implement or explicitly document exclusion |
 | PLANNED | Rate limiting | Protect login/payment APIs |
 | PLANNED | Security audit events | Login failures, authorization failures, admin actions |
@@ -55,7 +55,7 @@ When an existing feature changes, mark it `NEEDS UPDATE`, describe the required 
 
 | Status | Feature | Work |
 | --- | --- | --- |
-| IN PROGRESS | Flyway migrations | Separate auth/customer/payment/bank/notification schemas; Hibernate validate-only |
+| DONE | Flyway migrations | Separate auth/customer/payment/bank/notification schemas; clean Docker database boot verified; Hibernate validate-only |
 | DONE | Bank transaction ledger | Immutable transaction history |
 | DONE | Locking | Concurrency protection around money-changing operations |
 | PLANNED | Outbox Pattern | Reliable DB commit + RabbitMQ publication |
@@ -67,31 +67,32 @@ When an existing feature changes, mark it `NEEDS UPDATE`, describe the required 
 | Status | Feature | Work |
 | --- | --- | --- |
 | DONE | Correlation ID | HTTP + RabbitMQ propagation and MDC restore |
-| IN PROGRESS | Common error model | code/message/path/correlationId/fieldErrors/timestamp |
-| PLANNED | Structured JSON logging | service/environment/event/customer/payment/transfer/duration/errorCode |
-| PLANNED | HTTP connect/read timeouts | Explicit values on all service clients |
-| PLANNED | Circuit breaker | Safe downstream operations only |
-| PLANNED | Retry policy | Never blindly retry money movement |
+| DONE | Common error model | timestamp/code/message/path/correlationId/fieldErrors standardized across application services; edge security errors standardized |
+| DONE | Structured JSON logging | Logstash-style JSON console output enabled across services for later Cloud Logging/BigQuery/Grafana ingestion |
+| DONE | HTTP connect/read timeouts | Explicit 2s connect / 5s read defaults on payment and gateway synchronous clients |
+| PLANNED | Circuit breaker | Safe downstream operations only; no blind replay of money movement |
+| PLANNED | Retry policy | Retry only demonstrably idempotent operations; never blindly retry debit/transfer |
 | DONE | Notification retry + DLQ | Retry/backoff and dead-letter topology |
 
 ## Phase 5 — Testing & Quality Gates
 
 | Status | Feature | Work |
 | --- | --- | --- |
-| DONE | Core unit tests | Payment, Bank, Gateway, Customer |
-| PLANNED | Auth security tests | JWT/roles/locked-disabled users |
+| DONE | Core unit tests | Payment, transfer, Bank debit/P2P/idempotency, Gateway, Customer |
+| IN PROGRESS | Auth security tests | Added successful login, bad password and locked-user coverage; role/disabled/controller cases remain |
 | PLANNED | Authorization/controller tests | 401/403/ownership/support/admin |
 | PLANNED | Testcontainers PostgreSQL | Real DB/schema integration tests |
 | PLANNED | Testcontainers RabbitMQ | Producer/consumer/retry/DLQ integration |
-| IN PROGRESS | Full-stack Docker smoke test | Health → login → payment → P2P → teardown |
+| DONE | Full-stack Docker smoke test | Health → login → merchant payment → P2P → teardown verified through API Gateway |
 | PLANNED | Failure scenario suite | Insufficient funds, slow bank, 500, timeout, duplicate, message failure |
+| DONE | CI smoke diagnostics | HTTP status/body plus relevant service logs emitted on smoke failure |
 
 ## Phase 6 — Frontend / Support / Admin
 
 | Status | Feature | Work |
 | --- | --- | --- |
 | DONE | Customer dashboard | Login/payment/P2P/history/notifications |
-| DONE | Frontend Docker/Nginx | Production-style static hosting |
+| DONE | Frontend Docker/Nginx | Production-style static hosting + deterministic container health check |
 | PLANNED | Support dashboard | Search payment/transfer/correlation ID/failures |
 | PLANNED | Admin/test dashboard | Trigger slow/error/insufficient scenarios, reset data |
 | PLANNED | Service health page | Liveness/readiness overview |
@@ -111,9 +112,10 @@ When an existing feature changes, mark it `NEEDS UPDATE`, describe the required 
 OpenTelemetry starts only after all of these pass:
 
 - CI green.
-- All services boot under Docker Compose.
-- Login/payment/P2P/notification flows pass.
-- Flyway validated against a clean database.
+- All services boot under Docker Compose. **Verified.**
+- Login/payment/P2P flows pass through the API Gateway. **Verified.**
+- Notification flow and retry/DLQ integration test pass.
+- Flyway validated against a clean database. **Verified.**
 - Authorization/security tests pass.
 - Failure scenarios are reproducible.
 - Support/admin demo path is usable.
@@ -146,35 +148,27 @@ OpenTelemetry starts only after all of these pass:
 
 ---
 
-## Additional enterprise features added to scope
+## Findings / architecture decisions while building
 
-These were not all in the earliest design but strengthen the POC:
-
-- Audit trail for security/admin/state-changing operations.
-- Transaction reversal/refund/compensation flow.
-- Risk/transfer-limit rules.
-- Outbox Pattern for DB + RabbitMQ reliability.
-- Structured JSON logs before OTel.
-- Standard JSON 401/403 and common error contract.
-- API rate limiting at the edge.
-- Support and Admin dashboards.
-- Service health/readiness UI.
-- OpenAPI documentation.
-- Local/docker/gcp configuration profiles.
-- Data retention policy.
-- Observability deep links from support UI.
-- Secret/config strategy for GCP.
+- The API Gateway must use reactive security (`ReactiveJwtDecoder`) because it is WebFlux; servlet JWT beans prevented gateway startup.
+- JWT signing/verification is explicitly HS256 across the current demo flow to avoid runtime algorithm ambiguity.
+- Bank P2P initially failed because the gateway and bank transfer paths disagreed; the bank contract is now consistently `/api/v1/bank/**`.
+- Customer Service currently relies on edge/internal trust. Do not add superficial JWT protection until service-to-service authentication/private ingress is designed, otherwise Payment → Customer calls break.
+- Money-changing calls must not receive generic automatic retries. Use idempotency-aware policies and circuit breakers/timeouts instead.
+- CI now prints response bodies and service logs when smoke calls fail; this significantly shortens diagnosis time.
+- Docker build contexts are larger than necessary because service/frontend `.dockerignore` files are minimal. Optimize them before the GCP/container-registry phase.
+- Mockito reports future-JDK dynamic-agent warnings. Configure the Mockito agent before moving beyond Java 21/current test runtime.
+- GitHub Actions reports Node 20 action-runtime deprecation for checkout/setup-node versions currently used; refresh action versions as a CI-maintenance task.
 
 ## Current immediate execution queue
 
-1. Finish Flyway runtime validation and full Docker smoke test.
-2. Fix any schema/runtime issues found by CI.
-3. Implement common error model + standard 401/403.
-4. Add structured JSON logging.
-5. Add HTTP timeouts/resilience policies.
-6. Build Support/Admin UI.
-7. Add Testcontainers + failure tests.
-8. Add refund/reversal + risk limits.
-9. Add Outbox reliability.
-10. Add OpenAPI and satisfy Baseline Freeze gate.
-11. Start OpenTelemetry only after the baseline gate is green.
+1. Finish service authorization/security handlers and controller tests.
+2. Add controlled circuit breaker/resilience policies without unsafe money-movement retries.
+3. Add Testcontainers PostgreSQL + RabbitMQ and failure scenarios.
+4. Build Support/Admin UI + service health page.
+5. Add refund/reversal + transfer limits/risk rules.
+6. Add Outbox Pattern for reliable event publication.
+7. Add OpenAPI, environment profiles and documented secret strategy.
+8. Optimize Docker build contexts and CI maintenance warnings.
+9. Satisfy the remaining Baseline Freeze gate items.
+10. Start OpenTelemetry only after the baseline gate is green.
