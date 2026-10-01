@@ -1,5 +1,6 @@
 package com.srinu.payments.payment.api;
 
+import com.srinu.payments.payment.service.PaymentApplicationService;
 import com.srinu.payments.payment.service.PaymentNotFoundException;
 import com.srinu.payments.payment.service.TransferApplicationService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,6 +31,13 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiError> paymentNotFound(PaymentNotFoundException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(error("PAYMENT_NOT_FOUND", ex.getMessage(), request, Map.of()));
+    }
+
+    @ExceptionHandler(PaymentApplicationService.PaymentAuthorizationException.class)
+    ResponseEntity<ApiError> paymentForbidden(PaymentApplicationService.PaymentAuthorizationException ex,
+                                              HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(error("PAYMENT_FORBIDDEN", ex.getMessage(), request, Map.of()));
     }
 
     @ExceptionHandler(TransferApplicationService.TransferNotFoundException.class)
