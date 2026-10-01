@@ -54,6 +54,17 @@ public class PaymentEventListener {
                 return;
             }
 
+            if ("PAYMENT_REFUNDED".equals(eventType)) {
+                UUID paymentId = UUID.fromString(text(event, "paymentId"));
+                UUID refundId = UUID.fromString(text(event, "refundId"));
+                String customerId = text(event, "customerId");
+                String destination = customerId == null ? "customer@example.test" : customerId + "@example.test";
+                deliverOnce(sourceEventId, paymentId, null, customerId, eventType,
+                    "EMAIL_SIMULATED", destination,
+                    "Payment refunded", "Refund " + shortId(refundId) + " for payment " + shortId(paymentId) + " completed");
+                return;
+            }
+
             if ("TRANSFER_COMPLETED".equals(eventType)) {
                 UUID transferId = UUID.fromString(text(event, "transferId"));
                 String customerId = text(event, "customerId");
