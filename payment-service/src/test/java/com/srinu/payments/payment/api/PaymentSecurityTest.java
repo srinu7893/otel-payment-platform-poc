@@ -3,6 +3,7 @@ package com.srinu.payments.payment.api;
 import com.srinu.payments.payment.config.SecurityConfig;
 import com.srinu.payments.payment.config.SecurityErrorHandler;
 import com.srinu.payments.payment.service.PaymentApplicationService;
+import com.srinu.payments.payment.service.RefundApplicationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -26,6 +27,9 @@ class PaymentSecurityTest {
 
     @MockBean
     private PaymentApplicationService paymentService;
+
+    @MockBean
+    private RefundApplicationService refundService;
 
     @Test
     void paymentEndpointWithoutTokenReturnsStandard401() throws Exception {
