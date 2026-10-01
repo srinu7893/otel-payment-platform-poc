@@ -3,6 +3,7 @@ package com.srinu.payments.payment.api;
 import com.srinu.payments.payment.service.PaymentApplicationService;
 import com.srinu.payments.payment.service.PaymentNotFoundException;
 import com.srinu.payments.payment.service.RefundStateService;
+import com.srinu.payments.payment.service.RiskLimitExceededException;
 import com.srinu.payments.payment.service.TransferApplicationService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.MDC;
@@ -38,6 +39,12 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiError> refundNotFound(RefundStateService.RefundNotFoundException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(error("REFUND_NOT_FOUND", ex.getMessage(), request, Map.of()));
+    }
+
+    @ExceptionHandler(RiskLimitExceededException.class)
+    ResponseEntity<ApiError> riskRejected(RiskLimitExceededException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+            .body(error("RISK_LIMIT_EXCEEDED", ex.getMessage(), request, Map.of("rule", ex.getRule())));
     }
 
     @ExceptionHandler(PaymentApplicationService.PaymentAuthorizationException.class)
