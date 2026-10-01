@@ -1,0 +1,23 @@
+server:
+  port: 8083
+spring:
+  application:
+    name: notification-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/payments
+    username: payments
+    password: payments
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: payments
+    password: payments
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
