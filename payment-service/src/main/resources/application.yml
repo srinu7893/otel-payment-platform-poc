@@ -1,0 +1,8 @@
+server: { port: 8080 }
+spring:
+  application: { name: payment-service }
+  datasource: { url: "jdbc:postgresql://localhost:5432/payments", username: payments, password: payments }
+  jpa: { hibernate: { ddl-auto: update }, open-in-view: false }
+  rabbitmq: { host: localhost, port: 5672, username: payments, password: payments }
+management.endpoints.web.exposure.include: health,info,metrics
+clients.gateway.base-url: http://localhost:8081
