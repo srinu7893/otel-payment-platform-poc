@@ -1,38 +1,117 @@
 services:
   postgres:
     image: postgres:16-alpine
-    environment: { POSTGRES_DB: payments, POSTGRES_USER: payments, POSTGRES_PASSWORD: payments }
+    environment:
+      POSTGRES_DB: payments
+      POSTGRES_USER: payments
+      POSTGRES_PASSWORD: payments
     ports: ["5432:5432"]
-    healthcheck: { test: ["CMD-SHELL","pg_isready -U payments"], interval: 5s, timeout: 3s, retries: 10 }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payments -d payments"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    environment: { RABBITMQ_DEFAULT_USER: payments, RABBITMQ_DEFAULT_PASS: payments }
-    ports: ["5672:5672","15672:15672"]
+    environment:
+      RABBITMQ_DEFAULT_USER: payments
+      RABBITMQ_DEFAULT_PASS: payments
+    ports: ["5672:5672", "15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   auth-service:
     build: ./auth-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments
+      SPRING_DATASOURCE_USERNAME: payments
+      SPRING_DATASOURCE_PASSWORD: payments
+      JWT_SECRET: change-this-demo-secret-change-this-demo-secret
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports: ["8079:8079"]
+
   customer-service:
     build: ./customer-service
-    environment: { SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments, SPRING_DATASOURCE_USERNAME: payments, SPRING_DATASOURCE_PASSWORD: payments }
-    depends_on: [postgres]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments
+      SPRING_DATASOURCE_USERNAME: payments
+      SPRING_DATASOURCE_PASSWORD: payments
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports: ["8084:8084"]
+
   mock-bank-service:
     build: ./mock-bank-service
-    environment: { SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments, SPRING_DATASOURCE_USERNAME: payments, SPRING_DATASOURCE_PASSWORD: payments }
-    depends_on: [postgres]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments
+      SPRING_DATASOURCE_USERNAME: payments
+      SPRING_DATASOURCE_PASSWORD: payments
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports: ["8082:8082"]
+
   gateway-service:
     build: ./gateway-service
-    environment: { CLIENTS_BANK_BASE_URL: http://mock-bank-service:8082 }
-    depends_on: [mock-bank-service]
+    environment:
+      CLIENTS_BANK_BASE_URL: http://mock-bank-service:8082
+    depends_on:
+      - mock-bank-service
     ports: ["8081:8081"]
+
   payment-service:
     build: ./payment-service
-    environment: { SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments, SPRING_DATASOURCE_USERNAME: payments, SPRING_DATASOURCE_PASSWORD: payments, SPRING_RABBITMQ_HOST: rabbitmq, CLIENTS_GATEWAY_BASE_URL: http://gateway-service:8081 }
-    depends_on: [postgres,rabbitmq,gateway-service]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments
+      SPRING_DATASOURCE_USERNAME: payments
+      SPRING_DATASOURCE_PASSWORD: payments
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: payments
+      SPRING_RABBITMQ_PASSWORD: payments
+      CLIENTS_GATEWAY_BASE_URL: http://gateway-service:8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      gateway-service:
+        condition: service_started
     ports: ["8080:8080"]
+
   notification-service:
     build: ./notification-service
-    environment: { SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments, SPRING_DATASOURCE_USERNAME: payments, SPRING_DATASOURCE_PASSWORD: payments, SPRING_RABBITMQ_HOST: rabbitmq }
-    depends_on: [postgres,rabbitmq]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments
+      SPRING_DATASOURCE_USERNAME: payments
+      SPRING_DATASOURCE_PASSWORD: payments
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: payments
+      SPRING_RABBITMQ_PASSWORD: payments
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     ports: ["8083:8083"]
+
+  api-gateway:
+    build: ./api-gateway
+    environment:
+      JWT_SECRET: change-this-demo-secret-change-this-demo-secret
+      SERVICES_AUTH_URL: http://auth-service:8079
+      SERVICES_CUSTOMER_URL: http://customer-service:8084
+      SERVICES_PAYMENT_URL: http://payment-service:8080
+      SERVICES_NOTIFICATION_URL: http://notification-service:8083
+    depends_on:
+      - auth-service
+      - customer-service
+      - payment-service
+      - notification-service
+    ports: ["8088:8088"]
