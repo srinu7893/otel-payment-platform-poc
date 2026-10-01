@@ -1,9 +1,84 @@
 package com.srinu.payments.payment.domain;
-import jakarta.persistence.*; import java.math.BigDecimal; import java.time.Instant; import java.util.UUID;
-@Entity @Table(name="payment",uniqueConstraints=@UniqueConstraint(columnNames="idempotencyKey"))
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "payments", uniqueConstraints = @UniqueConstraint(name = "uk_payment_idempotency", columnNames = "idempotency_key"), indexes = {
+        @Index(name = "idx_payment_status", columnList = "status"),
+        @Index(name = "idx_payment_created_at", columnList = "created_at")
+})
 public class Payment {
- @Id private UUID id; @Column(nullable=false) private String idempotencyKey; @Column(nullable=false) private String accountNumber;
- @Column(nullable=false) private String merchant; @Column(nullable=false) private BigDecimal amount; @Column(nullable=false) private String status; @Column(nullable=false) private Instant createdAt;
- protected Payment(){} public Payment(UUID id,String key,String acct,String merchant,BigDecimal amount,String status){this.id=id;this.idempotencyKey=key;this.accountNumber=acct;this.merchant=merchant;this.amount=amount;this.status=status;this.createdAt=Instant.now();}
- public UUID getId(){return id;} public String getIdempotencyKey(){return idempotencyKey;} public BigDecimal getAmount(){return amount;} public String getStatus(){return status;} public void setStatus(String s){status=s;}
+    @Id
+    private UUID id;
+
+    @Column(name = "idempotency_key", nullable = false, updatable = false, length = 100)
+    private String idempotencyKey;
+
+    @Column(name = "account_number", nullable = false, updatable = false, length = 64)
+    private String accountNumber;
+
+    @Column(nullable = false, updatable = false, length = 120)
+    private String merchant;
+
+    @Column(nullable = false, precision = 19, scale = 2, updatable = false)
+    private BigDecimal amount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private PaymentStatus status;
+
+    @Column(name = "failure_code", length = 80)
+    private String failureCode;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    @Version
+    private long version;
+
+    protected Payment() {}
+
+    public Payment(UUID id, String idempotencyKey, String accountNumber, String merchant, BigDecimal amount) {
+        this.id = id;
+        this.idempotencyKey = idempotencyKey;
+        this.accountNumber = accountNumber;
+        this.merchant = merchant;
+        this.amount = amount;
+        this.status = PaymentStatus.PENDING;
+        this.createdAt = Instant.now();
+        this.updatedAt = this.createdAt;
+    }
+
+    public void markCompleted() { transitionTo(PaymentStatus.COMPLETED, null); }
+    public void markDeclined(String code) { transitionTo(PaymentStatus.DECLINED, code); }
+    public void markFailed(String code) { transitionTo(PaymentStatus.FAILED, code); }
+
+    public void cancel() {
+        if (status != PaymentStatus.PENDING) {
+            throw new IllegalStateException("Only PENDING payments can be cancelled");
+        }
+        transitionTo(PaymentStatus.CANCELLED, null);
+    }
+
+    private void transitionTo(PaymentStatus next, String code) {
+        this.status = next;
+        this.failureCode = code;
+        this.updatedAt = Instant.now();
+    }
+
+    public UUID getId() { return id; }
+    public String getIdempotencyKey() { return idempotencyKey; }
+    public String getAccountNumber() { return accountNumber; }
+    public String getMerchant() { return merchant; }
+    public BigDecimal getAmount() { return amount; }
+    public PaymentStatus getStatus() { return status; }
+    public String getFailureCode() { return failureCode; }
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
 }
