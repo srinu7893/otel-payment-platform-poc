@@ -20,6 +20,12 @@ public class DemoUserConfig {
             if (!users.existsById("receiver")) {
                 users.save(new AppUser("receiver", passwordEncoder.encode("receiver123"), "receiver-customer", Set.of("CUSTOMER")));
             }
+            if (!users.existsById("slowdemo")) {
+                users.save(new AppUser("slowdemo", passwordEncoder.encode("slowdemo123"), "slow-customer", Set.of("CUSTOMER")));
+            }
+            if (!users.existsById("errordemo")) {
+                users.save(new AppUser("errordemo", passwordEncoder.encode("errordemo123"), "error-customer", Set.of("CUSTOMER")));
+            }
             if (!users.existsById("support")) {
                 users.save(new AppUser("support", passwordEncoder.encode("support123"), "support-user", Set.of("SUPPORT")));
             }
