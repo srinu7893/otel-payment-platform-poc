@@ -24,6 +24,18 @@ public class BankClient {
                 .body(BankDebitResponse.class);
     }
 
+    public BankTransferResponse transfer(UUID paymentId, String senderAccount, String receiverAccount,
+                                         BigDecimal amount, String currency) {
+        return client.post()
+                .uri("/api/v1/bank/transfers")
+                .body(new BankTransferRequest(paymentId, senderAccount, receiverAccount, amount, currency))
+                .retrieve()
+                .body(BankTransferResponse.class);
+    }
+
     public record BankDebitRequest(UUID paymentId, String accountNumber, BigDecimal amount) {}
     public record BankDebitResponse(String status, String message) {}
+    public record BankTransferRequest(UUID paymentId, String senderAccount, String receiverAccount,
+                                      BigDecimal amount, String currency) {}
+    public record BankTransferResponse(UUID transactionId, String status, String message) {}
 }
