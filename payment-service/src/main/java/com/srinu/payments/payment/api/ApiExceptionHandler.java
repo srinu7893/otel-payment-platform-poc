@@ -1,0 +1,3 @@
+package com.srinu.payments.payment.api;
+import org.springframework.http.*; import org.springframework.web.bind.MethodArgumentNotValidException; import org.springframework.web.bind.annotation.*; import java.time.Instant;
+@RestControllerAdvice public class ApiExceptionHandler { @ExceptionHandler(MethodArgumentNotValidException.class) ResponseEntity<?> invalid(MethodArgumentNotValidException e){return ResponseEntity.badRequest().body(new ErrorResponse(Instant.now(),"VALIDATION_ERROR","Invalid payment request"));} @ExceptionHandler(Exception.class) ResponseEntity<?> error(Exception e){return ResponseEntity.status(500).body(new ErrorResponse(Instant.now(),"INTERNAL_ERROR",e.getMessage()));} record ErrorResponse(Instant timestamp,String code,String message){} }
