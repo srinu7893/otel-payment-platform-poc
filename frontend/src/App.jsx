@@ -1,65 +1,188 @@
-import { useEffect, useState } from 'react';
-import { createPayment, listPayments, login } from './api';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  createPayment,
+  createTransfer,
+  getCustomer,
+  listNotifications,
+  listPayments,
+  listTransfers,
+  login
+} from './api';
 
 export default function App() {
   const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [payments, setPayments] = useState([]);
+  const [transfers, setTransfers] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [tab, setTab] = useState('overview');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const roles = useMemo(() => session?.roles || [], [session]);
 
   async function handleLogin(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setLoading(true);
     setError('');
+    setSuccess('');
     try {
       const result = await login(form.get('username'), form.get('password'));
       setSession(result);
+      setTab('overview');
     } catch (e) {
-      setError(e.message);
+      setError(`${e.message}${e.correlationId ? ` (correlation ${e.correlationId})` : ''}`);
     } finally {
       setLoading(false);
     }
   }
 
-  async function refreshPayments() {
+  async function refreshAll() {
     if (!session?.accessToken) return;
     setError('');
     try {
-      const page = await listPayments(session.accessToken);
-      setPayments(page.content || []);
+      const [customer, paymentPage, transferPage, notificationPage] = await Promise.all([
+        getCustomer(session.accessToken, session.customerId),
+        listPayments(session.accessToken),
+        listTransfers(session.accessToken),
+        listNotifications(session.accessToken)
+      ]);
+      setProfile(customer);
+      setPayments(paymentPage?.content || []);
+      setTransfers(transferPage?.content || []);
+      setNotifications(notificationPage?.content || []);
     } catch (e) {
-      setError(e.message);
+      setError(`${e.message}${e.correlationId ? ` (correlation ${e.correlationId})` : ''}`);
     }
   }
 
-  useEffect(() => { refreshPayments(); }, [session]);
+  useEffect(() => {
+    refreshAll();
+  }, [session]);
 
   async function handlePayment(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setLoading(true);
     setError('');
+    setSuccess('');
     try {
-      await createPayment(session.accessToken, {
-        customerId: session.customerId,
-        accountNumber: form.get('accountNumber'),
-        merchantName: form.get('merchantName'),
-        amount: Number(form.get('amount')),
-        idempotencyKey: crypto.randomUUID()
+      const result = await createPayment(session.accessToken, {
+        idempotencyKey: crypto.randomUUID(),
+        accountNumber: profile?.accountNumber || form.get('accountNumber'),
+        merchant: form.get('merchant'),
+        amount: Number(form.get('amount'))
       });
+      setSuccess(`Payment ${String(result.paymentId).slice(0, 8)} is ${result.status}`);
       event.currentTarget.reset();
-      await refreshPayments();
+      await refreshAll();
     } catch (e) {
-      setError(e.message);
+      setError(`${e.message}${e.correlationId ? ` (correlation ${e.correlationId})` : ''}`);
     } finally {
       setLoading(false);
     }
   }
 
-  if (!session) {
-    return <main className="shell"><section className="card login"><h1>Payment Platform</h1><p>Enterprise microservices POC console</p><form onSubmit={handleLogin}><label>Username<input name="username" defaultValue="demo" required /></label><label>Password<input name="password" type="password" defaultValue="demo123" required /></label><button disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button></form>{error && <p className="error">{error}</p>}</section></main>;
+  async function handleTransfer(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const result = await createTransfer(session.accessToken, {
+        idempotencyKey: crypto.randomUUID(),
+        senderAccount: profile?.accountNumber,
+        receiverAccount: form.get('receiverAccount'),
+        amount: Number(form.get('amount')),
+        currency: form.get('currency') || 'INR'
+      });
+      setSuccess(`Transfer ${String(result.transferId).slice(0, 8)} is ${result.status}`);
+      event.currentTarget.reset();
+      await refreshAll();
+    } catch (e) {
+      setError(`${e.message}${e.correlationId ? ` (correlation ${e.correlationId})` : ''}`);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  return <main className="shell"><header><div><h1>Payment Platform</h1><p>Customer: {session.customerId}</p></div><button className="secondary" onClick={() => setSession(null)}>Sign out</button></header><section className="grid"><div className="card"><h2>Send payment</h2><form onSubmit={handlePayment}><label>Account<input name="accountNumber" defaultValue="ACC1001" required /></label><label>Merchant / receiver<input name="merchantName" placeholder="Demo Store" required /></label><label>Amount<input name="amount" type="number" min="1" step="0.01" required /></label><button disabled={loading}>Submit payment</button></form></div><div className="card"><div className="row"><h2>Recent payments</h2><button className="secondary" onClick={refreshPayments}>Refresh</button></div><div className="tableWrap"><table><thead><tr><th>ID</th><th>Merchant</th><th>Amount</th><th>Status</th></tr></thead><tbody>{payments.map(p => <tr key={p.paymentId || p.id}><td>{String(p.paymentId || p.id || '').slice(0,8)}</td><td>{p.merchantName}</td><td>{p.amount}</td><td><span className="badge">{p.status}</span></td></tr>)}{payments.length === 0 && <tr><td colSpan="4">No payments yet.</td></tr>}</tbody></table></div></div></section>{error && <p className="error">{error}</p>}<section className="card architecture"><h2>POC flow</h2><code>Frontend → Auth/API Gateway → Payment → Gateway → Mock Bank → PostgreSQL<br/>Payment → RabbitMQ → Notification Service<br/>Later: OTel Agent → Collector → traces / metrics / logs</code></section></main>;
+  function signOut() {
+    setSession(null);
+    setProfile(null);
+    setPayments([]);
+    setTransfers([]);
+    setNotifications([]);
+    setError('');
+    setSuccess('');
+  }
+
+  if (!session) {
+    return (
+      <main className="shell">
+        <section className="card login">
+          <p className="eyebrow">Enterprise observability lab</p>
+          <h1>Payment Platform</h1>
+          <p>Sign in to run real microservice flows before and after OpenTelemetry instrumentation.</p>
+          <form onSubmit={handleLogin}>
+            <label>Username<input name="username" defaultValue="demo" required /></label>
+            <label>Password<input name="password" type="password" defaultValue="demo123" required /></label>
+            <button disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
+          </form>
+          <div className="demoCredentials"><b>Demo users</b><span>demo / demo123</span><span>receiver / receiver123</span><span>support / support123</span></div>
+          {error && <p className="error">{error}</p>}
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="shell">
+      <header>
+        <div>
+          <p className="eyebrow">Full-stack payment platform</p>
+          <h1>Payment Platform</h1>
+          <p>{profile?.name || session.customerId} · {roles.join(', ') || 'USER'}</p>
+        </div>
+        <div className="headerActions"><button className="secondary" onClick={refreshAll}>Refresh</button><button className="secondary" onClick={signOut}>Sign out</button></div>
+      </header>
+
+      <nav className="tabs">
+        {['overview', 'payment', 'transfer', 'history', 'notifications'].map(name => (
+          <button key={name} className={tab === name ? 'active' : 'secondary'} onClick={() => setTab(name)}>{name}</button>
+        ))}
+      </nav>
+
+      {error && <p className="error">{error}</p>}
+      {success && <p className="success">{success}</p>}
+
+      {tab === 'overview' && <section className="dashboardGrid">
+        <article className="card metric"><span>Customer</span><strong>{profile?.name || 'Loading…'}</strong><small>{profile?.email}</small></article>
+        <article className="card metric"><span>Linked account</span><strong>{profile?.accountNumber || '—'}</strong><small>{profile?.active ? 'Active' : 'Inactive'}</small></article>
+        <article className="card metric"><span>Payments</span><strong>{payments.length}</strong><small>recent records</small></article>
+        <article className="card metric"><span>Transfers</span><strong>{transfers.length}</strong><small>recent records</small></article>
+        <article className="card architecture wide"><h2>Request flow</h2><code>React → API Gateway → JWT authorization → Payment Service → Gateway Service → Mock Bank → PostgreSQL<br/>Payment/Transfer → RabbitMQ → Notification Service<br/>Later: OTel Java Agent → Collector → traces / metrics / correlated logs</code></article>
+      </section>}
+
+      {tab === 'payment' && <section className="twoCol">
+        <div className="card"><h2>Merchant payment</h2><p>The sender account is taken from the authenticated customer profile.</p><form onSubmit={handlePayment}><label>Source account<input name="accountNumber" value={profile?.accountNumber || ''} readOnly /></label><label>Merchant<input name="merchant" placeholder="Demo Store" required /></label><label>Amount<input name="amount" type="number" min="0.01" step="0.01" required /></label><button disabled={loading}>Submit payment</button></form></div>
+        <HistoryTable title="Recent payments" rows={payments} type="payment" />
+      </section>}
+
+      {tab === 'transfer' && <section className="twoCol">
+        <div className="card"><h2>Send money</h2><p>Use <b>ACC2001</b> to transfer to the seeded receiver customer.</p><form onSubmit={handleTransfer}><label>From<input value={profile?.accountNumber || ''} readOnly /></label><label>Receiver account<input name="receiverAccount" defaultValue="ACC2001" required /></label><label>Amount<input name="amount" type="number" min="0.01" step="0.01" required /></label><label>Currency<input name="currency" defaultValue="INR" maxLength="3" required /></label><button disabled={loading}>Send transfer</button></form></div>
+        <HistoryTable title="Recent transfers" rows={transfers} type="transfer" />
+      </section>}
+
+      {tab === 'history' && <section className="stack"><HistoryTable title="Payment history" rows={payments} type="payment" /><HistoryTable title="Transfer history" rows={transfers} type="transfer" /></section>}
+
+      {tab === 'notifications' && <section className="card"><div className="row"><div><h2>Notification events</h2><p>RabbitMQ consumer results from payment and transfer events.</p></div><button className="secondary" onClick={refreshAll}>Refresh</button></div><div className="tableWrap"><table><thead><tr><th>ID</th><th>Payment</th><th>Channel</th><th>Status</th></tr></thead><tbody>{notifications.map(n => <tr key={n.id}><td>{String(n.id || '').slice(0, 8)}</td><td>{String(n.paymentId || '').slice(0, 8) || '—'}</td><td>{n.channel || 'LOG'}</td><td><span className="badge">{n.status}</span></td></tr>)}{notifications.length === 0 && <tr><td colSpan="4">No notifications yet.</td></tr>}</tbody></table></div></section>}
+    </main>
+  );
+}
+
+function HistoryTable({ title, rows, type }) {
+  return <div className="card"><h2>{title}</h2><div className="tableWrap"><table><thead><tr><th>ID</th><th>Destination</th><th>Amount</th><th>Status</th></tr></thead><tbody>{rows.map(row => <tr key={row.paymentId || row.transferId}><td>{String(row.paymentId || row.transferId || '').slice(0, 8)}</td><td>{type === 'payment' ? row.merchant : row.receiverAccount}</td><td>{row.amount} {type === 'transfer' ? row.currency : ''}</td><td><span className="badge">{row.status}</span></td></tr>)}{rows.length === 0 && <tr><td colSpan="4">No records yet.</td></tr>}</tbody></table></div></div>;
 }
