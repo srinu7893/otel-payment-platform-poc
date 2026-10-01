@@ -1,0 +1,3 @@
+package com.srinu.payments.payment.api;
+import com.srinu.payments.payment.service.PaymentApplicationService; import jakarta.validation.Valid; import org.springframework.http.*; import org.springframework.web.bind.annotation.*;
+@RestController @RequestMapping("/api/v1/payments") public class PaymentController { private final PaymentApplicationService service; public PaymentController(PaymentApplicationService s){service=s;} @PostMapping public ResponseEntity<PaymentResponse> create(@Valid @RequestBody PaymentRequest request){return ResponseEntity.status(HttpStatus.CREATED).body(service.pay(request));} }
