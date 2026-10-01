@@ -37,6 +37,15 @@ public class BankClient {
             .body(BankTransferResponse.class);
     }
 
+    public BankRefundResponse refund(UUID refundId, UUID originalPaymentId, String accountNumber, BigDecimal amount) {
+        return client.post()
+            .uri("/api/v1/bank/refunds")
+            .header(CORRELATION_HEADER, correlationId())
+            .body(new BankRefundRequest(refundId, originalPaymentId, accountNumber, amount))
+            .retrieve()
+            .body(BankRefundResponse.class);
+    }
+
     private String correlationId() {
         String value = MDC.get("correlationId");
         return value == null ? UUID.randomUUID().toString() : value;
@@ -47,4 +56,6 @@ public class BankClient {
     public record BankTransferRequest(UUID paymentId, String senderAccount, String receiverAccount,
                                       BigDecimal amount, String currency) {}
     public record BankTransferResponse(UUID transactionId, String status, String message) {}
+    public record BankRefundRequest(UUID refundId, UUID originalPaymentId, String accountNumber, BigDecimal amount) {}
+    public record BankRefundResponse(UUID transactionId, String status, String message) {}
 }
