@@ -9,6 +9,7 @@ This file is the source of truth for what is built, what is being hardened, and 
 - Spring Cloud Gateway is the browser-facing edge/API gateway.
 - PostgreSQL for persistent business data.
 - RabbitMQ for asynchronous payment/notification events.
+- Each database-owning microservice now owns a dedicated PostgreSQL schema (`auth`, `customer`, `payment`, `bank`, `notification`) with Flyway migrations.
 - Local service discovery uses Docker DNS and environment-configured service URLs.
 - GCP will use the selected platform's native service addressing. Eureka is optional and will only be added as a separate profile if it is an explicit POC requirement.
 - Business application is completed and tested before OpenTelemetry is introduced.
@@ -18,27 +19,29 @@ This file is the source of truth for what is built, what is being hardened, and 
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Frontend | BUILT / HARDENING | React login, dashboard, payment, P2P transfer, history, notifications |
+| Frontend | BUILT / HARDENING | React login, dashboard, payment, P2P transfer, history, notifications, nginx container |
 | API Gateway | BUILT / HARDENING | routing, JWT validation, correlation ID, authenticated context headers |
-| Auth Service | BUILT / HARDENING | DB-backed users, BCrypt, JWT issuance, CUSTOMER/SUPPORT/ADMIN roles |
-| Customer Service | BUILT / HARDENING | CRUD, JPA repository, seeded sender/receiver customers |
-| Payment Service | BUILT / HARDENING | merchant payments, P2P transfers, idempotency, ownership validation, JWT resource server |
+| Auth Service | BUILT / HARDENING | DB-backed users, BCrypt, JWT issuance, CUSTOMER/SUPPORT/ADMIN roles, Flyway auth schema |
+| Customer Service | BUILT / HARDENING | CRUD, JPA repository, seeded sender/receiver customers, Flyway customer schema |
+| Payment Service | BUILT / HARDENING | merchant payments, P2P transfers, idempotency, ownership validation, JWT resource server, Flyway payment schema |
 | Gateway Service | BUILT / HARDENING | merchant authorization + P2P transfer authorization to mock bank |
-| Mock Bank Service | BUILT / HARDENING | account CRUD, debit, P2P debit/credit, row locking, ledger, failure/latency accounts |
-| Notification Service | BUILT / HARDENING | RabbitMQ payment/transfer consumer, email/SMS simulation, retry/backoff, DLQ |
+| Mock Bank Service | BUILT / HARDENING | account CRUD, debit, P2P debit/credit, row locking, ledger, failure/latency accounts, Flyway bank schema |
+| Notification Service | BUILT / HARDENING | RabbitMQ payment/transfer consumer, email/SMS simulation, retry/backoff, DLQ, Flyway notification schema |
 
 ## Database tables / planned schema
 
-- [x] `user_account` - username, BCrypt password hash, customer id, enabled/locked, audit timestamps.
-- [x] `user_role` - user-to-role mapping (`CUSTOMER`, `SUPPORT`, `ADMIN`).
-- [x] `customers` - customer profile, email, linked demo account, active state.
-- [x] `payments` - payment id, idempotency, account, merchant, amount, state and timestamps.
-- [x] `transfers` - P2P transfer identity, customer, sender/receiver, amount, state, bank transaction reference.
-- [x] `bank_account` - simulated account owner, balance, active state, optimistic version.
-- [x] `bank_transaction` - immutable debit/credit/transfer ledger records.
-- [x] `notifications` - event, channel, delivery lifecycle, attempts, failure information.
-- [ ] `outbox_event` - production-style reliable event publication table.
-- [ ] Replace Hibernate `ddl-auto=update` with versioned Flyway migrations.
+- [x] `auth.user_account` - username, BCrypt password hash, customer id, enabled/locked, audit timestamps.
+- [x] `auth.user_role` - user-to-role mapping (`CUSTOMER`, `SUPPORT`, `ADMIN`).
+- [x] `customer.customers` - customer profile, email, linked demo account, active state.
+- [x] `payment.payments` - payment id, idempotency, customer/account, merchant, amount, state and timestamps.
+- [x] `payment.transfers` - P2P transfer identity, customer, sender/receiver, amount, state, bank transaction reference.
+- [x] `bank.bank_account` - simulated account owner, balance, active state, optimistic version.
+- [x] `bank.bank_transaction` - immutable debit/credit/transfer ledger records.
+- [x] `notification.notifications` - event, channel, delivery lifecycle, attempts, failure information.
+- [ ] `payment.outbox_event` - production-style reliable event publication table.
+- [x] Flyway V1 migrations created for all database-owning services.
+- [x] Hibernate schema mutation replaced with `ddl-auto=validate` in database-owning services.
+- [ ] Full runtime Flyway/Hibernate validation must pass the new Docker smoke test before this item is considered baseline-frozen.
 
 ## Merchant payment capabilities
 
@@ -49,7 +52,8 @@ This file is the source of truth for what is built, what is being hardened, and 
 - [x] Controlled payment cancellation.
 - [x] Mask account data in API response/logging.
 - [x] RabbitMQ completed-payment event.
-- [ ] Associate merchant payment ownership with authenticated customer for strict customer-only payment history.
+- [x] Merchant payment ownership associated with authenticated `customer_id`.
+- [x] CUSTOMER payment history/get/cancel restricted to owned records; SUPPORT/ADMIN retain operational access.
 - [ ] Simulated refund/reversal.
 
 ## P2P transfer capabilities
@@ -73,13 +77,15 @@ This file is the source of truth for what is built, what is being hardened, and 
 - [x] JWT access-token issuance.
 - [x] Edge gateway JWT validation.
 - [x] Payment Service JWT validation (defense in depth).
+- [x] Notification Service JWT validation.
 - [x] `CUSTOMER`, `SUPPORT`, `ADMIN` roles in JWT.
 - [x] P2P sender ownership enforcement.
+- [x] Merchant payment ownership enforcement.
+- [x] CUSTOMER notification history is customer-scoped.
 - [x] Security audit logging for successful/failed login without logging passwords/tokens.
-- [ ] Customer/payment/notification endpoint authorization completed consistently across every service.
-- [ ] CUSTOMER: restrict merchant payment/history/notification visibility to own records.
-- [ ] SUPPORT: operational read-only endpoints only.
-- [ ] ADMIN: explicit admin/test scenario operations.
+- [ ] Customer Service endpoint authorization completed consistently.
+- [ ] SUPPORT role restricted to explicit operational read-only endpoints.
+- [ ] ADMIN role restricted to explicit admin/test scenario operations.
 - [ ] Standard JSON 401/403 contracts at gateway and resource services.
 - [ ] Refresh-token/session-revocation design (optional for POC; document if not implemented).
 
@@ -95,7 +101,7 @@ This file is the source of truth for what is built, what is being hardened, and 
 - [x] P2P send-money screen.
 - [x] Payment/transfer history views.
 - [x] Notification view.
-- [ ] Frontend production Docker image + nginx/static hosting.
+- [x] Frontend production nginx container and Docker Compose service.
 - [ ] Support operations dashboard.
 - [ ] Admin/test-scenario dashboard.
 - [ ] Service-health page for demo/support use.
@@ -111,6 +117,7 @@ This file is the source of truth for what is built, what is being hardened, and 
 - [x] Correlation ID included in RabbitMQ message headers.
 - [x] Rabbit consumer restores correlation ID into MDC.
 - [x] Standard payment/transfer validation and core exception handling.
+- [x] Flyway migrations introduced with service-owned PostgreSQL schemas.
 - [ ] Common error contract across every service.
 - [ ] Structured JSON Logback configuration for every service.
 - [ ] Explicit HTTP connect/read timeouts.
@@ -119,7 +126,6 @@ This file is the source of truth for what is built, what is being hardened, and 
 - [x] Notification retry/backoff configuration.
 - [x] Health/readiness probes enabled on key services.
 - [ ] Health/readiness/liveness groups standardized across all services.
-- [ ] Flyway migrations instead of Hibernate schema mutation.
 - [ ] OpenAPI documentation.
 - [ ] Outbox pattern for database + RabbitMQ delivery reliability.
 - [ ] Audit/event history.
@@ -154,17 +160,17 @@ This file is the source of truth for what is built, what is being hardened, and 
 - [x] Gateway service unit tests.
 - [x] Bank service unit tests.
 - [x] Customer service unit tests.
+- [x] Transfer application-service ownership/idempotency/success tests.
 - [ ] Auth service unit/security tests.
-- [ ] Transfer application-service tests (ownership, idempotency, success/failure).
 - [ ] Bank transfer tests (balance mutation, ledger, idempotency, insufficient funds).
 - [ ] Notification sender/delivery/consumer tests.
 - [ ] Controller/JWT authorization tests.
 - [ ] API Gateway route/security tests.
 - [ ] Testcontainers PostgreSQL integration tests.
 - [ ] Testcontainers RabbitMQ integration tests.
-- [ ] End-to-end payment test.
-- [ ] End-to-end P2P transfer test.
-- [ ] Failure scenarios: insufficient funds, slow bank, 500, timeout, duplicate request, message failure/DLQ.
+- [ ] Dedicated end-to-end test suite.
+- [x] CI full-stack smoke workflow now performs login + merchant payment + P2P transfer after booting Docker Compose.
+- [ ] Failure scenarios in CI: insufficient funds, slow bank, 500, timeout, duplicate request, message failure/DLQ.
 
 ## Local platform / CI
 
@@ -174,10 +180,9 @@ This file is the source of truth for what is built, what is being hardened, and 
 - [x] Docker Compose service addressing.
 - [x] GitHub Actions Java 21 backend build/test/package.
 - [x] GitHub Actions Node frontend install/build.
-- [x] A recent baseline CI run is green; newest commits must remain green before baseline freeze.
-- [ ] Frontend Docker/Compose service.
-- [ ] Docker Compose end-to-end smoke test.
-- [ ] CI container-image build validation.
+- [x] Frontend container-image build validation.
+- [x] Full-stack Docker Compose build/start/health/login/payment/transfer smoke test added to CI.
+- [ ] Latest Flyway/full-stack smoke run must complete green; fix runtime issues before moving to the next hardening block.
 
 ## OpenTelemetry phase - do not start until baseline is stable
 
@@ -218,13 +223,13 @@ These decisions do not block the local enterprise baseline; work should continue
 
 ## Current implementation order
 
-1. Keep CI green after each feature batch.
-2. Add missing unit/security tests around Auth, Transfer, Gateway and Notification.
-3. Add strict customer ownership to merchant payment and notification history.
-4. Add structured JSON logging/common error contract and HTTP timeouts.
-5. Add frontend production container + support/admin views.
-6. Add Testcontainers PostgreSQL/RabbitMQ integration tests and Docker smoke tests.
-7. Add Flyway, OpenAPI and outbox reliability pattern.
+1. Finish Flyway/runtime Docker smoke validation and fix any schema/startup issue.
+2. Add common JSON error contract and structured JSON logging.
+3. Add explicit REST connect/read timeouts and safe resilience rules.
+4. Add Support/Admin frontend views and service-health page.
+5. Add Testcontainers PostgreSQL/RabbitMQ integration tests.
+6. Add refund/reversal scenarios and notification preference/customer-contact integration.
+7. Add Outbox pattern and OpenAPI documentation.
 8. Freeze/test baseline application.
 9. Add OpenTelemetry Java Agent + Collector and all three signals.
 10. Deploy to GCP and wire Cloud Logging/Monitoring/BigQuery/Grafana as agreed.
