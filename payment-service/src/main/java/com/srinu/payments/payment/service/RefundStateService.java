@@ -41,7 +41,7 @@ public class RefundStateService {
     @Transactional
     public Refund createProcessing(UUID paymentId, String customerId, String idempotencyKey) {
         var payment = payments.findById(paymentId)
-            .orElseThrow(() -> new PaymentApplicationService.PaymentNotFoundException(paymentId));
+            .orElseThrow(() -> new PaymentNotFoundException(paymentId));
         if (!payment.getCustomerId().equals(customerId)) {
             throw new PaymentApplicationService.PaymentAuthorizationException("Payment does not belong to authenticated customer");
         }
