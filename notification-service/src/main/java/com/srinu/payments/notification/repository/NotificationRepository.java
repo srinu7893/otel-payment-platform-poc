@@ -11,4 +11,5 @@ public interface NotificationRepository extends JpaRepository<NotificationRecord
     Page<NotificationRecord> findAllByPaymentId(UUID paymentId, Pageable pageable);
     Page<NotificationRecord> findAllByTransferId(UUID transferId, Pageable pageable);
     Page<NotificationRecord> findAllByCustomerId(String customerId, Pageable pageable);
+    boolean existsBySourceEventIdAndChannel(UUID sourceEventId, String channel);
 }
