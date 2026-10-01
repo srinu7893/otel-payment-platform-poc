@@ -12,4 +12,6 @@ import java.util.UUID;
 public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     Optional<Payment> findByIdempotencyKey(String key);
     Page<Payment> findAllByStatus(PaymentStatus status, Pageable pageable);
+    Page<Payment> findAllByCustomerId(String customerId, Pageable pageable);
+    Page<Payment> findAllByCustomerIdAndStatus(String customerId, PaymentStatus status, Pageable pageable);
 }
