@@ -42,7 +42,7 @@ public class GatewayClient {
     }
 
     public record GatewayRequest(UUID paymentId, String accountNumber, BigDecimal amount) {}
-    public record GatewayResult(String status, String message) {}
+    public record GatewayResult(UUID bankTransactionId, String status, String message) {}
     public record TransferGatewayRequest(UUID paymentId, String senderAccount, String receiverAccount,
                                          BigDecimal amount, String currency) {}
     public record TransferGatewayResult(UUID bankTransactionId, String status, String message) {}
