@@ -6,8 +6,11 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -20,25 +23,37 @@ public class PaymentController {
     }
 
     @PostMapping
-    public ResponseEntity<PaymentResponse> create(@Valid @RequestBody PaymentRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
+    public ResponseEntity<PaymentResponse> create(@AuthenticationPrincipal Jwt jwt,
+                                                  @Valid @RequestBody PaymentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(customerId(jwt), request));
     }
 
     @GetMapping("/{id}")
-    public PaymentResponse get(@PathVariable UUID id) {
-        return service.get(id);
+    public PaymentResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return service.get(customerId(jwt), id, privileged(jwt));
     }
 
     @GetMapping
-    public Page<PaymentResponse> list(
-            @RequestParam(required = false) PaymentStatus status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return service.list(status, page, size);
+    public Page<PaymentResponse> list(@AuthenticationPrincipal Jwt jwt,
+                                      @RequestParam(required = false) PaymentStatus status,
+                                      @RequestParam(defaultValue = "0") int page,
+                                      @RequestParam(defaultValue = "20") int size) {
+        return service.list(customerId(jwt), privileged(jwt), status, page, size);
     }
 
     @PostMapping("/{id}/cancel")
-    public PaymentResponse cancel(@PathVariable UUID id) {
-        return service.cancel(id);
+    public PaymentResponse cancel(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return service.cancel(customerId(jwt), id, privileged(jwt));
+    }
+
+    private String customerId(Jwt jwt) {
+        String id = jwt.getClaimAsString("customer_id");
+        if (id == null || id.isBlank()) throw new IllegalStateException("JWT missing customer_id claim");
+        return id;
+    }
+
+    private boolean privileged(Jwt jwt) {
+        List<String> roles = jwt.getClaimAsStringList("roles");
+        return roles != null && (roles.contains("SUPPORT") || roles.contains("ADMIN"));
     }
 }
