@@ -39,7 +39,8 @@ public class PaymentApplicationService {
         }
 
         var payment = repo.save(new Payment(UUID.randomUUID(), req.idempotencyKey(), req.accountNumber(), req.merchant(), req.amount()));
-        log.info("event=PAYMENT_CREATED paymentId={} merchant={} amount={}", payment.getId(), payment.getMerchant(), payment.getAmount());
+        log.info("event=PAYMENT_CREATED paymentId={} merchant={} amount={} account={}",
+            payment.getId(), payment.getMerchant(), payment.getAmount(), mask(payment.getAccountNumber()));
 
         try {
             var result = gateway.authorize(payment.getId(), req.accountNumber(), req.amount());
@@ -54,13 +55,15 @@ public class PaymentApplicationService {
                 events.completed(payment.getId(), payment.getAmount());
                 log.info("event=PAYMENT_COMPLETED paymentId={} amount={}", payment.getId(), payment.getAmount());
             } else {
-                log.warn("event=PAYMENT_NOT_COMPLETED paymentId={} status={} failureCode={}", payment.getId(), payment.getStatus(), payment.getFailureCode());
+                log.warn("event=PAYMENT_NOT_COMPLETED paymentId={} status={} failureCode={}",
+                    payment.getId(), payment.getStatus(), payment.getFailureCode());
             }
             return toResponse(payment, result.message());
         } catch (RuntimeException ex) {
             payment.markFailed("DOWNSTREAM_EXCEPTION");
             repo.save(payment);
-            log.error("event=PAYMENT_FAILED paymentId={} errorType={} message={}", payment.getId(), ex.getClass().getSimpleName(), ex.getMessage(), ex);
+            log.error("event=PAYMENT_FAILED paymentId={} errorType={} message={}",
+                payment.getId(), ex.getClass().getSimpleName(), ex.getMessage(), ex);
             throw ex;
         }
     }
@@ -72,7 +75,7 @@ public class PaymentApplicationService {
 
     @Transactional(readOnly = true)
     public Page<PaymentResponse> list(PaymentStatus status, int page, int size) {
-        var pageable = PageRequest.of(page, Math.min(size, 100));
+        var pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
         var result = status == null ? repo.findAll(pageable) : repo.findAllByStatus(status, pageable);
         return result.map(p -> toResponse(p, "Payment retrieved"));
     }
@@ -91,6 +94,12 @@ public class PaymentApplicationService {
     }
 
     private PaymentResponse toResponse(Payment p, String message) {
-        return new PaymentResponse(p.getId(), p.getStatus().name(), p.getAmount(), message);
+        return new PaymentResponse(p.getId(), p.getStatus().name(), p.getAmount(), p.getMerchant(),
+            mask(p.getAccountNumber()), p.getFailureCode(), message, p.getCreatedAt());
+    }
+
+    private String mask(String account) {
+        if (account == null || account.length() <= 4) return "****";
+        return "****" + account.substring(account.length() - 4);
     }
 }
