@@ -17,6 +17,12 @@ public class DemoCustomerConfig {
             if (!repo.existsById("receiver-customer")) {
                 repo.save(new Customer("receiver-customer", "Receiver User", "receiver@example.com", "ACC2001"));
             }
+            if (!repo.existsById("slow-customer")) {
+                repo.save(new Customer("slow-customer", "Slow Bank Demo", "slow@example.com", "ACC-SLOW"));
+            }
+            if (!repo.existsById("error-customer")) {
+                repo.save(new Customer("error-customer", "Error Bank Demo", "error@example.com", "ACC-ERROR"));
+            }
         };
     }
 }
