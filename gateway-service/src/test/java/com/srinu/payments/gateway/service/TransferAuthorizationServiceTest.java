@@ -32,7 +32,7 @@ class TransferAuthorizationServiceTest {
             paymentId, "ACC1001", "ACC2001", new BigDecimal("10.00"), "INR"));
 
         assertEquals("COMPLETED", result.status());
-        assertEquals(transactionId, result.transactionId());
+        assertEquals(transactionId, result.bankTransactionId());
     }
 
     @Test
