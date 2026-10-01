@@ -6,7 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/transfers")
+@RequestMapping("/api/v1/bank/transfers")
 public class TransferController {
     private final BankTransferService service;
 
