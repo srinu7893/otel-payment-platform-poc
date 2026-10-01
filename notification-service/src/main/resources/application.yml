@@ -1,5 +1,6 @@
 server:
   port: 8083
+
 spring:
   application:
     name: notification-service
@@ -16,8 +17,22 @@ spring:
     port: 5672
     username: payments
     password: payments
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000ms
+          multiplier: 2.0
+          max-interval: 5000ms
+
 management:
   endpoints:
     web:
       exposure:
         include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
