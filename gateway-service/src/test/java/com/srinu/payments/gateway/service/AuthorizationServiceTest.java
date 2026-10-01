@@ -19,20 +19,22 @@ import static org.mockito.Mockito.when;
 
 class AuthorizationServiceTest {
     @Test
-    void returnsCompletedWhenBankApproves() {
+    void returnsCompletedAndBankTransactionIdWhenBankApproves() {
         var bank = mock(BankClient.class);
         var paymentId = UUID.randomUUID();
+        var transactionId = UUID.randomUUID();
         when(bank.debit(paymentId, "ACC1001", new BigDecimal("50.00")))
-                .thenReturn(new BankClient.BankDebitResponse("COMPLETED", "Debit successful"));
+                .thenReturn(new BankClient.BankDebitResponse(transactionId, "COMPLETED", "Debit successful"));
 
         var service = new AuthorizationService(bank, passThroughCircuitBreakerFactory());
         var result = service.authorize(new AuthorizationRequest(paymentId, "ACC1001", new BigDecimal("50.00")));
 
         assertEquals("COMPLETED", result.status());
+        assertEquals(transactionId, result.bankTransactionId());
     }
 
     @Test
-    void returnsFailedThroughCircuitBreakerFallbackWhenBankClientThrows() {
+    void returnsUnknownThroughCircuitBreakerFallbackWhenBankClientThrows() {
         var bank = mock(BankClient.class);
         var paymentId = UUID.randomUUID();
         when(bank.debit(any(), anyString(), any())).thenThrow(new RuntimeException("downstream unavailable"));
@@ -40,8 +42,9 @@ class AuthorizationServiceTest {
         var service = new AuthorizationService(bank, passThroughCircuitBreakerFactory());
         var result = service.authorize(new AuthorizationRequest(paymentId, "ACC1001", new BigDecimal("50.00")));
 
-        assertEquals("FAILED", result.status());
-        assertEquals("Bank unavailable", result.message());
+        assertEquals("UNKNOWN", result.status());
+        assertEquals("Bank outcome requires reconciliation", result.message());
+        assertEquals(null, result.bankTransactionId());
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
