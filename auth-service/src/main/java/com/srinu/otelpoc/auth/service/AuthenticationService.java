@@ -5,13 +5,13 @@ import com.srinu.otelpoc.auth.repository.AppUserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Map;
 
 @Service
 public class AuthenticationService {
@@ -44,8 +44,9 @@ public class AuthenticationService {
             .claim("customer_id", user.getCustomerId())
             .claim("roles", user.getRoles())
             .build();
+        JwsHeader headers = JwsHeader.with(MacAlgorithm.HS256).build();
 
-        String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(headers, claims)).getTokenValue();
         user.recordLogin();
         users.save(user);
         log.info("event=LOGIN_SUCCEEDED username={} customerId={} roles={}", user.getUsername(), user.getCustomerId(), user.getRoles());
