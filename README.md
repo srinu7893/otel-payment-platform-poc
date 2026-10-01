@@ -1,58 +1,153 @@
 # OTel Payment Platform POC
 
-Enterprise-style Spring Boot microservices platform for demonstrating business flow, production-style logging, failure handling, distributed tracing, metrics, and GCP observability.
+Enterprise-style full-stack payment platform for demonstrating Spring Boot microservices, authentication/authorization, synchronous REST calls, RabbitMQ messaging, PostgreSQL persistence, production-style logging, failure handling and—after the baseline is stable—OpenTelemetry traces, metrics and logs.
 
-## Current services
-- auth-service : 8079
-- payment-service : 8080
-- gateway-service : 8081
-- mock-bank-service : 8082
-- notification-service : 8083
-- customer-service : 8084
-- PostgreSQL : 5432
-- RabbitMQ : 5672 / management UI 15672
+> All accounts, balances, gateways, email/SMS messages and money movement are simulated. Never use real bank credentials, card data or production secrets in this POC.
 
-## Baseline business flow
+## Current architecture
 
 ```text
-Login -> Customer -> Payment -> Gateway -> Mock Bank -> DB
-                                      |
-                                      -> RabbitMQ -> Notification
+React Frontend :3000
+        |
+        v
+API Gateway :8088
+        |
+        +--> Auth Service :8079 ------> PostgreSQL
+        +--> Customer Service :8084 --> PostgreSQL
+        +--> Payment Service :8080 ---> PostgreSQL
+                    |
+                    v
+             Gateway Service :8081
+                    |
+                    v
+             Mock Bank :8082 ---------> PostgreSQL
+                    |
+                    +--> account balance / debit / P2P credit
+                    +--> immutable bank transaction ledger
+
+Payment / Transfer completion
+        |
+        v
+RabbitMQ :5672
+        |
+        v
+Notification Service :8083 ----------> PostgreSQL
+        +--> simulated email
+        +--> simulated SMS
+        +--> retry/backoff + DLQ
 ```
 
-All bank accounts and funds are simulated. Never use real bank credentials, card data, or production secrets.
+RabbitMQ management UI: `http://localhost:15672`
 
-## Phase 1
-Build and validate the complete business application without OpenTelemetry.
+## Baseline security
 
-## Phase 2
-Add OpenTelemetry Java Agent + Collector, traces, metrics, and correlated logs.
+- Users are stored in PostgreSQL.
+- Passwords are BCrypt hashes.
+- Auth Service issues a short-lived JWT.
+- API Gateway validates the JWT.
+- Payment and Notification Services also validate JWTs for defense in depth.
+- Roles: `CUSTOMER`, `SUPPORT`, `ADMIN`.
+- Customer payment/transfer operations are checked against the authenticated `customer_id`.
+- Passwords and JWTs are never written to application logs.
 
-## Phase 3
-Deploy agreed components to GCP and connect Cloud Logging / Monitoring / BigQuery / Grafana.
+## Demo users
 
-## Local test credentials
-- username: demo
-- password: demo123
-- customer id: demo-customer
-- linked demo account: ACC1001
+| User | Password | Customer | Role | Linked account |
+| --- | --- | --- | --- | --- |
+| `demo` | `demo123` | `demo-customer` | CUSTOMER | `ACC1001` |
+| `receiver` | `receiver123` | `receiver-customer` | CUSTOMER | `ACC2001` |
+| `support` | `support123` | support user | SUPPORT | n/a |
+| `admin` | `admin123` | admin user | ADMIN | n/a |
 
-## Build
+Additional deterministic test accounts include `ACC1002` for insufficient funds, `ACC-SLOW` for latency and `ACC-ERROR` for failure simulation.
+
+## Build and test
+
 ```bash
-mvn clean package
+mvn clean test
+mvn package -DskipTests
+cd frontend
+npm install
+npm run build
 ```
 
-## Run
+GitHub Actions executes backend tests/package, frontend build, Docker Compose validation and frontend-container build on every branch push.
+
+## Run complete local stack
+
 ```bash
 docker compose up --build
 ```
 
-## Login
-```bash
-curl -X POST http://localhost:8079/api/v1/auth/login -H 'Content-Type: application/json' -d '{"username":"demo","password":"demo123"}'
+Then open:
+
+```text
+http://localhost:3000
 ```
 
-## Create payment
+The frontend talks only to the Edge API Gateway. Internal service-to-service communication uses Docker DNS names such as `gateway-service`, `mock-bank-service` and `customer-service`.
+
+## Login through API Gateway
+
 ```bash
-curl -X POST http://localhost:8080/api/v1/payments -H 'Content-Type: application/json' -H 'X-Correlation-Id: demo-001' -d '{"idempotencyKey":"pay-001","accountNumber":"ACC1001","merchant":"Demo Store","amount":50.00}'
+curl -s -X POST http://localhost:8088/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -H 'X-Correlation-Id: login-001' \
+  -d '{"username":"demo","password":"demo123"}'
 ```
+
+Copy the returned `accessToken` into `TOKEN`:
+
+```bash
+TOKEN='<jwt>'
+```
+
+## Merchant payment
+
+```bash
+curl -X POST http://localhost:8088/api/v1/payments \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H 'X-Correlation-Id: payment-001' \
+  -d '{"idempotencyKey":"pay-001","accountNumber":"ACC1001","merchant":"Demo Store","amount":50.00}'
+```
+
+A CUSTOMER cannot submit a different customer's source account.
+
+## P2P transfer
+
+```bash
+curl -X POST http://localhost:8088/api/v1/transfers \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H 'X-Correlation-Id: transfer-001' \
+  -d '{"idempotencyKey":"transfer-001","senderAccount":"ACC1001","receiverAccount":"ACC2001","amount":125.00,"currency":"INR"}'
+```
+
+The mock bank locks both account rows, verifies balance, debits the sender, credits the receiver, stores an immutable bank ledger record and returns the simulated transaction result.
+
+## History and notifications
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8088/api/v1/payments
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8088/api/v1/transfers
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8088/api/v1/notifications
+```
+
+CUSTOMER responses are scoped to their own records; SUPPORT/ADMIN operational visibility is being hardened separately.
+
+## Correlation logging
+
+Send or let the gateway generate `X-Correlation-Id`. It is propagated through HTTP calls and RabbitMQ headers and restored into the Notification Service MDC. This creates a pre-OpenTelemetry correlation baseline that we can compare with OTel `traceId`/`spanId` later.
+
+## Delivery plan
+
+1. Finish and test the full-stack baseline without OpenTelemetry.
+2. Freeze business behavior.
+3. Add OpenTelemetry Java Agent + OTLP Collector.
+4. Export traces to Jaeger/Tempo, metrics to Prometheus/Grafana and correlate logs.
+5. Deploy the agreed architecture to GCP.
+6. Integrate Cloud Logging / Cloud Monitoring and BigQuery if required.
+7. Build the final Grafana/support demonstration.
+
+Detailed status is maintained in [`docs/BUILD_TRACKER.md`](docs/BUILD_TRACKER.md).
