@@ -46,7 +46,7 @@ HEALTH=$(curl --fail --silent --show-error \
   -H 'X-Correlation-Id: pre-otel-ops-health' \
   "${BASE_URL}/api/v1/ops/health")
 echo "$HEALTH" | jq .
-test "$(echo "$HEALTH" | jq -r '.overall')" = "UP"
+test "$(echo "$HEALTH" | jq -r '.allHealthy')" = "true"
 test "$(echo "$HEALTH" | jq '[.services[] | select(.status != "UP")] | length')" = "0"
 
 echo '2/3 Verify deterministic slow-bank timeout maps to reconciliation'
