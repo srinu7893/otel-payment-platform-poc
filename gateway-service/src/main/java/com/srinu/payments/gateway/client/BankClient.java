@@ -43,7 +43,7 @@ public class BankClient {
     }
 
     public record BankDebitRequest(UUID paymentId, String accountNumber, BigDecimal amount) {}
-    public record BankDebitResponse(String status, String message) {}
+    public record BankDebitResponse(UUID transactionId, String status, String message) {}
     public record BankTransferRequest(UUID paymentId, String senderAccount, String receiverAccount,
                                       BigDecimal amount, String currency) {}
     public record BankTransferResponse(UUID transactionId, String status, String message) {}
