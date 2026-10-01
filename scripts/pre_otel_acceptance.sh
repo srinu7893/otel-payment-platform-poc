@@ -6,11 +6,23 @@ BASE_URL="${BASE_URL:-http://localhost:8088}"
 auth() {
   local username="$1"
   local password="$2"
-  curl --fail --silent --show-error \
-    -X POST "${BASE_URL}/api/v1/auth/login" \
-    -H 'Content-Type: application/json' \
-    -H "X-Correlation-Id: pre-otel-login-${username}" \
-    -d "{\"username\":\"${username}\",\"password\":\"${password}\"}" | jq -r '.accessToken'
+  local body_file="/tmp/pre-otel-login-${username}.json"
+  local status
+  for attempt in {1..20}; do
+    status=$(curl --silent --show-error --output "$body_file" --write-out '%{http_code}' \
+      -X POST "${BASE_URL}/api/v1/auth/login" \
+      -H 'Content-Type: application/json' \
+      -H "X-Correlation-Id: pre-otel-login-${username}" \
+      -d "{\"username\":\"${username}\",\"password\":\"${password}\"}")
+    if [ "$status" = "200" ]; then
+      jq -r '.accessToken' "$body_file"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "Login failed for ${username} after startup retry window (last HTTP ${status})" >&2
+  cat "$body_file" >&2 || true
+  return 1
 }
 
 post_payment() {
