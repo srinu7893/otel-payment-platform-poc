@@ -14,6 +14,7 @@ public class DemoDataConfig {
     CommandLineRunner seedAccounts(AccountRepository accounts) {
         return args -> {
             seed(accounts, "ACC1001", "Demo Customer", "5000.00");
+            seed(accounts, "ACC2001", "Receiver Customer", "1200.00");
             seed(accounts, "ACC1002", "Low Balance Customer", "25.00");
             seed(accounts, "ACC-SLOW", "Slow Scenario Customer", "5000.00");
             seed(accounts, "ACC-ERROR", "Failure Scenario Customer", "5000.00");
