@@ -1,6 +1,7 @@
 package com.srinu.payments.payment.api;
 
 import com.srinu.payments.payment.service.PaymentNotFoundException;
+import com.srinu.payments.payment.service.TransferApplicationService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
@@ -18,27 +19,48 @@ public class ApiExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiError> validation(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> fields = ex.getBindingResult().getFieldErrors().stream()
-                .collect(java.util.stream.Collectors.toMap(
-                        e -> e.getField(),
-                        e -> e.getDefaultMessage() == null ? "invalid" : e.getDefaultMessage(),
-                        (a, b) -> a));
+            .collect(java.util.stream.Collectors.toMap(
+                e -> e.getField(),
+                e -> e.getDefaultMessage() == null ? "invalid" : e.getDefaultMessage(),
+                (a, b) -> a));
         return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Request validation failed", request, fields));
     }
 
     @ExceptionHandler(PaymentNotFoundException.class)
-    ResponseEntity<ApiError> notFound(PaymentNotFoundException ex, HttpServletRequest request) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("PAYMENT_NOT_FOUND", ex.getMessage(), request, Map.of()));
+    ResponseEntity<ApiError> paymentNotFound(PaymentNotFoundException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(error("PAYMENT_NOT_FOUND", ex.getMessage(), request, Map.of()));
+    }
+
+    @ExceptionHandler(TransferApplicationService.TransferNotFoundException.class)
+    ResponseEntity<ApiError> transferNotFound(TransferApplicationService.TransferNotFoundException ex,
+                                              HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(error("TRANSFER_NOT_FOUND", ex.getMessage(), request, Map.of()));
+    }
+
+    @ExceptionHandler(TransferApplicationService.TransferAuthorizationException.class)
+    ResponseEntity<ApiError> transferForbidden(TransferApplicationService.TransferAuthorizationException ex,
+                                               HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(error("TRANSFER_FORBIDDEN", ex.getMessage(), request, Map.of()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<ApiError> badRequest(IllegalArgumentException ex, HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(error("INVALID_REQUEST", ex.getMessage(), request, Map.of()));
     }
 
     @ExceptionHandler(IllegalStateException.class)
     ResponseEntity<ApiError> conflict(IllegalStateException ex, HttpServletRequest request) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error("INVALID_PAYMENT_STATE", ex.getMessage(), request, Map.of()));
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(error("INVALID_STATE", ex.getMessage(), request, Map.of()));
     }
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiError> unexpected(Exception ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(error("INTERNAL_ERROR", "Unexpected processing error", request, Map.of()));
+            .body(error("INTERNAL_ERROR", "Unexpected processing error", request, Map.of()));
     }
 
     private ApiError error(String code, String message, HttpServletRequest request, Map<String, String> fieldErrors) {
