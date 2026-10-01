@@ -1,4 +1,6 @@
 package com.srinu.payments.gateway.api;
 
-public record AuthorizationResponse(String status, String message) {
+import java.util.UUID;
+
+public record AuthorizationResponse(UUID bankTransactionId, String status, String message) {
 }
