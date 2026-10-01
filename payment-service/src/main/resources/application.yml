@@ -25,6 +25,10 @@ spring:
     port: 5672
     username: payments
     password: payments
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
 
 security:
   jwt:
@@ -48,6 +52,13 @@ clients:
     base-url: http://localhost:8081
   customer:
     base-url: http://localhost:8084
+
+outbox:
+  relay:
+    enabled: true
+    fixed-delay-ms: 1000
+    batch-size: 20
+    confirm-timeout-ms: 5000
 
 logging:
   structured:
