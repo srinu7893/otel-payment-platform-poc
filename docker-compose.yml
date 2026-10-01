@@ -76,12 +76,16 @@ services:
       SPRING_RABBITMQ_USERNAME: payments
       SPRING_RABBITMQ_PASSWORD: payments
       CLIENTS_GATEWAY_BASE_URL: http://gateway-service:8081
+      CLIENTS_CUSTOMER_BASE_URL: http://customer-service:8084
+      JWT_SECRET: change-this-demo-secret-change-this-demo-secret
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
       gateway-service:
+        condition: service_started
+      customer-service:
         condition: service_started
     ports: ["8080:8080"]
 
