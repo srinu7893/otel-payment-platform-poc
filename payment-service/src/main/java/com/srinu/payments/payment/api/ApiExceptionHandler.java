@@ -2,6 +2,7 @@ package com.srinu.payments.payment.api;
 
 import com.srinu.payments.payment.service.PaymentApplicationService;
 import com.srinu.payments.payment.service.PaymentNotFoundException;
+import com.srinu.payments.payment.service.RefundStateService;
 import com.srinu.payments.payment.service.TransferApplicationService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.MDC;
@@ -31,6 +32,12 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiError> paymentNotFound(PaymentNotFoundException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(error("PAYMENT_NOT_FOUND", ex.getMessage(), request, Map.of()));
+    }
+
+    @ExceptionHandler(RefundStateService.RefundNotFoundException.class)
+    ResponseEntity<ApiError> refundNotFound(RefundStateService.RefundNotFoundException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(error("REFUND_NOT_FOUND", ex.getMessage(), request, Map.of()));
     }
 
     @ExceptionHandler(PaymentApplicationService.PaymentAuthorizationException.class)
