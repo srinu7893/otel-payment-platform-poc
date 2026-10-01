@@ -70,7 +70,8 @@ class NotificationRabbitIntegrationTest {
         assertThat(deadLetter).as("poison event should be routed to the notification DLQ").isNotNull();
         assertThat(new String(deadLetter.getBody(), StandardCharsets.UTF_8)).isEqualTo(poison);
         assertThat(deadLetter.getMessageProperties().getHeaders()).containsKey("x-death");
-        assertThat(deadLetter.getMessageProperties().getHeader("eventId")).isEqualTo(eventId.toString());
+        Object receivedEventId = deadLetter.getMessageProperties().getHeaders().get("eventId");
+        assertThat(String.valueOf(receivedEventId)).isEqualTo(eventId.toString());
     }
 
     private void publishPaymentEvent(String payload, UUID eventId, String correlationId) {
