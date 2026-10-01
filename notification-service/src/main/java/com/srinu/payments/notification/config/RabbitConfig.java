@@ -40,6 +40,11 @@ public class RabbitConfig {
     }
 
     @Bean
+    Binding paymentRefundedBinding(Queue notificationQueue, TopicExchange paymentExchange) {
+        return BindingBuilder.bind(notificationQueue).to(paymentExchange).with("payment.refunded");
+    }
+
+    @Bean
     Binding transferCompletedBinding(Queue notificationQueue, TopicExchange paymentExchange) {
         return BindingBuilder.bind(notificationQueue).to(paymentExchange).with("transfer.completed");
     }
