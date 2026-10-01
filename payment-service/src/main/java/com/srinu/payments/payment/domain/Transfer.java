@@ -43,6 +43,12 @@ public class Transfer {
     @Column(name = "failure_code", length = 80)
     private String failureCode;
 
+    @Column(name = "reconciliation_attempts", nullable = false)
+    private int reconciliationAttempts;
+
+    @Column(name = "last_reconciliation_at")
+    private Instant lastReconciliationAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -68,9 +74,16 @@ public class Transfer {
         this.updatedAt = createdAt;
     }
 
+    public void markProcessing() {
+        this.status = "PROCESSING";
+        this.failureCode = null;
+        this.updatedAt = Instant.now();
+    }
+
     public void complete(UUID bankTransactionId) {
         this.status = "COMPLETED";
         this.bankTransactionId = bankTransactionId;
+        this.failureCode = null;
         this.updatedAt = Instant.now();
     }
 
@@ -78,6 +91,18 @@ public class Transfer {
         this.status = "FAILED";
         this.failureCode = code;
         this.updatedAt = Instant.now();
+    }
+
+    public void markReconciliationRequired(String code) {
+        this.status = "RECONCILIATION_REQUIRED";
+        this.failureCode = code;
+        this.updatedAt = Instant.now();
+    }
+
+    public void noteReconciliationAttempt() {
+        reconciliationAttempts++;
+        lastReconciliationAt = Instant.now();
+        updatedAt = lastReconciliationAt;
     }
 
     public UUID getId() { return id; }
@@ -90,6 +115,8 @@ public class Transfer {
     public String getStatus() { return status; }
     public UUID getBankTransactionId() { return bankTransactionId; }
     public String getFailureCode() { return failureCode; }
+    public int getReconciliationAttempts() { return reconciliationAttempts; }
+    public Instant getLastReconciliationAt() { return lastReconciliationAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
