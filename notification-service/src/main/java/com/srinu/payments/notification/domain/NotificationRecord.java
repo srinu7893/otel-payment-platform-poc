@@ -8,11 +8,15 @@ import java.util.UUID;
 @Table(name = "notifications", indexes = {
     @Index(name = "idx_notification_payment", columnList = "payment_id"),
     @Index(name = "idx_notification_transfer", columnList = "transfer_id"),
-    @Index(name = "idx_notification_status", columnList = "status")
+    @Index(name = "idx_notification_status", columnList = "status"),
+    @Index(name = "idx_notification_source_event", columnList = "source_event_id")
 })
 public class NotificationRecord {
     @Id
     private UUID id;
+
+    @Column(name = "source_event_id")
+    private UUID sourceEventId;
 
     @Column(name = "payment_id")
     private UUID paymentId;
@@ -52,9 +56,10 @@ public class NotificationRecord {
 
     protected NotificationRecord() {}
 
-    public NotificationRecord(UUID paymentId, UUID transferId, String customerId,
+    public NotificationRecord(UUID sourceEventId, UUID paymentId, UUID transferId, String customerId,
                               String eventType, String channel, String destination) {
         this.id = UUID.randomUUID();
+        this.sourceEventId = sourceEventId;
         this.paymentId = paymentId;
         this.transferId = transferId;
         this.customerId = customerId;
@@ -86,6 +91,7 @@ public class NotificationRecord {
     }
 
     public UUID getId() { return id; }
+    public UUID getSourceEventId() { return sourceEventId; }
     public UUID getPaymentId() { return paymentId; }
     public UUID getTransferId() { return transferId; }
     public String getCustomerId() { return customerId; }
