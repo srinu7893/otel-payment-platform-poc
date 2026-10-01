@@ -5,10 +5,10 @@ import com.srinu.payments.payment.api.TransferResponse;
 import com.srinu.payments.payment.client.CustomerClient;
 import com.srinu.payments.payment.client.GatewayClient;
 import com.srinu.payments.payment.domain.Transfer;
-import com.srinu.payments.payment.messaging.PaymentEventPublisher;
 import com.srinu.payments.payment.repository.TransferRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -23,24 +23,23 @@ public class TransferApplicationService {
     private final TransferRepository transfers;
     private final CustomerClient customers;
     private final GatewayClient gateway;
-    private final PaymentEventPublisher events;
+    private final TransferStateService state;
 
     public TransferApplicationService(TransferRepository transfers, CustomerClient customers,
-                                      GatewayClient gateway, PaymentEventPublisher events) {
+                                      GatewayClient gateway, TransferStateService state) {
         this.transfers = transfers;
         this.customers = customers;
         this.gateway = gateway;
-        this.events = events;
+        this.state = state;
     }
 
-    @Transactional
     public TransferResponse create(String customerId, TransferRequest request) {
-        var replay = transfers.findByIdempotencyKey(request.idempotencyKey());
+        var replay = state.findByIdempotencyKey(request.idempotencyKey());
         if (replay.isPresent()) {
-            log.info("event=TRANSFER_IDEMPOTENT_REPLAY transferId={} customerId={}", replay.get().getId(), customerId);
-            return toResponse(replay.get(), "Idempotent replay");
+            return replay(customerId, replay.get());
         }
 
+        // Customer HTTP lookup intentionally runs without a local DB transaction.
         var customer = customers.get(customerId);
         if (customer == null || !customer.active()) {
             throw new TransferAuthorizationException("Customer is not active");
@@ -53,36 +52,53 @@ public class TransferApplicationService {
             throw new IllegalArgumentException("Sender and receiver accounts must be different");
         }
 
-        var transfer = transfers.save(new Transfer(UUID.randomUUID(), request.idempotencyKey(), customerId,
-            request.senderAccount(), request.receiverAccount(), request.amount(), request.currency()));
+        final Transfer transfer;
+        try {
+            transfer = state.createProcessing(customerId, request);
+        } catch (DataIntegrityViolationException duplicateRace) {
+            var existing = state.findByIdempotencyKey(request.idempotencyKey()).orElseThrow(() -> duplicateRace);
+            return replay(customerId, existing);
+        }
 
-        log.info("event=TRANSFER_CREATED transferId={} customerId={} sender={} receiver={} amount={} currency={}",
+        log.info("event=TRANSFER_PROCESSING transferId={} customerId={} sender={} receiver={} amount={} currency={}",
             transfer.getId(), customerId, mask(request.senderAccount()), mask(request.receiverAccount()),
             request.amount(), request.currency());
 
         try {
+            // Remote Gateway/Bank call intentionally runs after the create transaction has committed.
             var result = gateway.transfer(transfer.getId(), request.senderAccount(), request.receiverAccount(),
                 request.amount(), request.currency());
-            if ("COMPLETED".equals(result.status())) {
-                transfer.complete(result.bankTransactionId());
-                transfers.save(transfer);
-                events.transferCompleted(transfer.getId(), transfer.getBankTransactionId(), customerId,
-                    transfer.getSenderAccount(), transfer.getReceiverAccount(), transfer.getAmount(), transfer.getCurrency());
+            var finalized = state.applyGatewayResult(transfer.getId(), result);
+
+            if ("COMPLETED".equals(finalized.getStatus())) {
                 log.info("event=TRANSFER_COMPLETED transferId={} bankTransactionId={}",
-                    transfer.getId(), transfer.getBankTransactionId());
+                    finalized.getId(), finalized.getBankTransactionId());
+            } else if ("RECONCILIATION_REQUIRED".equals(finalized.getStatus())) {
+                log.warn("event=TRANSFER_RECONCILIATION_REQUIRED transferId={} failureCode={}",
+                    finalized.getId(), finalized.getFailureCode());
             } else {
-                transfer.fail("BANK_TRANSFER_FAILED");
-                transfers.save(transfer);
-                log.warn("event=TRANSFER_FAILED transferId={} reason={}", transfer.getId(), result.message());
+                log.warn("event=TRANSFER_NOT_COMPLETED transferId={} status={} reason={}",
+                    finalized.getId(), finalized.getStatus(), result.message());
             }
-            return toResponse(transfer, result.message());
+            return toResponse(finalized, result.message());
         } catch (RuntimeException ex) {
-            transfer.fail("DOWNSTREAM_EXCEPTION");
-            transfers.save(transfer);
-            log.error("event=TRANSFER_FAILED transferId={} errorType={} message={}",
+            log.error("event=TRANSFER_GATEWAY_EXCEPTION transferId={} errorType={} message={}",
                 transfer.getId(), ex.getClass().getSimpleName(), ex.getMessage(), ex);
-            throw ex;
+            try {
+                var unknown = state.markReconciliationRequired(transfer.getId(), "DOWNSTREAM_OUTCOME_UNKNOWN");
+                return toResponse(unknown, "Transfer outcome pending reconciliation");
+            } catch (RuntimeException stateFailure) {
+                ex.addSuppressed(stateFailure);
+                throw ex;
+            }
         }
+    }
+
+    private TransferResponse replay(String customerId, Transfer transfer) {
+        authorizeOwnership(customerId, transfer, false);
+        log.info("event=TRANSFER_IDEMPOTENT_REPLAY transferId={} customerId={} status={}",
+            transfer.getId(), customerId, transfer.getStatus());
+        return toResponse(transfer, "Idempotent replay");
     }
 
     @Transactional(readOnly = true)
