@@ -119,3 +119,9 @@ services:
       - payment-service
       - notification-service
     ports: ["8088:8088"]
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - api-gateway
+    ports: ["3000:80"]
