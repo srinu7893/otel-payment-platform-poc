@@ -1,6 +1,30 @@
-server: { port: 8084 }
+server:
+  port: 8084
 spring:
-  application: { name: customer-service }
-  datasource: { url: "jdbc:postgresql://localhost:5432/payments", username: payments, password: payments }
-  jpa: { hibernate: { ddl-auto: update }, open-in-view: false }
-management.endpoints.web.exposure.include: health,info,metrics
+  application:
+    name: customer-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/payments
+    username: payments
+    password: payments
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: customer
+  flyway:
+    enabled: true
+    create-schemas: true
+    schemas: customer
+    default-schema: customer
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
