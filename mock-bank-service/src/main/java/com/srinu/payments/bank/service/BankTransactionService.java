@@ -40,7 +40,8 @@ public class BankTransactionService {
 
         // Deterministic POC failure accounts let us reproduce production-style incidents.
         if ("ACC-SLOW".equalsIgnoreCase(request.accountNumber())) {
-            sleep(5000);
+            // Keep this safely above the Gateway read timeout so CI/demo behavior is deterministic.
+            sleep(7000);
         }
         if ("ACC-ERROR".equalsIgnoreCase(request.accountNumber())) {
             log.error("event=BANK_SIMULATED_FAILURE paymentId={} account={}", request.paymentId(), maskedAccount);
