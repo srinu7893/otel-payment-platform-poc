@@ -13,12 +13,16 @@ public class DemoDataConfig {
     @Bean
     CommandLineRunner seedAccounts(AccountRepository accounts) {
         return args -> {
-            if (!accounts.existsById("ACC1001")) {
-                accounts.save(new Account("ACC1001", "Demo Customer", new BigDecimal("5000.00")));
-            }
-            if (!accounts.existsById("ACC1002")) {
-                accounts.save(new Account("ACC1002", "Low Balance Customer", new BigDecimal("25.00")));
-            }
+            seed(accounts, "ACC1001", "Demo Customer", "5000.00");
+            seed(accounts, "ACC1002", "Low Balance Customer", "25.00");
+            seed(accounts, "ACC-SLOW", "Slow Scenario Customer", "5000.00");
+            seed(accounts, "ACC-ERROR", "Failure Scenario Customer", "5000.00");
         };
+    }
+
+    private void seed(AccountRepository accounts, String number, String name, String balance) {
+        if (!accounts.existsById(number)) {
+            accounts.save(new Account(number, name, new BigDecimal(balance)));
+        }
     }
 }
