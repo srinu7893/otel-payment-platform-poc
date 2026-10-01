@@ -1,5 +1,5 @@
-const AUTH_BASE = import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:8079';
-const PAYMENT_BASE = import.meta.env.VITE_PAYMENT_BASE_URL || 'http://localhost:8080';
+const AUTH_BASE = import.meta.env.VITE_AUTH_BASE_URL || '/auth-api';
+const PAYMENT_BASE = import.meta.env.VITE_PAYMENT_BASE_URL || '/payment-api';
 
 async function request(url, options = {}) {
   const response = await fetch(url, {
