@@ -27,6 +27,10 @@ spring:
           multiplier: 2.0
           max-interval: 5000ms
 
+security:
+  jwt:
+    secret: ${JWT_SECRET:change-this-demo-secret-change-this-demo-secret}
+
 management:
   endpoints:
     web:
