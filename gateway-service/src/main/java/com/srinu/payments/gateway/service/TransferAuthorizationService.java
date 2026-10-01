@@ -30,7 +30,7 @@ public class TransferAuthorizationService {
             throwable -> {
                 log.error("event=TRANSFER_GATEWAY_CIRCUIT_FALLBACK paymentId={} durationMs={} error={}",
                     request.paymentId(), System.currentTimeMillis() - started, safeMessage(throwable));
-                return new TransferAuthorizationResponse(null, "FAILED", "Bank unavailable");
+                return new TransferAuthorizationResponse(null, "UNKNOWN", "Bank transfer outcome requires reconciliation");
             });
     }
 
