@@ -1,22 +1,38 @@
 services:
   postgres:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: paymentdb
-      POSTGRES_USER: payment
-      POSTGRES_PASSWORD: payment
+    environment: { POSTGRES_DB: payments, POSTGRES_USER: payments, POSTGRES_PASSWORD: payments }
     ports: ["5432:5432"]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U payment -d paymentdb"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
+    healthcheck: { test: ["CMD-SHELL","pg_isready -U payments"], interval: 5s, timeout: 3s, retries: 10 }
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: payment
-      RABBITMQ_DEFAULT_PASS: payment
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+    environment: { RABBITMQ_DEFAULT_USER: payments, RABBITMQ_DEFAULT_PASS: payments }
+    ports: ["5672:5672","15672:15672"]
+  auth-service:
+    build: ./auth-service
+    ports: ["8079:8079"]
+  customer-service:
+    build: ./customer-service
+    environment: { SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments, SPRING_DATASOURCE_USERNAME: payments, SPRING_DATASOURCE_PASSWORD: payments }
+    depends_on: [postgres]
+    ports: ["8084:8084"]
+  mock-bank-service:
+    build: ./mock-bank-service
+    environment: { SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments, SPRING_DATASOURCE_USERNAME: payments, SPRING_DATASOURCE_PASSWORD: payments }
+    depends_on: [postgres]
+    ports: ["8082:8082"]
+  gateway-service:
+    build: ./gateway-service
+    environment: { CLIENTS_BANK_BASE_URL: http://mock-bank-service:8082 }
+    depends_on: [mock-bank-service]
+    ports: ["8081:8081"]
+  payment-service:
+    build: ./payment-service
+    environment: { SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments, SPRING_DATASOURCE_USERNAME: payments, SPRING_DATASOURCE_PASSWORD: payments, SPRING_RABBITMQ_HOST: rabbitmq, CLIENTS_GATEWAY_BASE_URL: http://gateway-service:8081 }
+    depends_on: [postgres,rabbitmq,gateway-service]
+    ports: ["8080:8080"]
+  notification-service:
+    build: ./notification-service
+    environment: { SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments, SPRING_DATASOURCE_USERNAME: payments, SPRING_DATASOURCE_PASSWORD: payments, SPRING_RABBITMQ_HOST: rabbitmq }
+    depends_on: [postgres,rabbitmq]
+    ports: ["8083:8083"]
