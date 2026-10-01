@@ -76,6 +76,14 @@ transfer:
     batch-size: 20
     max-automatic-attempts: 10
 
+refund:
+  reconciliation:
+    enabled: true
+    fixed-delay-ms: 15000
+    processing-stale-ms: 30000
+    batch-size: 20
+    max-automatic-attempts: 10
+
 logging:
   structured:
     format:
