@@ -1,0 +1,18 @@
+server:
+  port: 8082
+spring:
+  application:
+    name: mock-bank-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/payments
+    username: payments
+    password: payments
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
