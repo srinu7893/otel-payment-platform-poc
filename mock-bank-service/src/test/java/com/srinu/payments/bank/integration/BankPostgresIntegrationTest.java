@@ -1,7 +1,9 @@
 package com.srinu.payments.bank.integration;
 
+import com.srinu.payments.bank.api.DebitRequest;
 import com.srinu.payments.bank.api.TransferRequest;
 import com.srinu.payments.bank.repository.AccountRepository;
+import com.srinu.payments.bank.service.BankTransactionService;
 import com.srinu.payments.bank.service.BankTransferService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,9 @@ class BankPostgresIntegrationTest {
     @Autowired
     private BankTransferService transferService;
 
+    @Autowired
+    private BankTransactionService debitService;
+
     @Test
     @Transactional
     void flywaySchemaAndLockedTransferWorkOnRealPostgres() {
@@ -50,5 +55,24 @@ class BankPostgresIntegrationTest {
 
         assertThat(senderAfter).isEqualByComparingTo(senderBefore.subtract(amount));
         assertThat(receiverAfter).isEqualByComparingTo(receiverBefore.add(amount));
+    }
+
+    @Test
+    @Transactional
+    void repeatedMerchantDebitWithSamePaymentIdChangesBalanceOnlyOnce() {
+        UUID paymentId = UUID.randomUUID();
+        var amount = new BigDecimal("25.00");
+        var before = accounts.findById("ACC1001").orElseThrow().getBalance();
+
+        var first = debitService.debit(new DebitRequest(paymentId, "ACC1001", amount));
+        var second = debitService.debit(new DebitRequest(paymentId, "ACC1001", amount));
+
+        accounts.flush();
+        var after = accounts.findById("ACC1001").orElseThrow().getBalance();
+
+        assertThat(first.status()).isEqualTo("COMPLETED");
+        assertThat(second.status()).isEqualTo("COMPLETED");
+        assertThat(second.transactionId()).isEqualTo(first.transactionId());
+        assertThat(after).isEqualByComparingTo(before.subtract(amount));
     }
 }
