@@ -72,7 +72,7 @@ jobs:
             done
           done
 
-      - name: Smoke test login, payment, failures and P2P transfer
+      - name: Smoke test login, payment, outbox notification, failures and P2P transfer
         shell: bash
         run: |
           set -euo pipefail
@@ -108,6 +108,24 @@ jobs:
             -d '{"idempotencyKey":"ci-pay-001","accountNumber":"ACC1001","merchant":"CI Demo Store","amount":25.00}'
           test "$(jq -r '.status' /tmp/payment.json)" = "COMPLETED"
           PAYMENT_ID=$(jq -r '.paymentId' /tmp/payment.json)
+
+          NOTIFICATION_FOUND=false
+          for attempt in {1..30}; do
+            api_call "payment notification poll" /tmp/notifications.json \
+              -X GET "http://localhost:8088/api/v1/notifications?paymentId=${PAYMENT_ID}&page=0&size=10" \
+              -H "Authorization: Bearer $TOKEN" \
+              -H 'X-Correlation-Id: ci-notification-poll-001'
+            if jq -e --arg paymentId "$PAYMENT_ID" '.content[]? | select(.paymentId == $paymentId and .status == "SENT")' /tmp/notifications.json >/dev/null; then
+              NOTIFICATION_FOUND=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$NOTIFICATION_FOUND" != "true" ]; then
+            echo "No SENT notification observed for payment ${PAYMENT_ID} through outbox flow"
+            docker compose logs --no-color payment-service notification-service rabbitmq
+            exit 1
+          fi
 
           api_call "payment idempotent replay" /tmp/payment-replay.json -X POST http://localhost:8088/api/v1/payments \
             -H "Authorization: Bearer $TOKEN" \
