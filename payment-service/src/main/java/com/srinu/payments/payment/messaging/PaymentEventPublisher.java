@@ -23,8 +23,8 @@ public class PaymentEventPublisher {
         this.objectMapper = objectMapper;
     }
 
-    public void completed(UUID paymentId, BigDecimal amount) {
-        publish("payment.completed", new PaymentCompletedEvent(paymentId, amount, "PAYMENT_COMPLETED"));
+    public void completed(UUID paymentId, String customerId, BigDecimal amount) {
+        publish("payment.completed", new PaymentCompletedEvent(paymentId, customerId, amount, "PAYMENT_COMPLETED"));
     }
 
     public void transferCompleted(UUID transferId, UUID bankTransactionId, String customerId,
@@ -58,7 +58,7 @@ public class PaymentEventPublisher {
         return "****" + account.substring(account.length() - 4);
     }
 
-    public record PaymentCompletedEvent(UUID paymentId, BigDecimal amount, String eventType) {}
+    public record PaymentCompletedEvent(UUID paymentId, String customerId, BigDecimal amount, String eventType) {}
     public record TransferCompletedEvent(UUID transferId, UUID bankTransactionId, String customerId,
                                          String senderAccount, String receiverAccount, BigDecimal amount,
                                          String currency, String eventType) {}
