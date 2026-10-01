@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -26,7 +27,7 @@ class PaymentApplicationServiceTest {
         when(customers.get("demo-customer"))
             .thenReturn(new CustomerClient.CustomerView("demo-customer", "Demo", "demo@example.com", "ACC1001", true));
         when(gateway.authorize(any(), eq("ACC1001"), eq(new BigDecimal("50.00"))))
-            .thenReturn(new GatewayClient.GatewayResult("COMPLETED", "Approved"));
+            .thenReturn(new GatewayClient.GatewayResult(UUID.randomUUID(), "COMPLETED", "Approved"));
 
         var service = new PaymentApplicationService(repo, customers, gateway, events);
         var response = service.create("demo-customer",
