@@ -1,4 +1,6 @@
 package com.srinu.payments.bank.api;
 
-public record DebitResponse(String status, String message) {
+import java.util.UUID;
+
+public record DebitResponse(UUID transactionId, String status, String message) {
 }
