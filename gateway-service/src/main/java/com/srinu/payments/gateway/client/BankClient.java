@@ -1,5 +1,6 @@
 package com.srinu.payments.gateway.client;
 
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -9,6 +10,7 @@ import java.util.UUID;
 
 @Component
 public class BankClient {
+    private static final String CORRELATION_HEADER = "X-Correlation-Id";
     private final RestClient client;
 
     public BankClient(RestClient.Builder builder,
@@ -18,19 +20,26 @@ public class BankClient {
 
     public BankDebitResponse debit(UUID paymentId, String accountNumber, BigDecimal amount) {
         return client.post()
-                .uri("/api/v1/bank/debits")
-                .body(new BankDebitRequest(paymentId, accountNumber, amount))
-                .retrieve()
-                .body(BankDebitResponse.class);
+            .uri("/api/v1/bank/debits")
+            .header(CORRELATION_HEADER, correlationId())
+            .body(new BankDebitRequest(paymentId, accountNumber, amount))
+            .retrieve()
+            .body(BankDebitResponse.class);
     }
 
     public BankTransferResponse transfer(UUID paymentId, String senderAccount, String receiverAccount,
                                          BigDecimal amount, String currency) {
         return client.post()
-                .uri("/api/v1/bank/transfers")
-                .body(new BankTransferRequest(paymentId, senderAccount, receiverAccount, amount, currency))
-                .retrieve()
-                .body(BankTransferResponse.class);
+            .uri("/api/v1/bank/transfers")
+            .header(CORRELATION_HEADER, correlationId())
+            .body(new BankTransferRequest(paymentId, senderAccount, receiverAccount, amount, currency))
+            .retrieve()
+            .body(BankTransferResponse.class);
+    }
+
+    private String correlationId() {
+        String value = MDC.get("correlationId");
+        return value == null ? UUID.randomUUID().toString() : value;
     }
 
     public record BankDebitRequest(UUID paymentId, String accountNumber, BigDecimal amount) {}
