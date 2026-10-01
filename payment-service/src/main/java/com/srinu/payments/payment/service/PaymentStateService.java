@@ -34,7 +34,7 @@ public class PaymentStateService {
     @Transactional(readOnly = true)
     public Payment find(UUID paymentId) {
         return payments.findById(paymentId)
-            .orElseThrow(() -> new PaymentApplicationService.PaymentNotFoundException(paymentId));
+            .orElseThrow(() -> new PaymentNotFoundException(paymentId));
     }
 
     @Transactional
@@ -48,7 +48,7 @@ public class PaymentStateService {
     @Transactional
     public Payment applyGatewayResult(UUID paymentId, GatewayClient.GatewayResult result) {
         var payment = payments.findById(paymentId)
-            .orElseThrow(() -> new PaymentApplicationService.PaymentNotFoundException(paymentId));
+            .orElseThrow(() -> new PaymentNotFoundException(paymentId));
 
         if (isTerminal(payment.getStatus())) {
             return payment;
@@ -70,7 +70,7 @@ public class PaymentStateService {
     @Transactional
     public Payment markReconciliationRequired(UUID paymentId, String code) {
         var payment = payments.findById(paymentId)
-            .orElseThrow(() -> new PaymentApplicationService.PaymentNotFoundException(paymentId));
+            .orElseThrow(() -> new PaymentNotFoundException(paymentId));
         if (!isTerminal(payment.getStatus())) {
             payment.markReconciliationRequired(code);
             return payments.save(payment);
@@ -81,7 +81,7 @@ public class PaymentStateService {
     @Transactional
     public Payment noteReconciliationAttempt(UUID paymentId) {
         var payment = payments.findById(paymentId)
-            .orElseThrow(() -> new PaymentApplicationService.PaymentNotFoundException(paymentId));
+            .orElseThrow(() -> new PaymentNotFoundException(paymentId));
         if (!isTerminal(payment.getStatus())) {
             payment.noteReconciliationAttempt();
             return payments.save(payment);
