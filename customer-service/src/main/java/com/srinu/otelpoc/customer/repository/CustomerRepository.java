@@ -1,0 +1,1 @@
+package com.srinu.otelpoc.customer.repository; import com.srinu.otelpoc.customer.domain.Customer; import org.springframework.data.jpa.repository.JpaRepository; public interface CustomerRepository extends JpaRepository<Customer,String>{}
