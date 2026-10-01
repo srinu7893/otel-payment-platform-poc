@@ -41,7 +41,15 @@ management:
         enabled: true
 
 clients:
+  http:
+    connect-timeout: 2s
+    read-timeout: 5s
   gateway:
     base-url: http://localhost:8081
   customer:
     base-url: http://localhost:8084
+
+logging:
+  structured:
+    format:
+      console: logstash
