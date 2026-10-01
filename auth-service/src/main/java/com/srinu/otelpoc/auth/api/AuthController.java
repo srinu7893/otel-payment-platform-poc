@@ -3,7 +3,7 @@ package com.srinu.otelpoc.auth.api;
 import com.srinu.otelpoc.auth.service.AuthenticationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import org.springframework.http.*;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -16,15 +16,9 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-        try {
-            return ResponseEntity.ok(authenticationService.login(request.username(), request.password()));
-        } catch (AuthenticationService.InvalidCredentialsException ex) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new ErrorResponse("AUTHENTICATION_FAILED", "Invalid username or password"));
-        }
+    public ResponseEntity<AuthenticationService.LoginResult> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authenticationService.login(request.username(), request.password()));
     }
 
     public record LoginRequest(@NotBlank String username, @NotBlank String password) {}
-    public record ErrorResponse(String code, String message) {}
 }
