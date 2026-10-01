@@ -7,6 +7,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "payments", uniqueConstraints = @UniqueConstraint(name = "uk_payment_idempotency", columnNames = "idempotency_key"), indexes = {
+        @Index(name = "idx_payment_customer", columnList = "customer_id"),
         @Index(name = "idx_payment_status", columnList = "status"),
         @Index(name = "idx_payment_created_at", columnList = "created_at")
 })
@@ -16,6 +17,9 @@ public class Payment {
 
     @Column(name = "idempotency_key", nullable = false, updatable = false, length = 100)
     private String idempotencyKey;
+
+    @Column(name = "customer_id", nullable = false, updatable = false, length = 80)
+    private String customerId;
 
     @Column(name = "account_number", nullable = false, updatable = false, length = 64)
     private String accountNumber;
@@ -44,9 +48,10 @@ public class Payment {
 
     protected Payment() {}
 
-    public Payment(UUID id, String idempotencyKey, String accountNumber, String merchant, BigDecimal amount) {
+    public Payment(UUID id, String idempotencyKey, String customerId, String accountNumber, String merchant, BigDecimal amount) {
         this.id = id;
         this.idempotencyKey = idempotencyKey;
+        this.customerId = customerId;
         this.accountNumber = accountNumber;
         this.merchant = merchant;
         this.amount = amount;
@@ -74,6 +79,7 @@ public class Payment {
 
     public UUID getId() { return id; }
     public String getIdempotencyKey() { return idempotencyKey; }
+    public String getCustomerId() { return customerId; }
     public String getAccountNumber() { return accountNumber; }
     public String getMerchant() { return merchant; }
     public BigDecimal getAmount() { return amount; }
