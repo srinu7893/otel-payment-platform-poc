@@ -10,8 +10,16 @@ spring:
     password: payments
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     open-in-view: false
+    properties:
+      hibernate:
+        default_schema: notification
+  flyway:
+    enabled: true
+    create-schemas: true
+    schemas: notification
+    default-schema: notification
   rabbitmq:
     host: localhost
     port: 5672
