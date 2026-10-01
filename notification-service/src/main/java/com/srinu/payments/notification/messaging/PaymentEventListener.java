@@ -44,8 +44,10 @@ public class PaymentEventListener {
 
             if ("PAYMENT_COMPLETED".equals(eventType)) {
                 UUID paymentId = UUID.fromString(text(event, "paymentId"));
-                var record = repository.save(new NotificationRecord(paymentId, null, null,
-                    eventType, "EMAIL_SIMULATED", "demo@example.test"));
+                String customerId = text(event, "customerId");
+                String destination = customerId == null ? "customer@example.test" : customerId + "@example.test";
+                var record = repository.save(new NotificationRecord(paymentId, null, customerId,
+                    eventType, "EMAIL_SIMULATED", destination));
                 delivery.deliver(record, "Payment completed",
                     "Payment " + shortId(paymentId) + " completed successfully");
                 return;
