@@ -36,7 +36,7 @@ class TransferAuthorizationServiceTest {
     }
 
     @Test
-    void returnsFailedThroughCircuitBreakerFallbackWhenBankThrows() {
+    void returnsUnknownThroughCircuitBreakerFallbackWhenBankThrows() {
         var bank = mock(BankClient.class);
         when(bank.transfer(any(), anyString(), anyString(), any(), anyString()))
             .thenThrow(new RuntimeException("bank unavailable"));
@@ -45,8 +45,8 @@ class TransferAuthorizationServiceTest {
         var result = service.authorize(new TransferAuthorizationRequest(
             UUID.randomUUID(), "ACC1001", "ACC2001", new BigDecimal("10.00"), "INR"));
 
-        assertEquals("FAILED", result.status());
-        assertEquals("Bank unavailable", result.message());
+        assertEquals("UNKNOWN", result.status());
+        assertEquals("Bank transfer outcome requires reconciliation", result.message());
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
