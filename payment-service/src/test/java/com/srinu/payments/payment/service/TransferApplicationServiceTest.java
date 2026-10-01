@@ -4,7 +4,6 @@ import com.srinu.payments.payment.api.TransferRequest;
 import com.srinu.payments.payment.client.CustomerClient;
 import com.srinu.payments.payment.client.GatewayClient;
 import com.srinu.payments.payment.domain.Transfer;
-import com.srinu.payments.payment.messaging.PaymentEventPublisher;
 import com.srinu.payments.payment.repository.TransferRepository;
 import org.junit.jupiter.api.Test;
 
@@ -23,26 +22,38 @@ class TransferApplicationServiceTest {
         var repo = mock(TransferRepository.class);
         var customers = mock(CustomerClient.class);
         var gateway = mock(GatewayClient.class);
-        var events = mock(PaymentEventPublisher.class);
+        var state = mock(TransferStateService.class);
+        var transferId = UUID.randomUUID();
+        var bankTx = UUID.randomUUID();
+        var request = new TransferRequest("idem-1", "ACC1001", "ACC2001", new BigDecimal("125.00"), "INR");
 
-        when(repo.findByIdempotencyKey("idem-1")).thenReturn(Optional.empty());
-        when(repo.save(any(Transfer.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(state.findByIdempotencyKey("idem-1")).thenReturn(Optional.empty());
         when(customers.get("demo-customer"))
             .thenReturn(new CustomerClient.CustomerView("demo-customer", "Demo", "demo@example.com", "ACC1001", true));
-        var bankTx = UUID.randomUUID();
-        when(gateway.transfer(any(), eq("ACC1001"), eq("ACC2001"), eq(new BigDecimal("125.00")), eq("INR")))
-            .thenReturn(new GatewayClient.TransferGatewayResult(bankTx, "COMPLETED", "Transfer completed"));
 
-        var service = new TransferApplicationService(repo, customers, gateway, events);
-        var result = service.create("demo-customer",
-            new TransferRequest("idem-1", "ACC1001", "ACC2001", new BigDecimal("125.00"), "INR"));
+        var processing = new Transfer(transferId, "idem-1", "demo-customer", "ACC1001", "ACC2001",
+            new BigDecimal("125.00"), "INR");
+        processing.markProcessing();
+        when(state.createProcessing("demo-customer", request)).thenReturn(processing);
+
+        var gatewayResult = new GatewayClient.TransferGatewayResult(bankTx, "COMPLETED", "Transfer completed");
+        when(gateway.transfer(transferId, "ACC1001", "ACC2001", new BigDecimal("125.00"), "INR"))
+            .thenReturn(gatewayResult);
+
+        var completed = new Transfer(transferId, "idem-1", "demo-customer", "ACC1001", "ACC2001",
+            new BigDecimal("125.00"), "INR");
+        completed.markProcessing();
+        completed.complete(bankTx);
+        when(state.applyGatewayResult(transferId, gatewayResult)).thenReturn(completed);
+
+        var service = new TransferApplicationService(repo, customers, gateway, state);
+        var result = service.create("demo-customer", request);
 
         assertEquals("COMPLETED", result.status());
         assertEquals(bankTx, result.bankTransactionId());
         assertEquals("****1001", result.senderAccount());
         assertEquals("****2001", result.receiverAccount());
-        verify(events).transferCompleted(any(), eq(bankTx), eq("demo-customer"), eq("ACC1001"), eq("ACC2001"),
-            eq(new BigDecimal("125.00")), eq("INR"));
+        verify(state).applyGatewayResult(transferId, gatewayResult);
     }
 
     @Test
@@ -50,18 +61,19 @@ class TransferApplicationServiceTest {
         var repo = mock(TransferRepository.class);
         var customers = mock(CustomerClient.class);
         var gateway = mock(GatewayClient.class);
-        var events = mock(PaymentEventPublisher.class);
+        var state = mock(TransferStateService.class);
 
-        when(repo.findByIdempotencyKey("idem-2")).thenReturn(Optional.empty());
+        when(state.findByIdempotencyKey("idem-2")).thenReturn(Optional.empty());
         when(customers.get("demo-customer"))
             .thenReturn(new CustomerClient.CustomerView("demo-customer", "Demo", "demo@example.com", "ACC1001", true));
 
-        var service = new TransferApplicationService(repo, customers, gateway, events);
+        var service = new TransferApplicationService(repo, customers, gateway, state);
 
         assertThrows(TransferApplicationService.TransferAuthorizationException.class,
             () -> service.create("demo-customer",
                 new TransferRequest("idem-2", "ACC9999", "ACC2001", new BigDecimal("25.00"), "INR")));
-        verifyNoInteractions(gateway, events);
+        verifyNoInteractions(gateway);
+        verify(state, never()).createProcessing(anyString(), any());
     }
 
     @Test
@@ -69,18 +81,52 @@ class TransferApplicationServiceTest {
         var repo = mock(TransferRepository.class);
         var customers = mock(CustomerClient.class);
         var gateway = mock(GatewayClient.class);
-        var events = mock(PaymentEventPublisher.class);
+        var state = mock(TransferStateService.class);
 
         var existing = new Transfer(UUID.randomUUID(), "same-key", "demo-customer", "ACC1001", "ACC2001",
             new BigDecimal("10.00"), "INR");
-        when(repo.findByIdempotencyKey("same-key")).thenReturn(Optional.of(existing));
+        existing.markProcessing();
+        when(state.findByIdempotencyKey("same-key")).thenReturn(Optional.of(existing));
 
-        var service = new TransferApplicationService(repo, customers, gateway, events);
+        var service = new TransferApplicationService(repo, customers, gateway, state);
         var result = service.create("demo-customer",
             new TransferRequest("same-key", "ACC1001", "ACC2001", new BigDecimal("10.00"), "INR"));
 
         assertEquals(existing.getId(), result.transferId());
-        assertEquals("PENDING", result.status());
-        verifyNoInteractions(customers, gateway, events);
+        assertEquals("PROCESSING", result.status());
+        verifyNoInteractions(customers, gateway);
+    }
+
+    @Test
+    void marksTransferForReconciliationWhenGatewayThrows() {
+        var repo = mock(TransferRepository.class);
+        var customers = mock(CustomerClient.class);
+        var gateway = mock(GatewayClient.class);
+        var state = mock(TransferStateService.class);
+        var transferId = UUID.randomUUID();
+        var request = new TransferRequest("idem-3", "ACC1001", "ACC2001", new BigDecimal("15.00"), "INR");
+
+        when(state.findByIdempotencyKey("idem-3")).thenReturn(Optional.empty());
+        when(customers.get("demo-customer"))
+            .thenReturn(new CustomerClient.CustomerView("demo-customer", "Demo", "demo@example.com", "ACC1001", true));
+
+        var processing = new Transfer(transferId, "idem-3", "demo-customer", "ACC1001", "ACC2001",
+            new BigDecimal("15.00"), "INR");
+        processing.markProcessing();
+        when(state.createProcessing("demo-customer", request)).thenReturn(processing);
+        when(gateway.transfer(transferId, "ACC1001", "ACC2001", new BigDecimal("15.00"), "INR"))
+            .thenThrow(new RuntimeException("timeout"));
+
+        var unknown = new Transfer(transferId, "idem-3", "demo-customer", "ACC1001", "ACC2001",
+            new BigDecimal("15.00"), "INR");
+        unknown.markProcessing();
+        unknown.markReconciliationRequired("DOWNSTREAM_OUTCOME_UNKNOWN");
+        when(state.markReconciliationRequired(transferId, "DOWNSTREAM_OUTCOME_UNKNOWN")).thenReturn(unknown);
+
+        var service = new TransferApplicationService(repo, customers, gateway, state);
+        var result = service.create("demo-customer", request);
+
+        assertEquals("RECONCILIATION_REQUIRED", result.status());
+        verify(state).markReconciliationRequired(transferId, "DOWNSTREAM_OUTCOME_UNKNOWN");
     }
 }
