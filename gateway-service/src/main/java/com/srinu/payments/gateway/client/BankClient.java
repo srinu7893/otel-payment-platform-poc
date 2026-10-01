@@ -1,0 +1,29 @@
+package com.srinu.payments.gateway.client;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Component
+public class BankClient {
+    private final RestClient client;
+
+    public BankClient(RestClient.Builder builder,
+                      @Value("${clients.bank.base-url}") String baseUrl) {
+        this.client = builder.baseUrl(baseUrl).build();
+    }
+
+    public BankDebitResponse debit(UUID paymentId, String accountNumber, BigDecimal amount) {
+        return client.post()
+                .uri("/api/v1/bank/debits")
+                .body(new BankDebitRequest(paymentId, accountNumber, amount))
+                .retrieve()
+                .body(BankDebitResponse.class);
+    }
+
+    public record BankDebitRequest(UUID paymentId, String accountNumber, BigDecimal amount) {}
+    public record BankDebitResponse(String status, String message) {}
+}
