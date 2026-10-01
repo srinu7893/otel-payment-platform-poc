@@ -4,7 +4,6 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -42,13 +41,19 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityErrorHandler securityErrors) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/login", "/actuator/health", "/actuator/info").permitAll()
                 .anyRequest().authenticated())
-            .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()));
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint(securityErrors)
+                .accessDeniedHandler(securityErrors))
+            .oauth2ResourceServer(oauth -> oauth
+                .authenticationEntryPoint(securityErrors)
+                .accessDeniedHandler(securityErrors)
+                .jwt(jwt -> {}));
         return http.build();
     }
 }
