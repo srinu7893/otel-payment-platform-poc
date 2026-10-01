@@ -24,13 +24,16 @@ public class TransferApplicationService {
     private final CustomerClient customers;
     private final GatewayClient gateway;
     private final TransferStateService state;
+    private final RiskPolicyService risk;
 
     public TransferApplicationService(TransferRepository transfers, CustomerClient customers,
-                                      GatewayClient gateway, TransferStateService state) {
+                                      GatewayClient gateway, TransferStateService state,
+                                      RiskPolicyService risk) {
         this.transfers = transfers;
         this.customers = customers;
         this.gateway = gateway;
         this.state = state;
+        this.risk = risk;
     }
 
     public TransferResponse create(String customerId, TransferRequest request) {
@@ -39,7 +42,6 @@ public class TransferApplicationService {
             return replay(customerId, replay.get());
         }
 
-        // Customer HTTP lookup intentionally runs without a local DB transaction.
         var customer = customers.get(customerId);
         if (customer == null || !customer.active()) {
             throw new TransferAuthorizationException("Customer is not active");
@@ -51,6 +53,8 @@ public class TransferApplicationService {
         if (request.senderAccount().equals(request.receiverAccount())) {
             throw new IllegalArgumentException("Sender and receiver accounts must be different");
         }
+
+        risk.validate(customerId, request.senderAccount(), request.amount());
 
         final Transfer transfer;
         try {
@@ -65,7 +69,6 @@ public class TransferApplicationService {
             request.amount(), request.currency());
 
         try {
-            // Remote Gateway/Bank call intentionally runs after the create transaction has committed.
             var result = gateway.transfer(transfer.getId(), request.senderAccount(), request.receiverAccount(),
                 request.amount(), request.currency());
             var finalized = state.applyGatewayResult(transfer.getId(), result);
