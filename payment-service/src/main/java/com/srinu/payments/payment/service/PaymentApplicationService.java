@@ -40,7 +40,6 @@ public class PaymentApplicationService {
             return replay(customerId, req.idempotencyKey(), existing.get());
         }
 
-        // Remote customer lookup intentionally happens outside a database transaction.
         var customer = customers.get(customerId);
         if (customer == null || !customer.active()) {
             throw new PaymentAuthorizationException("Customer is not active");
@@ -52,7 +51,6 @@ public class PaymentApplicationService {
 
         final Payment payment;
         try {
-            // Short local transaction: create durable PROCESSING state, then release the DB connection/locks.
             payment = state.createProcessing(customerId, req);
         } catch (DataIntegrityViolationException duplicateRace) {
             var replay = state.findByIdempotencyKey(req.idempotencyKey()).orElseThrow(() -> duplicateRace);
@@ -63,7 +61,6 @@ public class PaymentApplicationService {
             payment.getId(), customerId, payment.getMerchant(), payment.getAmount(), mask(payment.getAccountNumber()));
 
         try {
-            // Remote Gateway/Bank call intentionally happens with no Payment DB transaction open.
             var result = gateway.authorize(payment.getId(), req.accountNumber(), req.amount());
             var finalized = state.applyGatewayResult(payment.getId(), result);
 
@@ -151,9 +148,5 @@ public class PaymentApplicationService {
 
     public static class PaymentAuthorizationException extends RuntimeException {
         public PaymentAuthorizationException(String message) { super(message); }
-    }
-
-    public static class PaymentNotFoundException extends RuntimeException {
-        public PaymentNotFoundException(UUID id) { super("Payment not found: " + id); }
     }
 }
