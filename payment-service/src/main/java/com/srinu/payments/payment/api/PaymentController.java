@@ -2,6 +2,7 @@ package com.srinu.payments.payment.api;
 
 import com.srinu.payments.payment.domain.PaymentStatus;
 import com.srinu.payments.payment.service.PaymentApplicationService;
+import com.srinu.payments.payment.service.RefundApplicationService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -17,9 +18,11 @@ import java.util.UUID;
 @RequestMapping("/api/v1/payments")
 public class PaymentController {
     private final PaymentApplicationService service;
+    private final RefundApplicationService refunds;
 
-    public PaymentController(PaymentApplicationService service) {
+    public PaymentController(PaymentApplicationService service, RefundApplicationService refunds) {
         this.service = service;
+        this.refunds = refunds;
     }
 
     @PostMapping
@@ -44,6 +47,18 @@ public class PaymentController {
     @PostMapping("/{id}/cancel")
     public PaymentResponse cancel(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return service.cancel(customerId(jwt), id, privileged(jwt));
+    }
+
+    @PostMapping("/{id}/refunds")
+    public ResponseEntity<RefundResponse> refund(@AuthenticationPrincipal Jwt jwt,
+                                                 @PathVariable UUID id,
+                                                 @Valid @RequestBody RefundRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(refunds.create(customerId(jwt), id, request));
+    }
+
+    @GetMapping("/{id}/refund")
+    public RefundResponse getRefund(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return refunds.get(customerId(jwt), id);
     }
 
     private String customerId(Jwt jwt) {
