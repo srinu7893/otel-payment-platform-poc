@@ -24,7 +24,8 @@ async function request(path, options = {}) {
       : body || `HTTP ${response.status}`;
     const error = new Error(message);
     error.status = response.status;
-    error.correlationId = response.headers.get('X-Correlation-Id') || correlationId;
+    error.code = typeof body === 'object' ? body?.code : undefined;
+    error.correlationId = response.headers.get('X-Correlation-Id') || body?.correlationId || correlationId;
     throw error;
   }
   return body;
@@ -43,6 +44,10 @@ export function login(username, password) {
 
 export function getCustomer(token, customerId) {
   return request(`/v1/customers/${customerId}`, { headers: authHeaders(token) });
+}
+
+export function listCustomers(token) {
+  return request('/v1/customers', { headers: authHeaders(token) });
 }
 
 export function listPayments(token, { page = 0, size = 20, status } = {}) {
@@ -70,9 +75,25 @@ export function cancelPayment(token, paymentId) {
   });
 }
 
+export function createRefund(token, paymentId, idempotencyKey = crypto.randomUUID()) {
+  return request(`/v1/payments/${paymentId}/refunds`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ idempotencyKey })
+  });
+}
+
+export function getRefund(token, paymentId) {
+  return request(`/v1/payments/${paymentId}/refund`, { headers: authHeaders(token) });
+}
+
 export function listTransfers(token, { page = 0, size = 20 } = {}) {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   return request(`/v1/transfers?${params.toString()}`, { headers: authHeaders(token) });
+}
+
+export function getTransfer(token, transferId) {
+  return request(`/v1/transfers/${transferId}`, { headers: authHeaders(token) });
 }
 
 export function createTransfer(token, payload) {
@@ -83,10 +104,13 @@ export function createTransfer(token, payload) {
   });
 }
 
-export function listNotifications(token) {
-  return request('/v1/notifications', { headers: authHeaders(token) });
+export function listNotifications(token, { paymentId, transferId, page = 0, size = 20 } = {}) {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  if (paymentId) params.set('paymentId', paymentId);
+  if (transferId) params.set('transferId', transferId);
+  return request(`/v1/notifications?${params.toString()}`, { headers: authHeaders(token) });
 }
 
-export function listCustomers(token) {
-  return request('/v1/customers', { headers: authHeaders(token) });
+export function getOperationsHealth(token) {
+  return request('/v1/ops/health', { headers: authHeaders(token) });
 }
