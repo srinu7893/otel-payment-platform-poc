@@ -30,21 +30,23 @@ public class AuthorizationService {
             throwable -> {
                 log.error("event=GATEWAY_BANK_CIRCUIT_FALLBACK paymentId={} durationMs={} error={}",
                     request.paymentId(), System.currentTimeMillis() - started, safeMessage(throwable));
-                return new AuthorizationResponse("FAILED", "Bank unavailable");
+                // The bank may have committed before the client observed the failure/timeout.
+                // UNKNOWN is deliberately distinct from a business decline so Payment can reconcile safely.
+                return new AuthorizationResponse(null, "UNKNOWN", "Bank outcome requires reconciliation");
             });
     }
 
     private AuthorizationResponse callBank(AuthorizationRequest request, long started) {
         try {
             var bank = bankClient.debit(request.paymentId(), request.accountNumber(), request.amount());
-            log.info("event=GATEWAY_AUTH_COMPLETED paymentId={} bankStatus={} durationMs={}",
-                request.paymentId(), bank.status(), System.currentTimeMillis() - started);
-            return new AuthorizationResponse(bank.status(), bank.message());
+            log.info("event=GATEWAY_AUTH_COMPLETED paymentId={} bankTransactionId={} bankStatus={} durationMs={}",
+                request.paymentId(), bank.transactionId(), bank.status(), System.currentTimeMillis() - started);
+            return new AuthorizationResponse(bank.transactionId(), bank.status(), bank.message());
         } catch (RestClientResponseException ex) {
             if (ex.getStatusCode().is4xxClientError()) {
                 log.warn("event=GATEWAY_BANK_REJECTED paymentId={} status={} durationMs={}",
                     request.paymentId(), ex.getStatusCode(), System.currentTimeMillis() - started);
-                return new AuthorizationResponse("FAILED", "Bank rejected transaction");
+                return new AuthorizationResponse(null, "FAILED", "Bank rejected transaction");
             }
             throw ex;
         }
@@ -52,7 +54,9 @@ public class AuthorizationService {
 
     private String safeMessage(Throwable throwable) {
         String message = throwable == null ? null : throwable.getMessage();
-        return message == null || message.isBlank() ? throwable == null ? "unknown" : throwable.getClass().getSimpleName() : message;
+        return message == null || message.isBlank()
+            ? throwable == null ? "unknown" : throwable.getClass().getSimpleName()
+            : message;
     }
 
     private String mask(String account) {
