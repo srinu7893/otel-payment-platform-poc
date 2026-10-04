@@ -6,7 +6,10 @@ x-otel-environment: &otel-environment
   OTEL_LOGS_EXPORTER: none
   OTEL_PROPAGATORS: tracecontext,baggage
   OTEL_METRIC_EXPORT_INTERVAL: "5000"
-  OTEL_RESOURCE_ATTRIBUTES: deployment.environment=local,service.version=0.1.0
+  OTEL_RESOURCE_ATTRIBUTES: service.namespace=payment-platform,deployment.environment.name=local,service.version=0.1.0
+  OTEL_INSTRUMENTATION_HTTP_SERVER_CAPTURE_REQUEST_HEADERS: X-Correlation-Id
+  OTEL_INSTRUMENTATION_HTTP_CLIENT_CAPTURE_REQUEST_HEADERS: X-Correlation-Id
+  OTEL_INSTRUMENTATION_LOGBACK_MDC_ENABLED: "true"
 
 services:
   postgres:
@@ -55,7 +58,7 @@ services:
       - "13133:13133"
 
   prometheus:
-    image: prom/prometheus:v3.15.0
+    image: prom/prometheus:v3.2.1
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=6h
@@ -67,7 +70,7 @@ services:
       - "9090:9090"
 
   grafana:
-    image: grafana/grafana:13.2.2
+    image: grafana/grafana:11.6.0
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
