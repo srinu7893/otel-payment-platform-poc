@@ -20,7 +20,7 @@
         "query": "api-gateway,auth-service,customer-service,payment-service,gateway-service,mock-bank-service,notification-service",
         "multi": true,
         "includeAll": true,
-        "allValue": ".*",
+        "allValue": ".+",
         "current": {
           "text": "All",
           "value": "$__all"

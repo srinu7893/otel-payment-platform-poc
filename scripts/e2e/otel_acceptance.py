@@ -170,6 +170,11 @@ def main():
                 payment(token)
             finally:
                 compose('start','otel-collector')
+            eventually(lambda: bool(request('http://localhost:13133')))
+            # Java exporters can cache the failed Docker DNS lookup during outage.
+            # Test genuinely fresh traffic after receiver readiness and DNS recovery,
+            # not spans already batched during the outage (delivery is best effort).
+            time.sleep(15)
             recovered_trace=uuid.uuid4().hex
             pid=payment(token,recovered_trace)
             eventually(lambda:notification(token,pid))

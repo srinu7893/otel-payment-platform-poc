@@ -17,6 +17,16 @@ def git(*args):
 revision=git('rev-parse','HEAD')
 ref=os.environ.get('GITHUB_HEAD_REF') or os.environ.get('GITHUB_REF_NAME') or git('branch','--show-current') or 'main'
 source='https://github.com/srinu7893/otel-payment-platform-poc/blob/'+ref+'/'
+def read_artifact(name, default=None):
+    path=ROOT/'artifacts'/name
+    return json.loads(path.read_text()) if path.exists() else default
+
+results=read_artifact('otel-results.json', [])
+pipeline=json.loads(os.environ.get('POC_PIPELINE_OUTCOMES','{}'))
+browser=read_artifact('browser-results.json', {})
+traffic=read_artifact('traffic.json', {})
+sampling=read_artifact('advanced-sampling.json', {})
+verified=bool(results) and all(x['status']=='PASS' for x in results) and browser.get('status')=='PASS' and sampling.get('status')=='PASS' and bool(pipeline) and all(x=='success' for x in pipeline.values())
 sections=[]
 def section(key,title,body):
     sections.append((key,title,body))
@@ -79,6 +89,9 @@ p('For local testing, keep the same COMPOSE_PROJECT_NAME used at startup. The re
 code('''bash scripts/e2e/business-smoke.sh
 RESILIENCE=true python3 scripts/e2e/otel_acceptance.py
 bash scripts/pre_otel_acceptance.sh
+python3 scripts/e2e/live-traffic.py
+python3 scripts/e2e/advanced-sampling.py
+python3 scripts/e2e/capture-evidence.py
 python3 scripts/render-poc-guide.py''')+
 p('The manual workflow runs Maven unit and Testcontainers integration tests, validates backend configs, builds/starts the stack, checks business success/failure paths, queries real telemetry backends, collects diagnostic logs and always removes its disposable stack. Evidence artifact: otel-poc-evidence-<run number>. Includes Surefire reports, actual OTel assertion results, trace ID summary, Compose logs and this HTML. A failed test fails the workflow; missing telemetry is not treated as a skipped success.')+
 table(['Scenario','Expected result','Executable source'],[
@@ -133,7 +146,7 @@ section('coverage','OpenTelemetry coverage: basic to advanced',table(['Capabilit
  ('Signals and context','Traces, metrics, logs, W3C propagation, durable outbox context, trace/log links','Global baggage propagation is available; arbitrary baggage is not stored in outbox.'),
  ('Business observability','Custom outbox.publish span and attempt metric; business outcome log panels','No full custom payment SLO/error-budget instrumentation or complete domain audit store.'),
  ('Collector','OTLP gRPC/HTTP receivers; resource, memory limit, privacy attribute deletion, batching, bounded exporter queues/retry','Queues are memory-backed. No guarantee of lossless delivery through lengthy outages or restarts.'),
- ('Visualization','Provisioned operations, business and pipeline dashboards; trace search, service graph, exemplars configured','Actual series and links require runtime acceptance. Exemplars depend on sampled data and compatible panels.'),
+ ('Visualization','Provisioned operations, business and pipeline dashboards; trace search, service graph, exemplars configured','The Evidence section records rendered dashboards and backend queries. Exemplars depend on sampled data and compatible panels.'),
  ('Sampling','Default always_on for deterministic demo; isolated tail experiment retains errors/slow traces + 10% baseline','The manual workflow runs a separate real-request sampling experiment after deterministic full-trace E2E. Error/slow rules require all spans for a trace to reach one sampling Collector.'),
  ('Alerts','Prometheus rules for telemetry scrape failure, outbox failure and span error ratio','No Alertmanager routing, pager/email delivery or production SLO policy.'),
  ('Resilience','Business idempotency/reconciliation plus broker/Collector outage tests','Not a load, capacity, HA, disaster recovery or production-readiness certification.'),
@@ -152,14 +165,12 @@ section('findings','Review findings and remaining decisions',bullets([
  '<strong>Fixed:</strong> full-stack smoke and pre-OTel acceptance ran on ordinary CI. They now live in a manual-only workflow, along with telemetry and resilience assertions.',
  '<strong>Fixed:</strong> no telemetry backends or operational trace/log entry point. The overlay provisions all three signal paths and support UI links.',
  '<strong>Known baseline boundary:</strong> internal customer/bank endpoints rely on trusted-network deployment; demo JWT secrets/accounts and exposed service ports must not be deployed publicly. See '+file('docs/SECURITY_BASELINE.md')+' and '+file('docs/SERVICE_IDENTITY_STRATEGY.md')+'.',
- '<strong>Pending verification:</strong> runtime agent/library compatibility, backend configurations, dashboard query results and complete live acceptance must be proven by the manual run. Local source/static checks alone do not establish these.',
+ ('<strong>Verified live:</strong> agent/library compatibility, backend configurations, connected payment traces, metrics/logs, recovery scenarios, browser screens, three rendered dashboards and tail sampling passed in the recorded manual run.' if verified else '<strong>Verification gate:</strong> check recorded workflow outcomes and assertion results below. Only a fully passing run verifies the live integration.'),
  '<strong>Production scope:</strong> choose GCP runtime, backend/vendor, IAM/secrets, retention/cost, broker management and support escalation policy. All OpenTelemetry ecosystem features cannot meaningfully be declared complete by one local PoC.'
 ]))
 
-results_path=ROOT/'artifacts/otel-results.json'
-results=json.loads(results_path.read_text()) if results_path.exists() else []
-pipeline=json.loads(os.environ.get('POC_PIPELINE_OUTCOMES','{}'))
-evidence=p('Source revision at generation: '+revision+'; source ref: '+ref+'. Generated '+datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')+'.')
+evidence=p('Live integration status: '+('VERIFIED — every recorded workflow stage and acceptance assertion passed.' if verified else 'See individual recorded outcomes; full live verification is not established by source configuration alone.'))
+evidence+=p('Source revision at generation: '+revision+'; source ref: '+ref+'. Generated '+datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')+'.')
 if os.environ.get('GITHUB_RUN_ID'):
     evidence+=p('GitHub run: ')+link('https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/'+os.environ['GITHUB_RUN_ID'],'Open exact workflow run')
 if pipeline:
@@ -168,10 +179,13 @@ if results:
     evidence+=table(['Telemetry/security/resilience assertion','Actual result','Detail'],[(e(x['scenario']),e(x['status']),e(x.get('error',str(x.get('seconds',''))+' seconds'))) for x in results])
 else:
     evidence+='<div class="notice">NOT RUN HERE: no live OTel acceptance result file is present. Docker was unavailable in the authoring workspace; backend tests and live telemetry must be verified in the manual workflow. Do not interpret this guide as a successful runtime test report.</div>'
-screens=sorted((ROOT/'artifacts/screenshots').glob('*.png'))
+for title, data in [('Browser acceptance',browser),('Measured demonstration traffic',traffic),('Advanced tail-sampling experiment',sampling)]:
+    if data:
+        evidence+='<h3>'+e(title)+'</h3>'+code(json.dumps(data,indent=2))
+screens=sorted((ROOT/'artifacts/screenshots').glob('*.png')) if os.environ.get('POC_EMBED_SCREENSHOTS','true').lower()=='true' else []
 if screens:
     evidence+='<h3>Captured from the live run</h3>'+''.join('<figure><figcaption>'+e(f.stem)+'</figcaption><img style="max-width:100%;border:1px solid #ccd" alt="'+e(f.stem)+'" src="data:image/png;base64,'+base64.b64encode(f.read_bytes()).decode()+'"></figure>' for f in screens)
-section('evidence','Execution evidence',evidence+p('Static source/config syntax checks and frontend build status are recorded in the pull request. A workflow artifact is a snapshot of that run, not a permanent promise of current health. The manual guide and scenario table describe expected outcomes; this section records observed results only.'))
+section('evidence','Execution evidence',evidence+p('Backend Surefire reports, raw trace/log/metric responses, database summaries, Compose logs and screenshots are included in the downloadable evidence archive. Frontend/container build results are recorded in ordinary CI and linked from the pull request. A workflow artifact is a snapshot of that run, not a permanent promise of current health. The manual guide and scenario table describe expected outcomes; this section records observed results only.'))
 
 sources=[('OTel Java agent','https://opentelemetry.io/docs/zero-code/java/agent/'),('Agent configuration','https://opentelemetry.io/docs/zero-code/java/agent/configuration/'),('Custom API with agent','https://opentelemetry.io/docs/zero-code/java/agent/api/'),('Collector configuration','https://opentelemetry.io/docs/collector/configuration/'),('Loki native OTLP ingestion','https://grafana.com/docs/loki/latest/send-data/otel/'),('Tempo service graphs','https://grafana.com/docs/tempo/latest/metrics-from-traces/service_graphs/'),('Tail sampling processor','https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor'),('Manual GitHub workflows','https://docs.github.com/en/actions/using-workflows/manually-running-a-workflow')]
 section('sources','Source links and maintenance',table(['Item','Repository source'],[(e(label),file(path)) for label,path in [('Base stack','docker-compose.yml'),('OTel overlay','docker-compose.otel.yml'),('Collector','observability/collector.yaml'),('Tempo','observability/tempo.yaml'),('Loki','observability/loki.yaml'),('Prometheus / alerts','observability/prometheus.yaml'),('Dashboard JSON','observability/grafana/dashboards'),('Datasource links','observability/grafana/provisioning/datasources/datasources.yaml'),('Manual workflow','.github/workflows/manual-otel-e2e.yml'),('Acceptance scripts','scripts/e2e'),('HTML generator','scripts/render-poc-guide.py')]])+

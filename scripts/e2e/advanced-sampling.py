@@ -28,6 +28,8 @@ def available(trace):
 try:
     compose(True,'up','-d','--no-deps','--force-recreate','otel-collector')
     eventually(lambda: bool(request('http://localhost:13133')))
+    # Allow Java exporters' negative DNS cache from Collector recreation to expire.
+    time.sleep(15)
     error=bank('ACC-ERROR',(500,))
     slow=bank('ACC-SLOW')
     normal=[bank('ACC1001') for _ in range(20)]
