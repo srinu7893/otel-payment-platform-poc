@@ -116,6 +116,8 @@ This is the source of truth for baseline completion before OpenTelemetry.
 
 ## Phase 8 — Baseline Freeze Gate
 
+**BASELINE FREEZE: DONE** — pre-OTel application baseline verified by the consolidated CI pipeline.
+
 OpenTelemetry starts only after these are satisfied:
 
 - DONE — CI green.
@@ -174,8 +176,7 @@ OpenTelemetry starts only after these are satisfied:
 
 ## Current immediate execution queue
 
-1. Wait for final normal CI + dedicated pre-OTel acceptance on the final baseline head.
-2. Mark Baseline Freeze `DONE` only when both are green.
-3. Merge the verified baseline to `main`.
-4. Create a separate OpenTelemetry branch from verified `main`.
-5. Start OTel Java Agent + Collector and advanced observability integrations there.
+1. Merge the verified baseline to `main`.
+2. Verify the consolidated CI on `main`.
+3. Create a separate OpenTelemetry branch from verified `main`.
+4. Start OTel Java Agent + Collector and advanced observability integrations there.
