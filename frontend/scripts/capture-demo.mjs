@@ -17,18 +17,33 @@ async function login(page, username, password) {
   await wait(1200);
 }
 
-async function getRecentTraceId() {
+function traceDurationMicros(trace) {
+  const spans = trace?.spans || [];
+  if (!spans.length) return 0;
+  const start = Math.min(...spans.map(s => Number(s.startTime || 0)));
+  const end = Math.max(...spans.map(s => Number(s.startTime || 0) + Number(s.duration || 0)));
+  return Math.max(0, end - start);
+}
+
+async function getDemoTraceIds() {
   for (let attempt = 0; attempt < 20; attempt++) {
-    const res = await fetch('http://localhost:16686/api/traces?service=api-gateway&limit=20&lookback=1h');
+    const res = await fetch('http://localhost:16686/api/traces?service=api-gateway&limit=50&lookback=1h');
     if (res.ok) {
       const body = await res.json();
       const traces = body?.data || [];
-      const preferred = traces.find(t =>
-        JSON.stringify(t).includes('/api/v1/payments') ||
-        JSON.stringify(t).includes('POST /api/v1/payments')
-      );
-      const trace = preferred || traces[0];
-      if (trace?.traceID) return trace.traceID;
+      const paymentTraces = traces.filter(t => {
+        const json = JSON.stringify(t);
+        return json.includes('/api/v1/payments') || json.includes('POST /api/v1/payments');
+      });
+      const candidates = paymentTraces.length ? paymentTraces : traces;
+      if (candidates.length) {
+        const sorted = [...candidates].sort((a, b) => traceDurationMicros(a) - traceDurationMicros(b));
+        return {
+          normalTraceId: sorted[0].traceID,
+          slowTraceId: sorted[sorted.length - 1].traceID,
+          slowDurationMicros: traceDurationMicros(sorted[sorted.length - 1])
+        };
+      }
     }
     await wait(1500);
   }
@@ -51,23 +66,28 @@ await page.getByRole('heading', { name: 'Support / Admin dashboard' }).waitFor()
 await wait(1500);
 await page.screenshot({ path: path.join(outDir, '03-support-observability-dashboard.png'), fullPage: true });
 
-const traceId = await getRecentTraceId();
-await page.goto('http://localhost:16686/trace/' + traceId, { waitUntil: 'networkidle' });
+const traces = await getDemoTraceIds();
+await page.goto('http://localhost:16686/trace/' + traces.normalTraceId, { waitUntil: 'networkidle' });
 await wait(2500);
-await page.screenshot({ path: path.join(outDir, '04-jaeger-distributed-trace.png'), fullPage: true });
+await page.screenshot({ path: path.join(outDir, '04-jaeger-normal-payment-trace.png'), fullPage: true });
 
-await page.goto('http://localhost:3001/login', { waitUntil: 'networkidle' });
-await page.locator('input[name="user"]').fill('admin');
-await page.locator('input[name="password"]').fill('admin');
-await page.getByRole('button', { name: /log in/i }).click();
-await wait(1200);
+await page.goto('http://localhost:16686/trace/' + traces.slowTraceId, { waitUntil: 'networkidle' });
+await wait(2500);
+await page.screenshot({ path: path.join(outDir, '05-jaeger-slow-failure-trace.png'), fullPage: true });
+
+const grafanaLogin = await page.request.post('http://localhost:3001/login', {
+  data: { user: 'admin', password: 'admin' }
+});
+if (!grafanaLogin.ok()) {
+  throw new Error('Grafana API login failed with HTTP ' + grafanaLogin.status());
+}
 await page.goto('http://localhost:3001/d/payment-platform-overview/payment-platform-otel-overview?orgId=1&from=now-15m&to=now', { waitUntil: 'networkidle' });
 await wait(3500);
-await page.screenshot({ path: path.join(outDir, '05-grafana-payment-platform-overview.png'), fullPage: true });
+await page.screenshot({ path: path.join(outDir, '06-grafana-payment-platform-overview.png'), fullPage: true });
 
 await page.goto('http://localhost:9090/targets', { waitUntil: 'networkidle' });
 await wait(1000);
-await page.screenshot({ path: path.join(outDir, '06-prometheus-targets.png'), fullPage: true });
+await page.screenshot({ path: path.join(outDir, '07-prometheus-targets.png'), fullPage: true });
 
 let logs = '';
 try {
@@ -98,7 +118,7 @@ pre { white-space:pre-wrap; word-break:break-word; font-size:13px; line-height:1
 <pre>${logs.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')}</pre>
 </body>
 </html>`);
-await page.screenshot({ path: path.join(outDir, '07-trace-log-correlation.png'), fullPage: true });
+await page.screenshot({ path: path.join(outDir, '08-trace-log-correlation.png'), fullPage: true });
 
 const md = `# Live Observability Demo Screenshots
 
