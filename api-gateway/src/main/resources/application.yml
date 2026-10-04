@@ -48,3 +48,9 @@ logging:
   structured:
     format:
       console: logstash
+
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /openapi.yaml
