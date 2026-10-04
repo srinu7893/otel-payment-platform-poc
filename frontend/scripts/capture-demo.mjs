@@ -127,12 +127,14 @@ Generated automatically from the running Docker stack after the end-to-end CI sc
 1. Customer overview — \`01-customer-overview.png\`
 2. RabbitMQ-driven notification activity — \`02-customer-notifications.png\`
 3. Support/Admin observability + service health — \`03-support-observability-dashboard.png\`
-4. Jaeger distributed trace — \`04-jaeger-distributed-trace.png\`
-5. Grafana payment platform dashboard — \`05-grafana-payment-platform-overview.png\`
-6. Prometheus targets — \`06-prometheus-targets.png\`
-7. Structured trace/log correlation — \`07-trace-log-correlation.png\`
+4. Jaeger normal payment distributed trace — \`04-jaeger-normal-payment-trace.png\`
+5. Jaeger slow/timeout trace — \`05-jaeger-slow-failure-trace.png\`
+6. Grafana payment platform dashboard — \`06-grafana-payment-platform-overview.png\`
+7. Prometheus targets — \`07-prometheus-targets.png\`
+8. Structured trace/log correlation — \`08-trace-log-correlation.png\`
 
-Jaeger trace captured: \`${traceId}\`
+Normal Jaeger trace: \`${traces.normalTraceId}\`
+Slow/failure Jaeger trace: \`${traces.slowTraceId}\` (~${Math.round(traces.slowDurationMicros / 1000)} ms)
 `;
 writeFileSync(path.resolve('../docs/demo/SCREENSHOTS.md'), md);
 
