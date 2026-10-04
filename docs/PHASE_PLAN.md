@@ -77,7 +77,7 @@ This is the source of truth for baseline completion before OpenTelemetry.
 | DONE | Circuit breaker | Gateway→Bank protected; transport ambiguity maps to UNKNOWN |
 | DONE | Safe retry model | No blind retry of money movement; operation IDs make reconciliation replay safe |
 | DONE | Notification retry + DLQ | Retry/backoff + poison-event dead-letter integration coverage |
-| IN PROGRESS | Failure scenario coverage | Insufficient funds/risk/duplicates/DLQ verified; add explicit slow-bank timeout and simulated 500 full-stack cases |
+| DONE | Failure scenario coverage | Insufficient funds, risk rejection, duplicate/idempotent replay, poison-message DLQ, slow-bank timeout and simulated bank-500 acceptance verified |
 
 ## Phase 5 — Testing & Quality Gates
 
@@ -89,7 +89,7 @@ This is the source of truth for baseline completion before OpenTelemetry.
 | DONE | Testcontainers RabbitMQ | Real producer/consumer, dedupe and poison-message DLQ |
 | DONE | Full-stack Docker smoke | Login → payment → outbox notification → refund → risk → P2P |
 | DONE | CI diagnostics | Response/status/log dump on smoke failures |
-| IN PROGRESS | Support/Admin direct smoke | UI builds and full stack boots; add a focused automated call to operations-health endpoint |
+| DONE | Support/Admin direct smoke | SUPPORT login + `/api/v1/ops/health` verified in dedicated pre-OTel acceptance workflow |
 
 ## Phase 6 — Frontend / Support / Admin
 
@@ -99,7 +99,7 @@ This is the source of truth for baseline completion before OpenTelemetry.
 | DONE | Refund UI | Completed payments can initiate refund from customer UI |
 | DONE | Support/Admin dashboard | Privileged list/search/problem summary without customer-profile dependency |
 | DONE | Service health backend | API Gateway aggregates six service actuator health checks |
-| IN PROGRESS | Service health UI acceptance | UI implemented; focused operations endpoint smoke still pending |
+| DONE | Service health UI acceptance | Operations health backend + focused acceptance verified; role-aware UI builds successfully |
 | PLANNED | Failure-scenario admin controls | Controlled slow/error/reset actions for live OTel demonstrations |
 | PLANNED | Correlation-ID operational search | Persist/index correlation ID or rely on log/trace backend once OTel is present |
 | PLANNED | Observability deep links | Trace/log links after Grafana/Tempo/Jaeger exists |
@@ -127,8 +127,8 @@ OpenTelemetry starts only after these are satisfied:
 - DONE — Testcontainers PostgreSQL/RabbitMQ pass.
 - DONE — customer frontend production build passes.
 - DONE — Support/Admin frontend production build passes.
-- IN PROGRESS — focused Support/Admin operations-health acceptance call.
-- IN PROGRESS — explicit slow-bank timeout + simulated HTTP 500 scenario in full-stack acceptance.
+- DONE — focused Support/Admin operations-health acceptance call.
+- DONE — explicit slow-bank timeout + simulated HTTP 500 scenario in pre-OTel acceptance.
 - NEEDS UPDATE — document/finalize service-to-service identity boundary for deployment.
 - PLANNED — OpenAPI/documented endpoint contract.
 - PLANNED — final known-limitations/security checklist.
@@ -174,10 +174,8 @@ OpenTelemetry starts only after these are satisfied:
 
 ## Current immediate execution queue
 
-1. Add focused automated Support/Admin `/api/v1/ops/health` acceptance coverage.
-2. Add full-stack slow-bank timeout and simulated bank-500 acceptance cases.
-3. Add OpenAPI/Swagger and endpoint examples.
-4. Add security/audit/known-limitations baseline document.
-5. Decide/document service-to-service identity strategy by environment.
-6. Mark Baseline Freeze `DONE`.
-7. Start OpenTelemetry Java Agent + Collector only after the freeze gate is green.
+1. Add OpenAPI/Swagger and endpoint examples.
+2. Add security/audit/known-limitations baseline document.
+3. Decide/document service-to-service identity strategy by environment.
+4. Mark Baseline Freeze `DONE`.
+5. Start OpenTelemetry Java Agent + Collector only after the freeze gate is green.
