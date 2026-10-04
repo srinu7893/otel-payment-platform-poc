@@ -10,6 +10,9 @@ concurrency:
   group: payment-platform-ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -229,6 +232,42 @@ jobs:
         if: github.ref == 'refs/heads/feature/opentelemetry-observability'
         shell: bash
         run: bash scripts/otel_acceptance.sh
+
+      - name: Install Playwright Chromium
+        if: github.ref == 'refs/heads/feature/opentelemetry-observability'
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture live observability screenshots
+        if: github.ref == 'refs/heads/feature/opentelemetry-observability'
+        working-directory: frontend
+        run: node scripts/capture-demo.mjs
+
+      - name: Upload observability demo screenshots
+        if: github.ref == 'refs/heads/feature/opentelemetry-observability'
+        uses: actions/upload-artifact@v4
+        with:
+          name: observability-demo-screenshots
+          path: |
+            docs/demo/screenshots
+            docs/demo/SCREENSHOTS.md
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit live demo screenshots
+        if: github.ref == 'refs/heads/feature/opentelemetry-observability' && github.event_name == 'push'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/demo/screenshots docs/demo/SCREENSHOTS.md
+          if git diff --cached --quiet; then
+            echo "No screenshot changes to commit"
+          else
+            git commit -m "docs: capture live observability demo [skip ci]"
+            git push origin HEAD:feature/opentelemetry-observability
+          fi
 
       - name: Show stack status
         if: always()
