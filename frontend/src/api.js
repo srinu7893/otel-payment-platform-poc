@@ -114,3 +114,8 @@ export function listNotifications(token, { paymentId, transferId, page = 0, size
 export function getOperationsHealth(token) {
   return request('/v1/ops/health', { headers: authHeaders(token) });
 }
+
+
+export function getObservabilityStatus(token) {
+  return request('/v1/ops/observability', { headers: authHeaders(token) });
+}
