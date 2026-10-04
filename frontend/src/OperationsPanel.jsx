@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   getOperationsHealth,
+  getObservabilityStatus,
   getPayment,
   getTransfer,
   listNotifications,
@@ -10,6 +11,7 @@ import {
 
 export default function OperationsPanel({ token, roles }) {
   const [health, setHealth] = useState(null);
+  const [observability, setObservability] = useState(null);
   const [payments, setPayments] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -23,13 +25,15 @@ export default function OperationsPanel({ token, roles }) {
     setLoading(true);
     setError('');
     try {
-      const [healthResult, paymentPage, transferPage, notificationPage] = await Promise.all([
+      const [healthResult, observabilityResult, paymentPage, transferPage, notificationPage] = await Promise.all([
         getOperationsHealth(token),
+        getObservabilityStatus(token),
         listPayments(token, { size: 50 }),
         listTransfers(token, { size: 50 }),
         listNotifications(token, { size: 50 })
       ]);
       setHealth(healthResult);
+      setObservability(observabilityResult);
       setPayments(paymentPage?.content || []);
       setTransfers(transferPage?.content || []);
       setNotifications(notificationPage?.content || []);
@@ -81,6 +85,15 @@ export default function OperationsPanel({ token, roles }) {
         <article className="card metric"><span>Problem payments</span><strong>{failedPayments.length}</strong><small>failed / declined / reconciliation</small></article>
         <article className="card metric"><span>Problem transfers</span><strong>{failedTransfers.length}</strong><small>failed / reconciliation</small></article>
         <article className="card metric"><span>Failed notifications</span><strong>{failedNotifications.length}</strong><small>delivery failures</small></article>
+      </section>
+
+      <section className="card">
+        <div className="row"><div><h2>Observability integrations</h2><p>Real backend health checks for the local telemetry pipeline.</p></div><span className="badge">{observability?.allHealthy ? 'READY' : 'CHECK'}</span></div>
+        <div className="tableWrap"><table><thead><tr><th>Component</th><th>Status</th><th>Latency</th><th>Open</th></tr></thead><tbody>
+          {(observability?.components || []).map(item => <tr key={item.component}><td>{item.component}</td><td><span className="badge">{item.healthy ? 'UP' : 'DOWN'}</span></td><td>{item.latencyMs} ms</td><td>{item.uiUrl ? <a href={item.uiUrl} target="_blank" rel="noreferrer">Open</a> : '—'}</td></tr>)}
+          {!observability?.components?.length && <tr><td colSpan="4">No observability data loaded.</td></tr>}
+        </tbody></table></div>
+        <p><strong>Demo path:</strong> create a payment, copy its correlation ID from logs, then inspect the distributed trace in Jaeger and request/JVM metrics in Grafana.</p>
       </section>
 
       <section className="card">
