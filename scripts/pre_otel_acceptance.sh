@@ -39,7 +39,8 @@ post_payment() {
 }
 
 echo '1/4 Verify public OpenAPI/Swagger contract'
-curl --fail --silent --show-error "${BASE_URL}/openapi.yaml" | grep -q '^openapi: 3.0.3'
+curl --fail --silent --show-error "${BASE_URL}/openapi.yaml" --output /tmp/pre-otel-openapi.yaml
+grep -q '^openapi: 3.0.3' /tmp/pre-otel-openapi.yaml
 curl --fail --silent --show-error -L "${BASE_URL}/swagger-ui.html" >/dev/null
 
 echo '2/4 Verify SUPPORT operations health'
