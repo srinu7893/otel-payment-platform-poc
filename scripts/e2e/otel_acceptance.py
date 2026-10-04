@@ -83,6 +83,7 @@ def notification(token, payment_id):
 
 def spans(trace):
     data = request('http://localhost:3200/api/traces/'+trace)
+    (ARTIFACTS/('trace-'+trace+'.json')).write_text(json.dumps(data,indent=2))
     result = []
     for batch in data.get('batches', data.get('resourceSpans', [])):
         resource = {a['key']:a['value'].get('stringValue') for a in batch.get('resource',{}).get('attributes',[])}
@@ -111,6 +112,7 @@ def trace_complete(trace):
 def prom(query):
     data = request('http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':query}))
     assert data['status'] == 'success'
+    (ARTIFACTS/'last-metric-query.json').write_text(json.dumps({'query':query,'response':data},indent=2))
     return data['data']['result']
 
 
@@ -129,6 +131,7 @@ def logs_present(trace):
     data = request('http://localhost:3100/loki/api/v1/query_range?'+urllib.parse.urlencode({'query':query,'limit':100}))
     assert data['status']=='success'
     assert data['data']['result'], 'No logs correlated to payment trace'
+    (ARTIFACTS/('logs-'+trace+'.json')).write_text(json.dumps(data,indent=2))
     return True
 
 
