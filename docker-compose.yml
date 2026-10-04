@@ -1,3 +1,17 @@
+x-otel-environment: &otel-environment
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_METRICS_EXPORTER: otlp
+  OTEL_LOGS_EXPORTER: none
+  OTEL_METRIC_EXPORT_INTERVAL: "5000"
+  OTEL_BSP_SCHEDULE_DELAY: "1000"
+  OTEL_PROPAGATORS: tracecontext,baggage
+  OTEL_RESOURCE_ATTRIBUTES: service.namespace=payment-platform,deployment.environment.name=local
+  OTEL_INSTRUMENTATION_HTTP_SERVER_CAPTURE_REQUEST_HEADERS: X-Correlation-Id
+  OTEL_INSTRUMENTATION_HTTP_CLIENT_CAPTURE_REQUEST_HEADERS: X-Correlation-Id
+  OTEL_INSTRUMENTATION_LOGBACK_MDC_ENABLED: "true"
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -17,16 +31,68 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-payments}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-payments}
-    ports: ["5672:5672", "15672:15672"]
+    ports: ["5672:5672", "15672:15672", "15692:15692"]
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 10
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.68.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    command: ["--config=/etc/otelcol-contrib/config.yml"]
+    volumes:
+      - ./observability/otel-collector-config.yml:/etc/otelcol-contrib/config.yml:ro
+    depends_on:
+      - jaeger
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "9464:9464"
+      - "13133:13133"
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2d
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - otel-collector
+      - rabbitmq
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_DEFAULT_THEME: light
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - jaeger
+    ports:
+      - "3001:3000"
+
   auth-service:
     build: ./auth-service
     environment:
+      <<: *otel-environment
+      OTEL_SERVICE_NAME: auth-service
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
@@ -34,41 +100,58 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports: ["8079:8079"]
 
   customer-service:
     build: ./customer-service
     environment:
+      <<: *otel-environment
+      OTEL_SERVICE_NAME: customer-service
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
     depends_on:
       postgres:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports: ["8084:8084"]
 
   mock-bank-service:
     build: ./mock-bank-service
     environment:
+      <<: *otel-environment
+      OTEL_SERVICE_NAME: mock-bank-service
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
     depends_on:
       postgres:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports: ["8082:8082"]
 
   gateway-service:
     build: ./gateway-service
     environment:
+      <<: *otel-environment
+      OTEL_SERVICE_NAME: gateway-service
       CLIENTS_BANK_BASE_URL: http://mock-bank-service:8082
     depends_on:
-      - mock-bank-service
+      mock-bank-service:
+        condition: service_started
+      otel-collector:
+        condition: service_started
     ports: ["8081:8081"]
 
   payment-service:
     build: ./payment-service
     environment:
+      <<: *otel-environment
+      OTEL_SERVICE_NAME: payment-service
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
@@ -90,11 +173,15 @@ services:
         condition: service_started
       customer-service:
         condition: service_started
+      otel-collector:
+        condition: service_started
     ports: ["8080:8080"]
 
   notification-service:
     build: ./notification-service
     environment:
+      <<: *otel-environment
+      OTEL_SERVICE_NAME: notification-service
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
@@ -107,11 +194,15 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports: ["8083:8083"]
 
   api-gateway:
     build: ./api-gateway
     environment:
+      <<: *otel-environment
+      OTEL_SERVICE_NAME: api-gateway
       JWT_SECRET: ${JWT_SECRET:-change-this-demo-secret-change-this-demo-secret}
       SERVICES_AUTH_URL: http://auth-service:8079
       SERVICES_CUSTOMER_URL: http://customer-service:8084
@@ -119,13 +210,32 @@ services:
       SERVICES_NOTIFICATION_URL: http://notification-service:8083
       SERVICES_GATEWAY_URL: http://gateway-service:8081
       SERVICES_BANK_URL: http://mock-bank-service:8082
+      OBSERVABILITY_COLLECTOR_URL: http://otel-collector:13133
+      OBSERVABILITY_JAEGER_URL: http://jaeger:16686
+      OBSERVABILITY_PROMETHEUS_URL: http://prometheus:9090
+      OBSERVABILITY_GRAFANA_URL: http://grafana:3000
+      OBSERVABILITY_JAEGER_UI_URL: http://localhost:16686
+      OBSERVABILITY_PROMETHEUS_UI_URL: http://localhost:9090
+      OBSERVABILITY_GRAFANA_UI_URL: http://localhost:3001
     depends_on:
-      - auth-service
-      - customer-service
-      - payment-service
-      - notification-service
-      - gateway-service
-      - mock-bank-service
+      auth-service:
+        condition: service_started
+      customer-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+      gateway-service:
+        condition: service_started
+      mock-bank-service:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      grafana:
+        condition: service_started
     ports: ["8088:8088"]
 
   frontend:
