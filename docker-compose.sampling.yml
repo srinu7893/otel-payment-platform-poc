@@ -1,0 +1,5 @@
+services:
+  otel-collector:
+    command: [--config=/etc/otelcol/config.yaml, --config=/etc/otelcol/tail.yaml]
+    volumes:
+      - ./observability/collector-tail-sampling.yaml:/etc/otelcol/tail.yaml:ro

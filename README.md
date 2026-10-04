@@ -4,6 +4,21 @@ Enterprise-style full-stack payment platform for demonstrating Spring Boot micro
 
 > All accounts, balances, gateways, email/SMS messages and money movement are simulated. Never use real bank credentials, card data or production secrets in this POC.
 
+## OpenTelemetry implementation and handover
+
+See [the self-contained HTML POC guide](docs/POC_GUIDE.html) for services, architecture, recreation commands, dashboards, source links, support/developer runbooks, success/failure scenarios and execution evidence.
+
+```bash
+mvn -B clean verify
+bash scripts/setup-otel-agent.sh
+bash scripts/otel-compose.sh up --build -d
+bash scripts/e2e/wait-ready.sh
+```
+
+Grafana: http://localhost:3001 (`admin` / `otel-demo-admin`). The overlay adds Collector, Tempo, Prometheus, Loki and three provisioned dashboards. Backend JVMs export all three signals; the durable outbox now carries W3C trace context into RabbitMQ delivery. The baseline `docker compose` command remains available without OTel.
+
+Runtime validation is **pending** until the manual workflow passes. Local source checks are not a substitute for the evidence artifact. Regenerate the guide after changes with `python3 scripts/render-poc-guide.py`; each manual run also produces a current HTML report alongside its test evidence.
+
 ## Current architecture
 
 ```text
@@ -71,7 +86,7 @@ npm install
 npm run build
 ```
 
-GitHub Actions executes backend tests/package, frontend build, Docker Compose validation and frontend-container build on every branch push.
+GitHub Actions runs backend tests/package, frontend build, Compose validation and container builds on configured pushes/PRs. Full-stack smoke, failure scenarios and OTel E2E run only through the separate `manual-otel-e2e` workflow (`workflow_dispatch`).
 
 ## Run complete local stack
 

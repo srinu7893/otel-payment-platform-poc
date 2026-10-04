@@ -50,6 +50,12 @@ public class OutboxEvent {
     @Column(columnDefinition = "TEXT")
     private String lastError;
 
+    @Column(length = 55)
+    private String traceparent;
+
+    @Column(length = 512)
+    private String tracestate;
+
     @Version
     private Long version;
 
@@ -57,6 +63,9 @@ public class OutboxEvent {
 
     public OutboxEvent(String aggregateType, UUID aggregateId, String eventType, String routingKey,
                        String payload, String correlationId) {
+        var trace = OutboxTraceContext.capture();
+        this.traceparent = trace.get("traceparent");
+        this.tracestate = trace.get("tracestate");
         this.id = UUID.randomUUID();
         this.aggregateType = aggregateType;
         this.aggregateId = aggregateId;
@@ -83,6 +92,10 @@ public class OutboxEvent {
         String message = error == null ? "Unknown publish error" : error.getMessage();
         this.lastError = message == null ? error.getClass().getSimpleName() : message.substring(0, Math.min(message.length(), 2000));
     }
+
+    public io.opentelemetry.context.Context traceContext() { return OutboxTraceContext.restore(traceparent, tracestate); }
+    public String getTraceparent() { return traceparent; }
+    public String getTracestate() { return tracestate; }
 
     public UUID getId() { return id; }
     public String getAggregateType() { return aggregateType; }

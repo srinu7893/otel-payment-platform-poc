@@ -1,0 +1,192 @@
+services:
+  api-gateway:
+    environment:
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar -Xms64m -Xmx384m
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_TRACES_SAMPLER: always_on
+      OTEL_METRIC_EXPORT_INTERVAL: '10000'
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=payment-poc,deployment.environment.name=local,service.version=0.1.0
+      OTEL_INSTRUMENTATION_MICROMETER_ENABLED: 'true'
+      OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES: correlationId
+      OTEL_INSTRUMENTATION_JDBC_STATEMENT_SANITIZER_ENABLED: 'true'
+      OTEL_SERVICE_NAME: api-gateway
+    volumes:
+    - ./observability/agent:/otel:ro
+  auth-service:
+    environment:
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar -Xms64m -Xmx384m
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_TRACES_SAMPLER: always_on
+      OTEL_METRIC_EXPORT_INTERVAL: '10000'
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=payment-poc,deployment.environment.name=local,service.version=0.1.0
+      OTEL_INSTRUMENTATION_MICROMETER_ENABLED: 'true'
+      OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES: correlationId
+      OTEL_INSTRUMENTATION_JDBC_STATEMENT_SANITIZER_ENABLED: 'true'
+      OTEL_SERVICE_NAME: auth-service
+    volumes:
+    - ./observability/agent:/otel:ro
+  customer-service:
+    environment:
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar -Xms64m -Xmx384m
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_TRACES_SAMPLER: always_on
+      OTEL_METRIC_EXPORT_INTERVAL: '10000'
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=payment-poc,deployment.environment.name=local,service.version=0.1.0
+      OTEL_INSTRUMENTATION_MICROMETER_ENABLED: 'true'
+      OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES: correlationId
+      OTEL_INSTRUMENTATION_JDBC_STATEMENT_SANITIZER_ENABLED: 'true'
+      OTEL_SERVICE_NAME: customer-service
+    volumes:
+    - ./observability/agent:/otel:ro
+  payment-service:
+    environment:
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar -Xms64m -Xmx384m
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_TRACES_SAMPLER: always_on
+      OTEL_METRIC_EXPORT_INTERVAL: '10000'
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=payment-poc,deployment.environment.name=local,service.version=0.1.0
+      OTEL_INSTRUMENTATION_MICROMETER_ENABLED: 'true'
+      OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES: correlationId
+      OTEL_INSTRUMENTATION_JDBC_STATEMENT_SANITIZER_ENABLED: 'true'
+      OTEL_SERVICE_NAME: payment-service
+    volumes:
+    - ./observability/agent:/otel:ro
+  gateway-service:
+    environment:
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar -Xms64m -Xmx384m
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_TRACES_SAMPLER: always_on
+      OTEL_METRIC_EXPORT_INTERVAL: '10000'
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=payment-poc,deployment.environment.name=local,service.version=0.1.0
+      OTEL_INSTRUMENTATION_MICROMETER_ENABLED: 'true'
+      OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES: correlationId
+      OTEL_INSTRUMENTATION_JDBC_STATEMENT_SANITIZER_ENABLED: 'true'
+      OTEL_SERVICE_NAME: gateway-service
+    volumes:
+    - ./observability/agent:/otel:ro
+  mock-bank-service:
+    environment:
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar -Xms64m -Xmx384m
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_TRACES_SAMPLER: always_on
+      OTEL_METRIC_EXPORT_INTERVAL: '10000'
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=payment-poc,deployment.environment.name=local,service.version=0.1.0
+      OTEL_INSTRUMENTATION_MICROMETER_ENABLED: 'true'
+      OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES: correlationId
+      OTEL_INSTRUMENTATION_JDBC_STATEMENT_SANITIZER_ENABLED: 'true'
+      OTEL_SERVICE_NAME: mock-bank-service
+    volumes:
+    - ./observability/agent:/otel:ro
+  notification-service:
+    environment:
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar -Xms64m -Xmx384m
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_TRACES_SAMPLER: always_on
+      OTEL_METRIC_EXPORT_INTERVAL: '10000'
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=payment-poc,deployment.environment.name=local,service.version=0.1.0
+      OTEL_INSTRUMENTATION_MICROMETER_ENABLED: 'true'
+      OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES: correlationId
+      OTEL_INSTRUMENTATION_JDBC_STATEMENT_SANITIZER_ENABLED: 'true'
+      OTEL_SERVICE_NAME: notification-service
+    volumes:
+    - ./observability/agent:/otel:ro
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.136.0
+    command:
+    - --config=/etc/otelcol/config.yaml
+    volumes:
+    - ./observability/collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+    - 127.0.0.1:4317:4317
+    - 127.0.0.1:4318:4318
+    - 127.0.0.1:13133:13133
+    depends_on:
+    - tempo
+    - loki
+    - prometheus
+  tempo:
+    image: grafana/tempo:2.9.0
+    command:
+    - -config.file=/etc/tempo.yaml
+    volumes:
+    - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+    - tempo-data:/var/tempo
+    ports:
+    - 127.0.0.1:3200:3200
+  loki:
+    image: grafana/loki:3.5.5
+    command:
+    - -config.file=/etc/loki/config.yaml
+    volumes:
+    - ./observability/loki.yaml:/etc/loki/config.yaml:ro
+    - loki-data:/loki
+    ports:
+    - 127.0.0.1:3100:3100
+  prometheus:
+    image: prom/prometheus:v3.6.0
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --web.enable-remote-write-receiver
+    - --storage.tsdb.retention.time=24h
+    volumes:
+    - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    - ./observability/alerts.yaml:/etc/prometheus/alerts.yaml:ro
+    - prometheus-data:/prometheus
+    ports:
+    - 127.0.0.1:9090:9090
+  grafana:
+    image: grafana/grafana:12.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-otel-demo-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+    - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    - grafana-data:/var/lib/grafana
+    ports:
+    - 127.0.0.1:3001:3000
+    depends_on:
+    - prometheus
+    - tempo
+    - loki
+volumes:
+  tempo-data: {}
+  loki-data: {}
+  prometheus-data: {}
+  grafana-data: {}

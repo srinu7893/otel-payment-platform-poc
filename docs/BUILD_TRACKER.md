@@ -1,3 +1,18 @@
+## Observability increment — implemented, runtime acceptance pending
+
+The following increment supersedes the historical pre-OTel checklist below. Do not mark runtime acceptance complete until the manual workflow evidence passes.
+
+- Added optional Java agent/Collector/Tempo/Loki/Prometheus/Grafana stack and three dashboards.
+- Added W3C outbox context persistence/restoration plus custom publish span and attempt metric.
+- Added operations UI trace/log lookup and dashboard links.
+- Moved full-stack acceptance out of automatic CI to `.github/workflows/manual-otel-e2e.yml`.
+- Added actual trace/metric/log assertions, security negatives, broker and Collector recovery scenarios.
+- Added regeneratable `docs/POC_GUIDE.html` with expected vs observed results and source links.
+- Optional tail-sampling overlay is provided as an advanced manual experiment.
+- Pending: full Java 21/Docker runtime acceptance; GCP deployment and production controls remain separately scoped.
+
+---
+
 # Payment Platform POC Build Tracker
 
 This file is the source of truth for what is built, what is being hardened, and what remains before OpenTelemetry and GCP work begin. Update this file as features are committed so the project scope is never lost.

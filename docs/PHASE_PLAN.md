@@ -135,6 +135,10 @@ OpenTelemetry starts only after these are satisfied:
 - DONE — OpenAPI documented endpoint contract + Swagger UI.
 - DONE — security baseline and known limitations documented.
 
+## Phase 9 implementation update
+
+The local OTel implementation is now present on the observability branch. Java agent, Collector, Tempo/Loki/Prometheus/Grafana, durable outbox propagation, dashboards and manual telemetry acceptance have been added. All items below remain **pending runtime verification** rather than DONE until the new manual workflow passes. See `POC_GUIDE.html` for exact implemented coverage and exclusions. The old immediate queue at the end describes the baseline handoff and is superseded by running/reviewing the new manual workflow.
+
 ## Phase 9 — OpenTelemetry
 
 | Status | Feature | Work |

@@ -1,0 +1,20 @@
+groups:
+  - name: payment-poc
+    rules:
+      - alert: TelemetryScrapeUnavailable
+        expr: up{job="otel-applications"} == 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: Collector metrics endpoint cannot be scraped
+      - alert: PaymentOutboxPublishFailures
+        expr: sum(increase(poc_outbox_publish_attempts_total{outcome="failure"}[5m])) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: Outbox publish failed; inspect broker and retry logs
+      - alert: ServiceSpanErrorRatio
+        expr: sum by (service) (rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[5m])) / clamp_min(sum by (service) (rate(traces_spanmetrics_calls_total[5m])), 0.001) > 0.05
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: More than five percent of recorded spans have errors

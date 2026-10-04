@@ -1,3 +1,7 @@
+## OpenTelemetry acceptance
+
+For the current OTel stack, dashboards, backend assertions and failure/recovery cases, use [POC_GUIDE.html](POC_GUIDE.html). Full-stack E2E is now manual-only via `manual-otel-e2e`; ordinary CI does not start the full stack. The historical baseline procedures below remain useful for individual API checks.
+
 # Full-Stack End-to-End Runbook
 
 This is the baseline runbook for the Spring Boot + React payment platform before OpenTelemetry is added.
