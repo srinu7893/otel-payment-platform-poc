@@ -38,7 +38,11 @@ post_payment() {
     -d "{\"idempotencyKey\":\"${key}\",\"accountNumber\":\"${account}\",\"merchant\":\"Pre-OTel Failure Lab\",\"amount\":10.00}"
 }
 
-echo '1/4 Verify public OpenAPI/Swagger contract'\ncurl --fail --silent --show-error \"${BASE_URL}/openapi.yaml\" | grep -q '^openapi: 3.0.3'\ncurl --fail --silent --show-error -L \"${BASE_URL}/swagger-ui.html\" >/dev/null\n\necho '2/4 Verify SUPPORT operations health'
+echo '1/4 Verify public OpenAPI/Swagger contract'
+curl --fail --silent --show-error \"${BASE_URL}/openapi.yaml\" | grep -q '^openapi: 3.0.3'
+curl --fail --silent --show-error -L \"${BASE_URL}/swagger-ui.html\" >/dev/null
+
+echo '2/4 Verify SUPPORT operations health'
 SUPPORT_TOKEN=$(auth support support123)
 test -n "$SUPPORT_TOKEN"
 HEALTH=$(curl --fail --silent --show-error \
