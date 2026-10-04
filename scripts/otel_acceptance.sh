@@ -92,7 +92,8 @@ test "$(jq -r '.database' /tmp/grafana-health.json)" = "ok"
 echo '5/5 Verify trace IDs are injected into structured application logs'
 TRACE_LOG_FOUND=false
 for attempt in {1..20}; do
-  if docker compose logs --no-color api-gateway payment-service gateway-service mock-bank-service 2>/dev/null | grep -Eq '"trace_id":"[0-9a-f]{32}"'; then
+  docker compose logs --no-color api-gateway payment-service gateway-service mock-bank-service > /tmp/otel-app-logs.txt 2>/dev/null || true
+  if grep -Eq '"trace_id":"[0-9a-f]{32}"' /tmp/otel-app-logs.txt; then
     TRACE_LOG_FOUND=true
     break
   fi
