@@ -47,10 +47,10 @@ This is the source of truth for baseline completion before OpenTelemetry.
 | DONE | Standard JSON 401/403 | Edge + secured services use structured security errors |
 | DONE | Role-aware frontend | CUSTOMER and SUPPORT/ADMIN no longer share customer-profile assumptions |
 | DONE | Operations route authorization | `/api/v1/ops/**` restricted to SUPPORT/ADMIN |
-| NEEDS UPDATE | Service-to-service identity | Customer Service still relies on trusted internal ingress; decide workload identity/client credentials/private ingress for deployment |
+| DONE | Service-to-service identity strategy | Local Docker trust boundary documented; GCP workload/private-ingress strategy defined in `docs/SERVICE_IDENTITY_STRATEGY.md` |
 | DEFERRED | Refresh/revocation | 30-minute demo token accepted for baseline; production design still required |
-| PLANNED | Rate limiting | Edge protection for login and money-moving APIs |
-| PLANNED | Security audit table/events | Persist login failures, forbidden access and admin actions |
+| DEFERRED | Rate limiting | Production/API-management hardening; intentionally not a blocker for local OTel baseline |
+| DEFERRED | Persistent security audit table/events | Useful production hardening; structured security logs exist now and OTel/log backend will be added next |
 
 ## Phase 3 — Database & Data Integrity
 
@@ -62,8 +62,8 @@ This is the source of truth for baseline completion before OpenTelemetry.
 | DONE | Transactional Outbox | DB state + event staging atomic; publisher confirms/backoff |
 | DONE | Consumer idempotency | Event ID + channel dedupe without breaking retry |
 | DONE | Reconciliation state | PROCESSING / RECONCILIATION_REQUIRED with capped scheduled recovery |
-| PLANNED | General audit history | Who changed what/when for support/admin actions |
-| PLANNED | Data retention/archive | DB/log/BigQuery retention to define before GCP |
+| DEFERRED | General audit history | Post-OTel/admin hardening; not required for baseline tracing/metrics/logging |
+| DEFERRED | Data retention/archive | Define with GCP logging/BigQuery retention policy |
 
 ## Phase 4 — Logging, Errors & Resilience
 
@@ -108,9 +108,9 @@ This is the source of truth for baseline completion before OpenTelemetry.
 
 | Status | Feature | Work |
 | --- | --- | --- |
-| PLANNED | OpenAPI / Swagger | Contracts, examples, auth, errors, pagination |
+| DONE | OpenAPI / Swagger | Gateway serves `/openapi.yaml` + Swagger UI; pre-OTel acceptance checks runtime reachability |
 | DONE | `/api/v1` convention | Current public APIs versioned under v1 |
-| IN PROGRESS | Environment/config strategy | `.env.example` + Compose externalization done; formal local/docker/gcp profile split still pending |
+| DONE | Environment/config baseline | `.env.example` + Compose externalization complete; cloud-specific identity/secrets remain deployment concerns |
 | DONE | Local secret externalization | DB/Rabbit/JWT values can come from environment; demo defaults remain local-only |
 | PLANNED | Cloud secret strategy | GCP Secret Manager/workload identity after runtime choice |
 
@@ -129,9 +129,9 @@ OpenTelemetry starts only after these are satisfied:
 - DONE — Support/Admin frontend production build passes.
 - DONE — focused Support/Admin operations-health acceptance call.
 - DONE — explicit slow-bank timeout + simulated HTTP 500 scenario in pre-OTel acceptance.
-- NEEDS UPDATE — document/finalize service-to-service identity boundary for deployment.
-- PLANNED — OpenAPI/documented endpoint contract.
-- PLANNED — final known-limitations/security checklist.
+- DONE — service-to-service identity boundary documented for local Docker and GCP deployment.
+- DONE — OpenAPI documented endpoint contract + Swagger UI.
+- DONE — security baseline and known limitations documented.
 
 ## Phase 9 — OpenTelemetry
 
@@ -174,8 +174,8 @@ OpenTelemetry starts only after these are satisfied:
 
 ## Current immediate execution queue
 
-1. Add OpenAPI/Swagger and endpoint examples.
-2. Add security/audit/known-limitations baseline document.
-3. Decide/document service-to-service identity strategy by environment.
-4. Mark Baseline Freeze `DONE`.
-5. Start OpenTelemetry Java Agent + Collector only after the freeze gate is green.
+1. Wait for final normal CI + dedicated pre-OTel acceptance on the final baseline head.
+2. Mark Baseline Freeze `DONE` only when both are green.
+3. Merge the verified baseline to `main`.
+4. Create a separate OpenTelemetry branch from verified `main`.
+5. Start OTel Java Agent + Collector and advanced observability integrations there.
