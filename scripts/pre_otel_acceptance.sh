@@ -38,7 +38,7 @@ post_payment() {
     -d "{\"idempotencyKey\":\"${key}\",\"accountNumber\":\"${account}\",\"merchant\":\"Pre-OTel Failure Lab\",\"amount\":10.00}"
 }
 
-echo '1/3 Verify SUPPORT operations health'
+echo '1/4 Verify public OpenAPI/Swagger contract'\ncurl --fail --silent --show-error \"${BASE_URL}/openapi.yaml\" | grep -q '^openapi: 3.0.3'\ncurl --fail --silent --show-error -L \"${BASE_URL}/swagger-ui.html\" >/dev/null\n\necho '2/4 Verify SUPPORT operations health'
 SUPPORT_TOKEN=$(auth support support123)
 test -n "$SUPPORT_TOKEN"
 HEALTH=$(curl --fail --silent --show-error \
@@ -49,14 +49,14 @@ echo "$HEALTH" | jq .
 test "$(echo "$HEALTH" | jq -r '.allHealthy')" = "true"
 test "$(echo "$HEALTH" | jq '[.services[] | select(.status != "UP")] | length')" = "0"
 
-echo '2/3 Verify deterministic slow-bank timeout maps to reconciliation'
+echo '3/4 Verify deterministic slow-bank timeout maps to reconciliation'
 SLOW_TOKEN=$(auth slowdemo slowdemo123)
 SLOW_KEY="pre-otel-slow-$(date +%s%N)"
 SLOW_RESPONSE=$(post_payment "$SLOW_TOKEN" ACC-SLOW "$SLOW_KEY" pre-otel-slow-payment)
 echo "$SLOW_RESPONSE" | jq .
 test "$(echo "$SLOW_RESPONSE" | jq -r '.status')" = "RECONCILIATION_REQUIRED"
 
-echo '3/3 Verify simulated bank 500 maps to reconciliation'
+echo '4/4 Verify simulated bank 500 maps to reconciliation'
 ERROR_TOKEN=$(auth errordemo errordemo123)
 ERROR_KEY="pre-otel-error-$(date +%s%N)"
 ERROR_RESPONSE=$(post_payment "$ERROR_TOKEN" ACC-ERROR "$ERROR_KEY" pre-otel-error-payment)
