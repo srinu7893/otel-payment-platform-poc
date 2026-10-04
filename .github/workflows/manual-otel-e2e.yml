@@ -38,7 +38,10 @@ jobs:
     - name: Prepare verified Java agent
       run: bash scripts/setup-otel-agent.sh
     - name: Validate Collector configuration
-      run: bash scripts/otel-compose.sh run --rm --no-deps otel-collector validate --config=/etc/otelcol/config.yaml
+      run: 'bash scripts/otel-compose.sh run --rm --no-deps otel-collector validate --config=/etc/otelcol/config.yaml
+
+        docker compose -f docker-compose.yml -f docker-compose.otel.yml -f docker-compose.sampling.yml run --rm --no-deps
+        otel-collector validate --config=/etc/otelcol/config.yaml --config=/etc/otelcol/tail.yaml'
       id: collector_config
     - name: Validate Prometheus configuration and rules
       run: bash scripts/otel-compose.sh run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
@@ -64,6 +67,9 @@ jobs:
       if: success()
       id: traffic
       run: python3 scripts/e2e/live-traffic.py
+    - name: Verify advanced error and latency tail sampling
+      id: sampling
+      run: python3 scripts/e2e/advanced-sampling.py
     - name: Install browser capture dependencies
       if: always() && steps.health.outcome == 'success'
       id: browser_setup
@@ -89,7 +95,8 @@ jobs:
           for all services": "${{ steps.health.outcome }}", "Payment, refund, replay, risk, notification and P2P": "${{ steps.business.outcome
           }}", "Assert real traces, metrics, logs and access controls": "${{ steps.telemetry.outcome }}", "Bank timeout, bank
           error, support health and API docs": "${{ steps.failures.outcome }}", "Measured demo traffic": "${{ steps.traffic.outcome
-          }}", "Browser UI and screenshots": "${{ steps.browser.outcome }}"}'
+          }}", "Browser UI and screenshots": "${{ steps.browser.outcome }}", "Advanced tail-sampling experiment": "${{ steps.sampling.outcome
+          }}"}'
     - name: Capture diagnostic logs
       if: always()
       run: 'mkdir -p artifacts

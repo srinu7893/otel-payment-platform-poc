@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 fs.mkdirSync('artifacts/screenshots', {recursive:true});
 (async () => {
   const browser = await chromium.launch({headless:true});
-  const context = await browser.newContext({viewport:{width:1440,height:1100}});
+  const context = await browser.newContext({viewport:{width:1440,height:1100},locale:'en-US',timezoneId:'Asia/Kolkata'});
   const page = await context.newPage();
   const errors=[];
   const diagnostics=[];
