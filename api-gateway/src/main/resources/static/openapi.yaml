@@ -1,0 +1,343 @@
+openapi: 3.0.3
+info:
+  title: OTel Payment Platform POC API
+  version: 1.0.0
+  description: >
+    Public edge contracts for the enterprise payment-platform POC. All protected
+    operations flow through the API Gateway. Correlation can be supplied with
+    X-Correlation-Id and is returned/propagated through the platform.
+servers:
+  - url: http://localhost:8088
+    description: Local Docker/API Gateway
+tags:
+  - name: Auth
+  - name: Customers
+  - name: Payments
+  - name: Transfers
+  - name: Notifications
+  - name: Operations
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login and obtain a bearer JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+            example: {username: demo, password: demo123}
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LoginResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /api/v1/customers/{customerId}:
+    get:
+      tags: [Customers]
+      summary: Get customer profile
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: customerId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Customer
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Customer'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/v1/payments:
+    get:
+      tags: [Payments]
+      summary: List visible payments
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: status, in: query, schema: {type: string}}
+        - {name: page, in: query, schema: {type: integer, default: 0}}
+        - {name: size, in: query, schema: {type: integer, default: 20}}
+      responses:
+        '200':
+          description: Payment page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Page'}
+    post:
+      tags: [Payments]
+      summary: Create merchant payment
+      description: Idempotent by idempotencyKey. CUSTOMER source account must belong to authenticated customer.
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaymentRequest'}
+      responses:
+        '201':
+          description: Payment created/finalized
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422':
+          description: Risk limit rejected
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiError'}
+  /api/v1/payments/{paymentId}:
+    get:
+      tags: [Payments]
+      summary: Get payment
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: paymentId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Payment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/v1/payments/{paymentId}/cancel:
+    post:
+      tags: [Payments]
+      summary: Cancel eligible payment
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: paymentId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Updated payment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResponse'}
+  /api/v1/payments/{paymentId}/refunds:
+    post:
+      tags: [Payments]
+      summary: Full refund for completed payment
+      description: Idempotent by refund idempotencyKey.
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: paymentId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idempotencyKey]
+              properties:
+                idempotencyKey: {type: string}
+      responses:
+        '201':
+          description: Refund created/finalized
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RefundResponse'}
+  /api/v1/payments/{paymentId}/refund:
+    get:
+      tags: [Payments]
+      summary: Get payment refund
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: paymentId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Refund
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RefundResponse'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/v1/transfers:
+    get:
+      tags: [Transfers]
+      summary: List visible P2P transfers
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: page, in: query, schema: {type: integer, default: 0}}
+        - {name: size, in: query, schema: {type: integer, default: 20}}
+      responses:
+        '200':
+          description: Transfer page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Page'}
+    post:
+      tags: [Transfers]
+      summary: Send P2P transfer
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TransferRequest'}
+      responses:
+        '201':
+          description: Transfer
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TransferResponse'}
+        '422':
+          description: Risk limit rejected
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiError'}
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      summary: List visible notifications
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: paymentId, in: query, schema: {type: string, format: uuid}}
+        - {name: page, in: query, schema: {type: integer, default: 0}}
+        - {name: size, in: query, schema: {type: integer, default: 20}}
+      responses:
+        '200':
+          description: Notification page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Page'}
+  /api/v1/ops/health:
+    get:
+      tags: [Operations]
+      summary: Aggregate downstream service health
+      description: SUPPORT or ADMIN only.
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Health summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allHealthy: {type: boolean}
+                  services:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        service: {type: string}
+                        status: {type: string}
+                        url: {type: string}
+        '403': {$ref: '#/components/responses/Forbidden'}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ApiError'}
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: {type: string}
+        password: {type: string, format: password}
+    LoginResponse:
+      type: object
+      properties:
+        accessToken: {type: string}
+        tokenType: {type: string, example: Bearer}
+        expiresInSeconds: {type: integer, example: 1800}
+        customerId: {type: string}
+        roles:
+          type: array
+          items: {type: string}
+    Customer:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        email: {type: string, format: email}
+        accountNumber: {type: string}
+        active: {type: boolean}
+    PaymentRequest:
+      type: object
+      required: [idempotencyKey, accountNumber, merchant, amount]
+      properties:
+        idempotencyKey: {type: string}
+        accountNumber: {type: string}
+        merchant: {type: string}
+        amount: {type: number, format: double, minimum: 0.01}
+    PaymentResponse:
+      type: object
+      properties:
+        paymentId: {type: string, format: uuid}
+        customerId: {type: string}
+        accountNumber: {type: string}
+        merchant: {type: string}
+        amount: {type: number}
+        status:
+          type: string
+          example: COMPLETED
+        bankTransactionId: {type: string, format: uuid, nullable: true}
+    TransferRequest:
+      type: object
+      required: [idempotencyKey, senderAccount, receiverAccount, amount, currency]
+      properties:
+        idempotencyKey: {type: string}
+        senderAccount: {type: string}
+        receiverAccount: {type: string}
+        amount: {type: number, minimum: 0.01}
+        currency: {type: string, example: INR}
+    TransferResponse:
+      type: object
+      properties:
+        transferId: {type: string, format: uuid}
+        senderCustomerId: {type: string}
+        senderAccount: {type: string}
+        receiverAccount: {type: string}
+        amount: {type: number}
+        currency: {type: string}
+        status: {type: string}
+        bankTransactionId: {type: string, format: uuid, nullable: true}
+    RefundResponse:
+      type: object
+      properties:
+        refundId: {type: string, format: uuid}
+        paymentId: {type: string, format: uuid}
+        amount: {type: number}
+        status: {type: string}
+        bankTransactionId: {type: string, format: uuid, nullable: true}
+    ApiError:
+      type: object
+      properties:
+        timestamp: {type: string, format: date-time}
+        code: {type: string}
+        message: {type: string}
+        path: {type: string}
+        correlationId: {type: string}
+        fieldErrors:
+          type: object
+          additionalProperties: {type: string}
+    Page:
+      type: object
+      properties:
+        content:
+          type: array
+          items: {type: object}
+        number: {type: integer}
+        size: {type: integer}
+        totalElements: {type: integer}
+        totalPages: {type: integer}
