@@ -7,6 +7,10 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
   const context = await browser.newContext({viewport:{width:1440,height:1100}});
   const page = await context.newPage();
   const errors=[];
+  const diagnostics=[];
+  page.on('console', m => { if(m.type()==='error') diagnostics.push({type:'console',message:m.text()}); });
+  page.on('requestfailed', r => diagnostics.push({type:'requestfailed',url:r.url(),error:r.failure()?.errorText}));
+  page.on('response', r => { if(r.status()>=400) diagnostics.push({type:'http',url:r.url(),status:r.status()}); });
   page.on('pageerror', e => errors.push(e.message));
   const screenshot = name => page.screenshot({path:`artifacts/screenshots/${name}.png`,fullPage:true});
   try {
@@ -15,7 +19,6 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
     await page.getByRole('button',{name:'payment',exact:true}).waitFor();
     await screenshot('01-customer-overview');
     await page.getByRole('button',{name:'payment',exact:true}).click();
-    await page.getByLabel('Source account').filter({visible:true}).waitFor().catch(()=>{});
     await page.waitForFunction(()=>document.querySelector('input[name=accountNumber]')?.value==='ACC1001');
     await page.getByLabel('Merchant',{exact:true}).fill('Browser demo');
     await page.getByLabel('Amount',{exact:true}).fill('1.00');
@@ -42,6 +45,8 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
     assert.equal(response.status(),200,'Grafana login');
     for (const [i,uid] of ['payment-poc','payment-business','telemetry-pipeline'].entries()) {
       await page.goto(`http://localhost:3001/d/${uid}?from=now-15m&to=now&kiosk`);
+      await page.getByText('Grafana has failed to load its application files',{exact:false}).waitFor({timeout:2000}).then(()=>{throw new Error('Grafana frontend assets failed to load')},()=>{});
+      await page.locator('[data-testid="data-testid Panel header"], [data-testid="data-testid Panel container"], .panel-container').first().waitFor({timeout:60000});
       await page.waitForTimeout(8000);
       await screenshot(`0${i+5}-${uid}`);
     }
@@ -51,5 +56,5 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
     await screenshot('99-browser-failure').catch(()=>{});
     fs.writeFileSync('artifacts/browser-results.json',JSON.stringify({status:'FAIL',error:error.message,errors},null,2));
     throw error;
-  } finally {await browser.close();}
+  } finally {fs.writeFileSync('artifacts/browser-diagnostics.json',JSON.stringify(diagnostics,null,2));await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

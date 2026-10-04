@@ -4,6 +4,7 @@ import json, os, subprocess, urllib.request, urllib.parse
 from pathlib import Path
 root=Path('artifacts');root.mkdir(exist_ok=True)
 urls={
+ 'grafana-frontend-settings':'http://localhost:3001/api/frontend/settings',
  'prometheus-targets':'http://localhost:9090/api/v1/targets',
  'prometheus-alerts':'http://localhost:9090/api/v1/alerts',
  'prometheus-series':'http://localhost:9090/api/v1/label/__name__/values',

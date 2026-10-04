@@ -151,7 +151,7 @@ def main():
     case('HTTP, JDBC and asynchronous spans share a connected trace',lambda:eventually(lambda:trace_complete(trace)))
     case('All service HTTP metrics, JVM, business metric and service graph exported',lambda:eventually(metrics_present))
     case('Payment logs correlated to exact trace ID',lambda:eventually(lambda:logs_present(trace)))
-    case('All dashboards and Grafana datasource connections available',lambda: eventually(lambda: (dashboard_present() or True)))
+    case('All dashboards and Grafana datasource connections available',lambda: eventually(lambda: (dashboard_present(trace) or True)))
     if os.environ.get('RESILIENCE','false').lower()=='true':
         def broker_recovery():
             compose('stop','rabbitmq')
@@ -193,7 +193,7 @@ def fault_trace(user, password, account):
     eventually(error_visible)
 
 
-def dashboard_present():
+def dashboard_present(trace):
     import base64
     password=os.environ.get('GRAFANA_ADMIN_PASSWORD','otel-demo-admin')
     headers={'Authorization':'Basic '+base64.b64encode(('admin:'+password).encode()).decode()}
@@ -202,11 +202,18 @@ def dashboard_present():
         with urllib.request.urlopen(req,timeout=15) as response:
             data=json.load(response)
         assert len(data['dashboard']['panels'])>=6, uid+' panels missing'
-    for uid in ('prometheus','tempo','loki'):
+    for uid in ('prometheus','loki'):
         req=urllib.request.Request('http://localhost:3001/api/datasources/uid/'+uid+'/health',headers=headers)
         with urllib.request.urlopen(req,timeout=15) as response:
             data=json.load(response)
         assert data.get('status')=='OK', uid+' datasource unhealthy'
+    # Tempo's Grafana plugin has no CheckHealth implementation; validate a real
+    # trace through Grafana's datasource proxy instead of accepting a 404.
+    req=urllib.request.Request('http://localhost:3001/api/datasources/proxy/uid/tempo/api/traces/'+trace,headers=headers)
+    with urllib.request.urlopen(req,timeout=15) as response:
+        data=json.load(response)
+    assert data.get('batches') or data.get('resourceSpans'), 'Grafana Tempo proxy returned no trace spans'
+    (ARTIFACTS/'grafana-trace-proxy.json').write_text(json.dumps(data,indent=2))
 
 
 if __name__=='__main__':
