@@ -217,6 +217,10 @@ jobs:
             -d '{"idempotencyKey":"ci-transfer-001","senderAccount":"ACC1001","receiverAccount":"ACC2001","amount":10.00,"currency":"INR"}'
           test "$(jq -r '.status' /tmp/transfer.json)" = "COMPLETED"
 
+      - name: Run pre-OTel acceptance
+        shell: bash
+        run: bash scripts/pre_otel_acceptance.sh
+
       - name: Show stack status
         if: always()
         run: docker compose ps
