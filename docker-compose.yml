@@ -203,6 +203,13 @@ services:
       SERVICES_NOTIFICATION_URL: http://notification-service:8083
       SERVICES_GATEWAY_URL: http://gateway-service:8081
       SERVICES_BANK_URL: http://mock-bank-service:8082
+      OBSERVABILITY_COLLECTOR_URL: http://otel-collector:13133
+      OBSERVABILITY_JAEGER_URL: http://jaeger:16686
+      OBSERVABILITY_PROMETHEUS_URL: http://prometheus:9090
+      OBSERVABILITY_GRAFANA_URL: http://grafana:3000
+      OBSERVABILITY_JAEGER_UI_URL: http://localhost:16686
+      OBSERVABILITY_PROMETHEUS_UI_URL: http://localhost:9090
+      OBSERVABILITY_GRAFANA_UI_URL: http://localhost:3001
     depends_on:
       auth-service:
         condition: service_started
