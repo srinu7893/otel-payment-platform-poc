@@ -2,7 +2,7 @@ name: payment-platform-ci
 
 on:
   push:
-    branches: [ main, feature/baseline-payment-platform ]
+    branches: [ main, feature/baseline-payment-platform, feature/opentelemetry-observability ]
   pull_request:
     branches: [ main ]
 
@@ -224,6 +224,11 @@ jobs:
       - name: Run pre-OTel acceptance
         shell: bash
         run: bash scripts/pre_otel_acceptance.sh
+
+      - name: Run OpenTelemetry acceptance
+        if: github.ref == 'refs/heads/feature/opentelemetry-observability'
+        shell: bash
+        run: bash scripts/otel_acceptance.sh
 
       - name: Show stack status
         if: always()
