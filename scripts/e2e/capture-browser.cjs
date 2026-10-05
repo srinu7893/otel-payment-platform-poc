@@ -44,9 +44,12 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
     const response=await context.request.post('http://localhost:3001/login',{data:{user:'admin',password:process.env.GRAFANA_ADMIN_PASSWORD||'otel-demo-admin'}});
     assert.equal(response.status(),200,'Grafana login');
     for (const [i,uid] of ['payment-poc','payment-business','telemetry-pipeline'].entries()) {
+      const dashboard=JSON.parse(fs.readFileSync(`observability/grafana/dashboards/${uid}.json`,'utf8'));
+      // Fit the whole grid: Grafana can unload rows that leave the viewport.
+      const gridHeight=Math.max(...dashboard.panels.map(p=>p.gridPos.y+p.gridPos.h));
+      await page.setViewportSize({width:1440,height:Math.max(1100,gridHeight*40+220)});
       await page.goto(`http://localhost:3001/d/${uid}?from=now-15m&to=now&kiosk`);
       await page.getByText('Grafana has failed to load its application files',{exact:false}).waitFor({timeout:2000}).then(()=>{throw new Error('Grafana frontend assets failed to load')},()=>{});
-      const dashboard=JSON.parse(fs.readFileSync(`observability/grafana/dashboards/${uid}.json`,'utf8'));
       for (const panel of dashboard.panels) {
         const heading=page.getByText(panel.title,{exact:true}).first();
         // Grafana mounts lower panels only after scrolling their row into view.
@@ -60,6 +63,9 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
         await page.waitForTimeout(500);
       }
       await page.waitForTimeout(8000);
+      for (const panel of dashboard.panels) {
+        assert(await page.getByText(panel.title,{exact:true}).first().isVisible(),`Panel left viewport before capture: ${panel.title}`);
+      }
       await screenshot(`0${i+5}-${uid}`);
     }
     assert.deepEqual(errors,[],'Browser runtime errors');
