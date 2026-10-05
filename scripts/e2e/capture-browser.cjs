@@ -48,7 +48,10 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
       await page.getByText('Grafana has failed to load its application files',{exact:false}).waitFor({timeout:2000}).then(()=>{throw new Error('Grafana frontend assets failed to load')},()=>{});
       const dashboard=JSON.parse(fs.readFileSync(`observability/grafana/dashboards/${uid}.json`,'utf8'));
       for (const panel of dashboard.panels) {
-        await page.getByText(panel.title,{exact:true}).first().waitFor({timeout:60000});
+        const heading=page.getByText(panel.title,{exact:true}).first();
+        await heading.waitFor({timeout:60000});
+        await heading.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(500);
       }
       await page.waitForTimeout(8000);
       await screenshot(`0${i+5}-${uid}`);

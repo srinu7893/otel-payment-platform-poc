@@ -1,20 +1,54 @@
 groups:
-  - name: payment-poc
-    rules:
-      - alert: TelemetryScrapeUnavailable
-        expr: up{job="otel-applications"} == 0
-        for: 1m
-        labels: {severity: warning}
-        annotations:
-          summary: Collector metrics endpoint cannot be scraped
-      - alert: PaymentOutboxPublishFailures
-        expr: sum(increase(poc_outbox_publish_attempts_total{outcome="failure"}[5m])) > 0
-        labels: {severity: warning}
-        annotations:
-          summary: Outbox publish failed; inspect broker and retry logs
-      - alert: ServiceSpanErrorRatio
-        expr: sum by (service) (rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[5m])) / clamp_min(sum by (service) (rate(traces_spanmetrics_calls_total[5m])), 0.001) > 0.05
-        for: 2m
-        labels: {severity: warning}
-        annotations:
-          summary: More than five percent of recorded spans have errors
+- name: payment-poc
+  rules:
+  - alert: TelemetryScrapeUnavailable
+    expr: up{job="otel-applications"} == 0
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: Collector metrics endpoint cannot be scraped
+  - alert: PaymentOutboxPublishFailures
+    expr: sum(increase(poc_outbox_publish_attempts_total{outcome="failure"}[5m]))
+      > 0
+    labels:
+      severity: warning
+    annotations:
+      summary: Outbox publish failed; inspect broker and retry logs
+  - alert: ServiceSpanErrorRatio
+    expr: sum by (service) (rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[5m]))
+      / clamp_min(sum by (service) (rate(traces_spanmetrics_calls_total[5m])), 0.001)
+      > 0.05
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: More than five percent of recorded spans have errors
+  - alert: CollectorExportQueueNearCapacity
+    expr: otelcol_exporter_queue_size / clamp_min(otelcol_exporter_queue_capacity,
+      1) > 0.8
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: Collector export queue above 80 percent; inspect backend and storage
+  - alert: CollectorExportFailures
+    expr: sum(increase(otelcol_exporter_send_failed_spans[5m])) + sum(increase(otelcol_exporter_send_failed_log_records[5m]))
+      > 0
+    labels:
+      severity: warning
+    annotations:
+      summary: Collector export failures; inspect queues and downstream backends
+  - alert: NotificationQueueBacklog
+    expr: rabbitmq_queue_messages_ready{queue="payments.notification"} > 20
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: Notification backlog growing; inspect consumer health
+  - alert: NotificationDeadLetters
+    expr: rabbitmq_queue_messages_ready{queue="payments.notification.dlq"} > 0
+    labels:
+      severity: warning
+    annotations:
+      summary: Notification DLQ contains messages; inspect before redrive

@@ -37,6 +37,8 @@ jobs:
       id: backend
     - name: Prepare verified Java agent
       run: bash scripts/setup-otel-agent.sh
+    - name: Prepare Collector queue storage
+      run: bash scripts/otel-compose.sh run --rm --no-deps otel-storage-init
     - name: Validate Collector configuration
       run: 'bash scripts/otel-compose.sh run --rm --no-deps otel-collector validate --config=/etc/otelcol/config.yaml
 

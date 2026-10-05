@@ -139,6 +139,54 @@ def compose(*args):
     subprocess.run(['bash','scripts/otel-compose.sh',*args],check=True,timeout=120)
 
 
+def pipeline_health():
+    for metric in ('otelcol_receiver_accepted_spans','otelcol_receiver_accepted_log_records','otelcol_receiver_accepted_metric_points'):
+        rows=prom(metric)
+        assert rows and sum(float(x['value'][1]) for x in rows)>0, 'No Collector ingress for '+metric
+    assert prom('otelcol_exporter_queue_capacity'), 'No Collector queue capacity metrics'
+    assert prom('rabbitmq_queue_messages_ready{queue="payments.notification"}'), 'No notification queue depth metrics'
+    consumers=prom('rabbitmq_queue_consumers{queue="payments.notification"}')
+    assert consumers and sum(float(x['value'][1]) for x in consumers)>0, 'No notification consumer metrics'
+    targets=request('http://localhost:9090/api/v1/targets')['data']['activeTargets']
+    assert {x['labels']['job'] for x in targets if x['health']=='up'} >= {'otel-applications','otel-collector-internal','rabbitmq','tempo','prometheus'}, 'A required scrape target is not UP'
+    (ARTIFACTS/'pipeline-health.json').write_text(json.dumps({'status':'PASS','targets':targets,'checks':['all three Collector signal ingress counters positive','export queues observable','notification depth and consumers present','five scrape jobs UP']},indent=2))
+    return True
+
+
+def persistent_queue_recovery(token):
+    report={'status':'FAIL','description':'Real payment telemetry queued while Tempo/Loki are down, Collector SIGKILL/restart, backend catch-up'}
+    def queue_size():
+        return sum(float(x['value'][1]) for x in prom('otelcol_exporter_queue_size'))
+    trace=uuid.uuid4().hex
+    stopped=False
+    try:
+        compose('stop','tempo','loki');stopped=True
+        eventually(lambda: queue_size()>0,120)
+        pid=payment(token,trace)
+        eventually(lambda:notification(token,pid))
+        # Give the agents and the Collector batch processor time to flush this request.
+        time.sleep(12)
+        before=queue_size();assert before>0
+        compose('kill','-s','SIGKILL','otel-collector')
+        compose('start','otel-collector')
+        eventually(lambda: bool(request('http://localhost:13133')))
+        compose('start','tempo','loki');stopped=False
+        eventually(lambda: bool(request('http://localhost:3200/ready')))
+        eventually(lambda: bool(request('http://localhost:3100/ready')))
+        eventually(lambda:trace_complete(trace),240)
+        eventually(lambda:logs_present(trace),240)
+        eventually(lambda:queue_size()==0,180)
+        report.update(status='PASS',traceId=trace,paymentId=pid,queuedBatchesBeforeKill=before,checks=['business completed during backend outage','queued request trace recovered across Collector SIGKILL','same trace logs recovered','export backlog drained'])
+    except Exception as error:
+        report['error']=str(error)
+        raise
+    finally:
+        if stopped:compose('start','tempo','loki')
+        # Restore the receiver even when a failure interrupts the crash experiment.
+        compose('start','otel-collector')
+        (ARTIFACTS/'persistent-queue.json').write_text(json.dumps(report,indent=2))
+
+
 def main():
     token=login()
     case('Unauthenticated request is rejected', lambda: request(BASE+'/api/v1/payments', expected=(401,)))
@@ -150,6 +198,7 @@ def main():
     case('Outbox to RabbitMQ to notification delivered',lambda: eventually(lambda:notification(token,payment_id)))
     case('HTTP, JDBC and asynchronous spans share a connected trace',lambda:eventually(lambda:trace_complete(trace)))
     case('All service HTTP metrics, JVM, business metric and service graph exported',lambda:eventually(metrics_present))
+    case('Collector ingress, export queues and RabbitMQ metrics observable',lambda:eventually(pipeline_health))
     case('Payment logs correlated to exact trace ID',lambda:eventually(lambda:logs_present(trace)))
     case('All dashboards and Grafana datasource connections available',lambda: eventually(lambda: (dashboard_present(trace) or True)))
     if os.environ.get('RESILIENCE','false').lower()=='true':
@@ -180,6 +229,7 @@ def main():
             eventually(lambda:notification(token,pid))
             eventually(lambda:trace_complete(recovered_trace))
         case('Collector outage: payment remains available; fresh traces recover',collector_recovery)
+        case('Persistent export queues: backend outage and Collector crash recover trace/logs',lambda:persistent_queue_recovery(token))
     case('Slow bank: unknown outcome and downstream error trace', lambda: fault_trace('slowdemo','slowdemo123','ACC-SLOW'))
     case('Bank 500: unknown outcome and downstream error trace', lambda: fault_trace('errordemo','errordemo123','ACC-ERROR'))
 

@@ -12,19 +12,19 @@ processors:
     spike_limit_mib: 96
   resource:
     attributes:
-      - key: service.namespace
-        value: payment-poc
-        action: upsert
+    - key: service.namespace
+      value: payment-poc
+      action: upsert
   attributes/privacy:
     actions:
-      - key: http.request.header.authorization
-        action: delete
-      - key: http.request.header.cookie
-        action: delete
-      - key: db.statement
-        action: delete
-      - key: db.query.text
-        action: delete
+    - key: http.request.header.authorization
+      action: delete
+    - key: http.request.header.cookie
+      action: delete
+    - key: db.statement
+      action: delete
+    - key: db.query.text
+      action: delete
   batch:
     timeout: 1s
     send_batch_size: 512
@@ -35,16 +35,18 @@ exporters:
       insecure: true
     sending_queue:
       queue_size: 1000
+      storage: file_storage/queue
     retry_on_failure:
       enabled: true
-      max_elapsed_time: 60s
+      max_elapsed_time: 5m
   otlphttp/loki:
     endpoint: http://loki:3100/otlp
     sending_queue:
       queue_size: 1000
+      storage: file_storage/queue
     retry_on_failure:
       enabled: true
-      max_elapsed_time: 60s
+      max_elapsed_time: 5m
   prometheus:
     endpoint: 0.0.0.0:8889
     resource_to_telemetry_conversion:
@@ -52,18 +54,53 @@ exporters:
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
+  file_storage/queue:
+    directory: /var/lib/otelcol/queues
+    timeout: 10s
 service:
-  extensions: [health_check]
+  extensions:
+  - health_check
+  - file_storage/queue
   pipelines:
     traces:
-      receivers: [otlp]
-      processors: [memory_limiter, resource, attributes/privacy, batch]
-      exporters: [otlp/tempo]
+      receivers:
+      - otlp
+      processors:
+      - memory_limiter
+      - resource
+      - attributes/privacy
+      - batch
+      exporters:
+      - otlp/tempo
     metrics:
-      receivers: [otlp]
-      processors: [memory_limiter, resource, batch]
-      exporters: [prometheus]
+      receivers:
+      - otlp
+      processors:
+      - memory_limiter
+      - resource
+      - batch
+      exporters:
+      - prometheus
     logs:
-      receivers: [otlp]
-      processors: [memory_limiter, resource, attributes/privacy, batch]
-      exporters: [otlphttp/loki]
+      receivers:
+      - otlp
+      processors:
+      - memory_limiter
+      - resource
+      - attributes/privacy
+      - batch
+      exporters:
+      - otlphttp/loki
+  telemetry:
+    logs:
+      encoding: json
+    metrics:
+      level: normal
+      readers:
+      - pull:
+          exporter:
+            prometheus:
+              host: 0.0.0.0
+              port: 8888
+              without_type_suffix: true
+              without_units: true

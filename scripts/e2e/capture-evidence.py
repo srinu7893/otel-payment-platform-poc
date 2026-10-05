@@ -10,6 +10,9 @@ urls={
  'prometheus-series':'http://localhost:9090/api/v1/label/__name__/values',
  'http-metrics':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'http_server_request_duration_seconds_count'}),
  'outbox-metrics':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'poc_outbox_publish_attempts_total'}),
+ 'collector-ingress':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'otelcol_receiver_accepted_spans or otelcol_receiver_accepted_log_records or otelcol_receiver_accepted_metric_points'}),
+ 'collector-queues':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'otelcol_exporter_queue_size or otelcol_exporter_queue_capacity'}),
+ 'rabbitmq-queues':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'rabbitmq_queue_messages_ready or rabbitmq_queue_messages_unacked or rabbitmq_queue_consumers'}),
  'service-graph':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'traces_service_graph_request_total'}),
  'recent-payment-logs':'http://localhost:3100/loki/api/v1/query_range?'+urllib.parse.urlencode({'query':'{service_name="payment-service"}','limit':200}),
 }

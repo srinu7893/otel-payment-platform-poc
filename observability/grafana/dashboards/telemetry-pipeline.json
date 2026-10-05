@@ -140,6 +140,138 @@
           "queryType": "range"
         }
       ]
+    },
+    {
+      "id": 7,
+      "title": "Collector accepted spans / second",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(otelcol_receiver_accepted_spans[$__rate_interval]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Collector queued export batches",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (exporter) (otelcol_exporter_queue_size)",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Collector failed exports / second",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(otelcol_exporter_send_failed_spans[$__rate_interval])) + sum(rate(otelcol_exporter_send_failed_log_records[$__rate_interval]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "RabbitMQ ready and unacknowledged messages",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_queue_messages_ready{queue=~\"payments.notification.*\"} or rabbitmq_queue_messages_unacked{queue=~\"payments.notification.*\"}",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "RabbitMQ notification consumers",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_queue_consumers{queue=\"payments.notification\"}",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Notification dead letters",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_queue_messages_ready{queue=\"payments.notification.dlq\"}",
+          "queryType": "range"
+        }
+      ]
     }
   ]
 }

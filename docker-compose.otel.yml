@@ -131,14 +131,21 @@ services:
     - --config=/etc/otelcol/config.yaml
     volumes:
     - ./observability/collector.yaml:/etc/otelcol/config.yaml:ro
+    - collector-data:/var/lib/otelcol
     ports:
     - 127.0.0.1:4317:4317
     - 127.0.0.1:4318:4318
     - 127.0.0.1:13133:13133
     depends_on:
-    - tempo
-    - loki
-    - prometheus
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      otel-storage-init:
+        condition: service_completed_successfully
+    user: 10001:10001
   tempo:
     image: grafana/tempo:2.9.0
     command:
@@ -187,8 +194,22 @@ services:
     - prometheus
     - tempo
     - loki
+  rabbitmq:
+    volumes:
+    - ./observability/rabbitmq-enabled-plugins:/etc/rabbitmq/enabled_plugins:ro
+  otel-storage-init:
+    image: busybox:1.37.0
+    user: 0:0
+    command:
+    - sh
+    - -c
+    - mkdir -p /storage/queues && chown -R 10001:10001 /storage
+    volumes:
+    - collector-data:/storage
+    restart: 'no'
 volumes:
   tempo-data: {}
   loki-data: {}
   prometheus-data: {}
   grafana-data: {}
+  collector-data: {}

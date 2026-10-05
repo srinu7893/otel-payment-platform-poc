@@ -189,6 +189,7 @@ table(['Scenario','Expected result','Executable source'],[
  ('Metrics/log integration','Seven service HTTP metric series, JVM and custom outbox metric, service graph; exact payment trace ID in Loki',file('scripts/e2e/otel_acceptance.py')),
  ('Advanced tail sampling','Real bank 500 and seven-second traces retained; normal traffic reduced; restores full-trace Collector afterward',file('scripts/e2e/advanced-sampling.py')),
  ('Broker outage and recovery','Payment commits; outbox failure metric appears; notification catches up after broker restarts',file('scripts/e2e/otel_acceptance.py')),
+ ('Persistent queue/backend outage','Real queued payment trace and matching logs survive Collector SIGKILL/restart while Tempo/Loki are down; backlog drains after recovery',file('scripts/e2e/otel_acceptance.py')),
  ('Collector outage and recovery','Payment remains available; a fresh trace reaches Tempo after restart. No promise of lossless outage telemetry.',file('scripts/e2e/otel_acceptance.py')),
  ('Poison event and redelivery','Bounded retries → DLQ with x-death; duplicate event results in one delivery',file('notification-service/src/test/java/com/srinu/payments/notification/integration/NotificationRabbitIntegrationTest.java')),
  ('Saved context / legacy event','W3C trace ID, span ID and tracestate survive scheduler boundary; invalid context cannot inherit scheduler trace',file('payment-service/src/test/java/com/srinu/payments/payment/outbox/OutboxTraceContextTest.java'))]))
@@ -226,16 +227,16 @@ histogram_quantile(0.95, sum by (le,service_name) (rate(http_server_request_dura
 sum(increase(poc_outbox_publish_attempts_total{outcome="failure"}[5m]))'''))
 
 section('coverage','OpenTelemetry coverage: basic to advanced',table(['Capability','This increment','Boundary / remaining work'],[
- ('Instrumentation','Java agent attached to all seven backend JVMs; HTTP/JDBC/RabbitMQ/JVM; Micrometer bridge enabled','Browser RUM, continuous profiling, host/Kubernetes metrics and broker-depth metrics are not implemented.'),
+ ('Instrumentation','Java agent attached to all seven backend JVMs; HTTP/JDBC/RabbitMQ/JVM; Micrometer bridge enabled','Browser RUM, continuous profiling, host/Kubernetes metrics are not implemented; RabbitMQ queue-depth/consumer metrics are added in this increment.'),
  ('Signals and context','Traces, metrics, logs, W3C propagation, durable outbox context, trace/log links','Global baggage propagation is available; arbitrary baggage is not stored in outbox.'),
  ('Business observability','Custom outbox.publish span and attempt metric; business outcome log panels','No full custom payment SLO/error-budget instrumentation or complete domain audit store.'),
- ('Collector','OTLP gRPC/HTTP receivers; resource, memory limit, privacy attribute deletion, batching, bounded exporter queues/retry','Queues are memory-backed. No guarantee of lossless delivery through lengthy outages or restarts.'),
+ ('Collector','OTLP gRPC/HTTP receivers; resource, memory limit, privacy attribute deletion, batching, bounded exporter queues/retry','Trace/log exporter queues use file_storage on a named volume; receiver/batch buffering, agent buffers, queue capacity, disk failure and retry expiry still permit loss.'),
  ('Visualization','Provisioned operations, business and pipeline dashboards; trace search, service graph, exemplars configured','The Evidence section records rendered dashboards and backend queries. Exemplars depend on sampled data and compatible panels.'),
  ('Sampling','Default always_on for deterministic demo; isolated tail experiment retains errors/slow traces + 10% baseline','The manual workflow runs a separate real-request sampling experiment after deterministic full-trace E2E. Error/slow rules require all spans for a trace to reach one sampling Collector.'),
  ('Alerts','Prometheus rules for telemetry scrape failure, outbox failure and span error ratio','No Alertmanager routing, pager/email delivery or production SLO policy.'),
  ('Resilience','Business idempotency/reconciliation plus broker/Collector outage tests','Not a load, capacity, HA, disaster recovery or production-readiness certification.'),
  ('Security/privacy','No authorization/cookie capture; selected sensitive DB attributes removed; bounded metric labels','Existing logs contain synthetic customer/business data. Attribute deletion does not sanitize arbitrary log bodies. Review/redact before using real data.'),
- ('Deployment','Local single-node Compose with retained telemetry volumes and 24h backend retention','GCP runtime, workload identity, secrets, TLS, ingress, scaling, durable telemetry queues and backups remain decisions.')])+
+ ('Deployment','Local single-node Compose with retained telemetry volumes and 24h backend retention','GCP runtime, workload identity, secrets, TLS, ingress, scaling, multi-node queue durability and backups remain decisions.')])+
 p('Optional sampling experiment (do not run deterministic trace assertions with it enabled):')+
 code('''docker compose -f docker-compose.yml -f docker-compose.otel.yml -f docker-compose.sampling.yml \
   run --rm --no-deps otel-collector validate --config=/etc/otelcol/config.yaml --config=/etc/otelcol/tail.yaml
@@ -279,7 +280,7 @@ if metric_names:
 alerts=read_artifact('prometheus-alerts.json', {}).get('data',{}).get('alerts',[])
 if alerts:
     evidence+=table(['Recorded alert','Observed state'],[(e(x['labels'].get('alertname','')),e(x['state'])) for x in alerts])
-for title, data in [('Browser acceptance',browser),('Measured demonstration traffic',traffic),('Advanced tail-sampling experiment',sampling)]:
+for title, data in [('Browser acceptance',browser),('Measured demonstration traffic',traffic),('Advanced tail-sampling experiment',sampling),('Persistent export queue recovery',read_artifact('persistent-queue.json',{}))]:
     if data:
         evidence+='<h3>'+e(title)+'</h3>'+code(json.dumps(data,indent=2))
 screen_captions={
