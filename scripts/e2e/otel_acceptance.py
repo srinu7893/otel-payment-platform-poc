@@ -46,7 +46,7 @@ def eventually(fn, timeout=150):
             value = fn()
             if value:
                 return value
-        except (AssertionError, urllib.error.URLError, TimeoutError) as error:
+        except (AssertionError, OSError) as error:
             last = str(error)
         time.sleep(2)
     raise AssertionError(f'Condition not reached within {timeout}s; last error: {last}')

@@ -7,6 +7,7 @@ import datetime
 import json
 import os
 import subprocess
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
@@ -26,6 +27,11 @@ pipeline=json.loads(os.environ.get('POC_PIPELINE_OUTCOMES','{}'))
 browser=read_artifact('browser-results.json', {})
 traffic=read_artifact('traffic.json', {})
 sampling=read_artifact('advanced-sampling.json', {})
+test_totals={k:0 for k in ('tests','failures','errors','skipped')}
+for path in ROOT.glob('**/target/surefire-reports/TEST-*.xml'):
+    suite=ET.parse(path).getroot()
+    for key in test_totals:
+        test_totals[key]+=int(suite.attrib.get(key,0))
 verified=bool(results) and all(x['status']=='PASS' for x in results) and browser.get('status')=='PASS' and sampling.get('status')=='PASS' and bool(pipeline) and all(x=='success' for x in pipeline.values())
 sections=[]
 def section(key,title,body):
@@ -163,6 +169,7 @@ p('Tail sampling waits 30 seconds and retains errors, latency over 2 seconds, an
 section('findings','Review findings and remaining decisions',bullets([
  '<strong>Fixed:</strong> transaction outbox lacked durable trace context. V6 adds nullable traceparent/tracestate and the relay restores request context around publish.',
  '<strong>Fixed:</strong> full-stack smoke and pre-OTel acceptance ran on ordinary CI. They now live in a manual-only workflow, along with telemetry and resilience assertions.',
+ '<strong>Fixed after live testing:</strong> async React form reset, browser locale, Loki all-service selection and Collector recovery readiness; repeated manual runs capture these behaviors.',
  '<strong>Fixed:</strong> no telemetry backends or operational trace/log entry point. The overlay provisions all three signal paths and support UI links.',
  '<strong>Known baseline boundary:</strong> internal customer/bank endpoints rely on trusted-network deployment; demo JWT secrets/accounts and exposed service ports must not be deployed publicly. See '+file('docs/SECURITY_BASELINE.md')+' and '+file('docs/SERVICE_IDENTITY_STRATEGY.md')+'.',
  ('<strong>Verified live:</strong> agent/library compatibility, backend configurations, connected payment traces, metrics/logs, recovery scenarios, browser screens, three rendered dashboards and tail sampling passed in the recorded manual run.' if verified else '<strong>Verification gate:</strong> check recorded workflow outcomes and assertion results below. Only a fully passing run verifies the live integration.'),
@@ -171,8 +178,11 @@ section('findings','Review findings and remaining decisions',bullets([
 
 evidence=p('Live integration status: '+('VERIFIED — every recorded workflow stage and acceptance assertion passed.' if verified else 'See individual recorded outcomes; full live verification is not established by source configuration alone.'))
 evidence+=p('Source revision at generation: '+revision+'; source ref: '+ref+'. Generated '+datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')+'.')
+evidence+=p('Reproduce this exact source snapshot with git checkout '+revision+' before building. Source links follow the implementation branch; the revision above identifies the tested snapshot.')
 if os.environ.get('GITHUB_RUN_ID'):
     evidence+=p('GitHub run: ')+link('https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/'+os.environ['GITHUB_RUN_ID'],'Open exact workflow run')
+if test_totals['tests']:
+    evidence+=table(['Backend tests','Failures','Errors','Skipped'],[tuple(str(test_totals[k]) for k in ('tests','failures','errors','skipped'))])
 if pipeline:
     evidence+=table(['Workflow stage','Actual outcome'],[(e(k),e(v)) for k,v in pipeline.items()])
 if results:
