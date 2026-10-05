@@ -19,6 +19,9 @@ import java.util.Map;
 @RequestMapping("/api/v1/ops")
 public class OperationsController {
     private final List<ServiceTarget> targets;
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.beans.factory.ObjectProvider<com.srinu.otelpoc.cloud.CloudRunIdentity> cloudIdentity;
+
 
     public OperationsController(
         @Value("${services.auth-url:http://localhost:8079}") String auth,
@@ -51,8 +54,13 @@ public class OperationsController {
 
     private Mono<ServiceHealth> probe(ServiceTarget target) {
         Instant started = Instant.now();
-        return WebClient.create(target.baseUrl())
-            .get()
+        var client = WebClient.builder().baseUrl(target.baseUrl());
+        var identity = cloudIdentity == null ? null : cloudIdentity.getIfAvailable();
+        if (identity != null) client.filter((request, next) -> Mono.fromCallable(() ->
+            identity.bearerFor(request.url())).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+            .flatMap(token -> next.exchange(org.springframework.web.reactive.function.client.ClientRequest.from(request)
+                .header(com.srinu.otelpoc.cloud.CloudRunIdentity.HEADER, token).build())));
+        return client.build().get()
             .uri("/actuator/health")
             .retrieve()
             .bodyToMono(Map.class)

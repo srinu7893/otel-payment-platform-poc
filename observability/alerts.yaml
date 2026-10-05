@@ -52,3 +52,27 @@ groups:
       severity: warning
     annotations:
       summary: Notification DLQ contains messages; inspect before redrive
+- name: payment-api-slo
+  rules:
+  - record: poc:payment_api_error_ratio:5m
+    expr: (sum(rate(http_server_request_duration_seconds_count{service_name="api-gateway",http_route=~"payment-service|transfer-service",http_response_status_code=~"5.."}[5m]))
+      or vector(0)) / sum(rate(http_server_request_duration_seconds_count{service_name="api-gateway",http_route=~"payment-service|transfer-service"}[5m]))
+  - record: poc:payment_api_error_ratio:1h
+    expr: (sum(rate(http_server_request_duration_seconds_count{service_name="api-gateway",http_route=~"payment-service|transfer-service",http_response_status_code=~"5.."}[1h]))
+      or vector(0)) / sum(rate(http_server_request_duration_seconds_count{service_name="api-gateway",http_route=~"payment-service|transfer-service"}[1h]))
+  - record: poc:payment_api_availability:5m
+    expr: 1 - poc:payment_api_error_ratio:5m
+  - record: poc:payment_api_latency_good_ratio:5m
+    expr: sum(rate(http_server_request_duration_seconds_bucket{service_name="api-gateway",http_route=~"payment-service|transfer-service",le="2.5"}[5m]))
+      / sum(rate(http_server_request_duration_seconds_count{service_name="api-gateway",http_route=~"payment-service|transfer-service"}[5m]))
+  - alert: PaymentApiFastErrorBudgetBurn
+    expr: (poc:payment_api_error_ratio:1h > 14.4 * 0.001) and (poc:payment_api_error_ratio:5m
+      > 14.4 * 0.001)
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: Payment API burns the 99.9% technical availability budget quickly
+      description: Both 1h and 5m windows exceed 14.4x budget burn. Inspect ingress
+        metrics, correlated logs and dependency traces. HTTP success does not guarantee
+        payment completion.

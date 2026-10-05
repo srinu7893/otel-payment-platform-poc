@@ -48,6 +48,15 @@ jobs:
     - name: Validate Prometheus configuration and rules
       run: bash scripts/otel-compose.sh run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
       id: prometheus_config
+    - name: Test SLO rules
+      id: slo_rules
+      run: docker run --rm --entrypoint promtool -v "$PWD/observability:/work:ro" -w /work prom/prometheus:v3.6.0 test rules slo-rule-tests.yaml
+    - name: Validate cloud release assets without credentials
+      id: cloud_assets
+      run: |
+        python3 -m unittest discover -s scripts/cloud -p 'test_*.py'
+        docker build -f deploy/cloud-run/Dockerfile.collector -t otel-cloud-collector .
+        docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation otel-cloud-collector validate --config=/etc/otelcol-contrib/config.yaml
     - name: Start instrumented demo
       run: 'bash scripts/otel-compose.sh config --quiet
 
@@ -65,6 +74,9 @@ jobs:
     - name: Bank timeout, bank error, support health and API docs
       run: bash scripts/pre_otel_acceptance.sh
       id: failures
+    - name: Verify synthetic log body redaction
+      id: privacy
+      run: python3 scripts/e2e/privacy_acceptance.py
     - name: Generate measured demo traffic
       if: success()
       id: traffic
@@ -91,7 +103,7 @@ jobs:
       if: always()
       run: python3 scripts/render-poc-guide.py
       env:
-        POC_PIPELINE_OUTCOMES: '{"Backend tests including PostgreSQL/RabbitMQ integration": "${{ steps.backend.outcome }}",
+        POC_PIPELINE_OUTCOMES: '{"Log body privacy probe": "${{ steps.privacy.outcome }}", "SLO rule scenarios": "${{ steps.slo_rules.outcome }}", "Cloud asset validation": "${{ steps.cloud_assets.outcome }}", "Backend tests including PostgreSQL/RabbitMQ integration": "${{ steps.backend.outcome }}",
           "Validate Collector configuration": "${{ steps.collector_config.outcome }}", "Validate Prometheus configuration
           and rules": "${{ steps.prometheus_config.outcome }}", "Start instrumented demo": "${{ steps.stack.outcome }}", "Wait
           for all services": "${{ steps.health.outcome }}", "Payment, refund, replay, risk, notification and P2P": "${{ steps.business.outcome

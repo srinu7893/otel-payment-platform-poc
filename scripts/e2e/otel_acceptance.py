@@ -252,7 +252,7 @@ def dashboard_present(trace):
     import base64
     password=os.environ.get('GRAFANA_ADMIN_PASSWORD','otel-demo-admin')
     headers={'Authorization':'Basic '+base64.b64encode(('admin:'+password).encode()).decode()}
-    for uid in ('payment-poc','payment-business','telemetry-pipeline'):
+    for uid in ('payment-poc','payment-business','telemetry-pipeline','payment-slo'):
         req=urllib.request.Request('http://localhost:3001/api/dashboards/uid/'+uid,headers=headers)
         with urllib.request.urlopen(req,timeout=15) as response:
             data=json.load(response)

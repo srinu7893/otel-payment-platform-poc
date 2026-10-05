@@ -29,6 +29,7 @@
   </dependencyManagement>
 
   <modules>
+    <module>cloud-runtime</module>
     <module>api-gateway</module>
     <module>auth-service</module>
     <module>customer-service</module>

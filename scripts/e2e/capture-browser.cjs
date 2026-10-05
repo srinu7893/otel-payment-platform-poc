@@ -43,7 +43,7 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
     await screenshot('04-support-operations');
     const response=await context.request.post('http://localhost:3001/login',{data:{user:'admin',password:process.env.GRAFANA_ADMIN_PASSWORD||'otel-demo-admin'}});
     assert.equal(response.status(),200,'Grafana login');
-    for (const [i,uid] of ['payment-poc','payment-business','telemetry-pipeline'].entries()) {
+    for (const [i,uid] of ['payment-poc','payment-business','telemetry-pipeline','payment-slo'].entries()) {
       const dashboard=JSON.parse(fs.readFileSync(`observability/grafana/dashboards/${uid}.json`,'utf8'));
       // Fit the whole grid: Grafana can unload rows that leave the viewport.
       const gridHeight=Math.max(...dashboard.panels.map(p=>p.gridPos.y+p.gridPos.h));
@@ -70,7 +70,7 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
     }
     assert.deepEqual(errors,[],'Browser runtime errors');
     assert.deepEqual(diagnostics.filter(x=>x.type==='http' && x.url.includes('/api/ds/query')),[],'Grafana datasource query errors');
-    fs.writeFileSync('artifacts/browser-results.json',JSON.stringify({status:'PASS',checks:['customer payment submit/reset','customer transfer submit/reset','support dashboard','three live Grafana screenshots'],errors},null,2));
+    fs.writeFileSync('artifacts/browser-results.json',JSON.stringify({status:'PASS',checks:['customer payment submit/reset','customer transfer submit/reset','support dashboard','four live Grafana screenshots'],errors},null,2));
   } catch (error) {
     await screenshot('99-browser-failure').catch(()=>{});
     fs.writeFileSync('artifacts/browser-results.json',JSON.stringify({status:'FAIL',error:error.message,errors},null,2));
