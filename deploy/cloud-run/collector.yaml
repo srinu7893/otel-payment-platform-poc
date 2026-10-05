@@ -47,8 +47,6 @@ exporters:
       default_log_name: payment-poc-otel
     sending_queue:
       queue_size: 200
-    retry_on_failure:
-      max_elapsed_time: 2m
   googlemanagedprometheus:
     project: ${env:GOOGLE_CLOUD_PROJECT}
     sending_queue:

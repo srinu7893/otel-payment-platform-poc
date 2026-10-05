@@ -57,6 +57,10 @@ jobs:
         python3 -m unittest discover -s scripts/cloud -p 'test_*.py'
         docker build -f deploy/cloud-run/Dockerfile.collector -t otel-cloud-collector .
         docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation otel-cloud-collector validate --config=/etc/otelcol-contrib/config.yaml
+        for service in auth-service customer-service mock-bank-service gateway-service notification-service payment-service api-gateway; do
+          docker build --build-arg SERVICE="$service" -f deploy/cloud-run/Dockerfile.java -t "otel-cloud-$service" .
+        done
+        docker build -f deploy/cloud-run/Dockerfile.frontend -t otel-cloud-frontend .
     - name: Start instrumented demo
       run: 'bash scripts/otel-compose.sh config --quiet
 
