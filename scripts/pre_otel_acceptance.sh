@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
+run_dir=$(mktemp -d)
+trap 'rm -rf "$run_dir"' EXIT
 
 BASE_URL="${BASE_URL:-http://localhost:8088}"
 
 auth() {
   local username="$1"
   local password="$2"
-  local body_file="/tmp/pre-otel-login-${username}.json"
+  local body_file="${run_dir}/login-${username}.json"
   local status
   for attempt in {1..20}; do
     status=$(curl --silent --show-error --output "$body_file" --write-out '%{http_code}' \
@@ -39,7 +42,10 @@ post_payment() {
 }
 
 echo '1/4 Verify public OpenAPI/Swagger contract'
-curl --fail --silent --show-error "${BASE_URL}/openapi.yaml" | grep -q '^openapi: 3.0.3'
+# Read the complete response before checking it: an early-exiting pipe reader
+# can make curl exit 23 under pipefail even when the contract is valid.
+curl --fail --silent --show-error --output "${run_dir}/openapi.yaml" "${BASE_URL}/openapi.yaml"
+python3 -c 'import pathlib,sys; assert pathlib.Path(sys.argv[1]).read_text().startswith("openapi: 3.0.3")' "${run_dir}/openapi.yaml"
 curl --fail --silent --show-error -L "${BASE_URL}/swagger-ui.html" >/dev/null
 
 echo '2/4 Verify SUPPORT operations health'
