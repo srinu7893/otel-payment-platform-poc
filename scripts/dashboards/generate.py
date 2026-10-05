@@ -32,7 +32,7 @@ for service in SERVICES:
   panels += [panel('Downstream HTTP p95','histogram_quantile(0.95,sum by (le) (rate(http_client_request_duration_seconds_bucket'+s+'[$__rate_interval])))','s','Aggregate client duration; use traces to identify the dependency.')]
  if service=='payment-service':panels += [panel('Durable payment rows by status','max by (status) (poc_payment_records'+s+')'),panel('Pending outbox events','max(poc_outbox_pending'+s+')'),panel('Oldest pending outbox age','max(poc_outbox_oldest_pending_seconds'+s+')','s')]
  if service=='notification-service':panels += [panel('Durable notification rows by status','max by (status) (poc_notification_records'+s+')'),panel('Oldest unsent record age','max(poc_notification_oldest_unsent_seconds'+s+')','s'),panel('Listener executions per second','sum(rate(spring_rabbitmq_listener_seconds_count'+s+'[$__rate_interval]))','ops','Listener executions may include retries, not unique delivered events.')]
- if service in {'payment-service','notification-service'}:panels += [panel('Business snapshot age','max(time()-poc_business_snapshot_last_success_timestamp_seconds'+s+')','s'),panel('Business snapshot last refresh healthy','min(poc_business_snapshot_healthy'+s+')')]
+ if service in {'payment-service','notification-service'}:panels += [panel('Business snapshot age','max(time()-(poc_business_snapshot_last_success_timestamp_seconds'+s+' > 0))','s','Only initialized timestamps are shown. An absent age is not healthy; inspect snapshot refresh health.'),panel('Business snapshot last refresh healthy','min(poc_business_snapshot_healthy'+s+')')]
  panels += [panel('Service raw logs','{service_name="'+service+'"}',description='Expand a record, copy trace_id and open Tempo in Explore. Increase the selected time window for async retries.',kind='logs',source='loki')]
  write('service-'+service,service+' — metrics and investigation',panels,service)
 write('service-frontend','Frontend — journey visibility and coverage gaps',[
@@ -52,6 +52,6 @@ write('platform-overview','Platform — consolidated service comparison',[
  panel('Collector scrape status','up{job="otel-applications"}','short','This checks the shared exporter, not every application health endpoint.'),
  panel('Exporter queue utilization','otelcol_exporter_queue_size / clamp_min(otelcol_exporter_queue_capacity,1)','percentunit'),
  panel('Waiting outbox work','max(poc_outbox_pending)'),panel('Notification queue depth','rabbitmq_queue_messages_ready{queue="payments.notification"}'),
- panel('Business snapshot age by service','max by (service_name) (time()-poc_business_snapshot_last_success_timestamp_seconds)','s'),
+ panel('Business snapshot age by service','max by (service_name) (time()-(poc_business_snapshot_last_success_timestamp_seconds > 0))','s','Only initialized timestamps are shown. Inspect refresh health when a service has no successful snapshot.'),
  panel('Active warnings by name','sum by (alertname) (ALERTS{alertstate="firing"})','short','Empty means no firing series. Also check scrape/telemetry freshness.')])
 print('Generated 7 backend dashboards, frontend coverage dashboard and consolidated overview')

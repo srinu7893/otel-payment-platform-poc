@@ -331,7 +331,7 @@
     {
       "title": "Business snapshot age by service",
       "type": "timeseries",
-      "description": "",
+      "description": "Only initialized timestamps are shown. Inspect refresh health when a service has no successful snapshot.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -339,7 +339,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max by (service_name) (time()-poc_business_snapshot_last_success_timestamp_seconds)",
+          "expr": "max by (service_name) (time()-(poc_business_snapshot_last_success_timestamp_seconds > 0))",
           "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
         }
       ],

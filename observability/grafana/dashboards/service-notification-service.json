@@ -480,7 +480,7 @@
     {
       "title": "Business snapshot age",
       "type": "timeseries",
-      "description": "",
+      "description": "Only initialized timestamps are shown. An absent age is not healthy; inspect snapshot refresh health.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -488,7 +488,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max(time()-poc_business_snapshot_last_success_timestamp_seconds{service_name=\"notification-service\"})",
+          "expr": "max(time()-(poc_business_snapshot_last_success_timestamp_seconds{service_name=\"notification-service\"} > 0))",
           "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
         }
       ],
