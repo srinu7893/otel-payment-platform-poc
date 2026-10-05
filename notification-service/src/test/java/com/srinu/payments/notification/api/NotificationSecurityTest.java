@@ -58,7 +58,8 @@ class NotificationSecurityTest {
             org.mockito.ArgumentMatchers.any())).thenReturn(org.springframework.data.domain.Page.empty());
         mvc.perform(get("/api/v1/notifications").param("paymentId", paymentId.toString())
                 .with(jwt().jwt(token -> token.claim("customer_id", "demo-customer")
-                    .claim("roles", java.util.List.of("CUSTOMER")))))
+                    .claim("roles", java.util.List.of("CUSTOMER")))
+                    .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CUSTOMER"))))
             .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
         org.mockito.Mockito.verify(repository).findAllByCustomerIdAndPaymentId(
             org.mockito.ArgumentMatchers.eq("demo-customer"), org.mockito.ArgumentMatchers.eq(paymentId), org.mockito.ArgumentMatchers.any());
@@ -73,7 +74,8 @@ class NotificationSecurityTest {
             org.mockito.ArgumentMatchers.any())).thenReturn(org.springframework.data.domain.Page.empty());
         mvc.perform(get("/api/v1/notifications").param("transferId", transferId.toString())
                 .with(jwt().jwt(token -> token.claim("customer_id", "demo-customer")
-                    .claim("roles", java.util.List.of("CUSTOMER")))))
+                    .claim("roles", java.util.List.of("CUSTOMER")))
+                    .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CUSTOMER"))))
             .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
         org.mockito.Mockito.verify(repository).findAllByCustomerIdAndTransferId(
             org.mockito.ArgumentMatchers.eq("demo-customer"), org.mockito.ArgumentMatchers.eq(transferId), org.mockito.ArgumentMatchers.any());
