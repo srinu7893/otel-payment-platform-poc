@@ -169,7 +169,7 @@ p('Tail sampling waits 30 seconds and retains errors, latency over 2 seconds, an
 section('findings','Review findings and remaining decisions',bullets([
  '<strong>Fixed:</strong> transaction outbox lacked durable trace context. V6 adds nullable traceparent/tracestate and the relay restores request context around publish.',
  '<strong>Fixed:</strong> full-stack smoke and pre-OTel acceptance ran on ordinary CI. They now live in a manual-only workflow, along with telemetry and resilience assertions.',
- '<strong>Fixed after live testing:</strong> async React form reset, browser locale, Loki all-service selection and Collector recovery readiness; repeated manual runs capture these behaviors.',
+ '<strong>Fixed after live testing:</strong> async React form reset, browser locale, Loki all-service selection, Collector recovery readiness and the OpenAPI curl pipe race; repeated manual runs capture these behaviors.',
  '<strong>Fixed:</strong> no telemetry backends or operational trace/log entry point. The overlay provisions all three signal paths and support UI links.',
  '<strong>Known baseline boundary:</strong> internal customer/bank endpoints rely on trusted-network deployment; demo JWT secrets/accounts and exposed service ports must not be deployed publicly. See '+file('docs/SECURITY_BASELINE.md')+' and '+file('docs/SERVICE_IDENTITY_STRATEGY.md')+'.',
  ('<strong>Verified live:</strong> agent/library compatibility, backend configurations, connected payment traces, metrics/logs, recovery scenarios, browser screens, three rendered dashboards and tail sampling passed in the recorded manual run.' if verified else '<strong>Verification gate:</strong> check recorded workflow outcomes and assertion results below. Only a fully passing run verifies the live integration.'),
@@ -189,6 +189,18 @@ if results:
     evidence+=table(['Telemetry/security/resilience assertion','Actual result','Detail'],[(e(x['scenario']),e(x['status']),e(x.get('error',str(x.get('seconds',''))+' seconds'))) for x in results])
 else:
     evidence+='<div class="notice">NOT RUN HERE: no live OTel acceptance result file is present. Docker was unavailable in the authoring workspace; backend tests and live telemetry must be verified in the manual workflow. Do not interpret this guide as a successful runtime test report.</div>'
+trace=read_artifact('trace-evidence.json', {})
+if trace:
+    evidence+='<h3>Connected payment trace</h3>'+code(json.dumps(trace,indent=2))
+targets=read_artifact('prometheus-targets.json', {}).get('data',{}).get('activeTargets',[])
+if targets:
+    evidence+=table(['Prometheus target','Observed health'],[(e(x['labels'].get('job','')),e(x['health'])) for x in targets])
+metric_names=read_artifact('prometheus-series.json', {}).get('data',[])
+if metric_names:
+    evidence+=p(str(len(metric_names))+' metric names exposed across the application and telemetry backends; the acceptance suite separately asserts required application, JVM, outbox and service-graph series.')
+alerts=read_artifact('prometheus-alerts.json', {}).get('data',{}).get('alerts',[])
+if alerts:
+    evidence+=table(['Recorded alert','Observed state'],[(e(x['labels'].get('alertname','')),e(x['state'])) for x in alerts])
 for title, data in [('Browser acceptance',browser),('Measured demonstration traffic',traffic),('Advanced tail-sampling experiment',sampling)]:
     if data:
         evidence+='<h3>'+e(title)+'</h3>'+code(json.dumps(data,indent=2))

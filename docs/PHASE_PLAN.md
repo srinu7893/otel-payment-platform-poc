@@ -1,6 +1,6 @@
 # OTel Payment Platform POC — Phase-by-Phase Delivery Plan
 
-This is the source of truth for baseline completion before OpenTelemetry.
+This records baseline and local OpenTelemetry completion, followed by separately scoped cloud deployment work.
 
 ## Status flags
 
@@ -21,7 +21,7 @@ This is the source of truth for baseline completion before OpenTelemetry.
 | DONE | React + Vite frontend | Customer + role-aware support/admin UI |
 | DONE | Spring Cloud API Gateway | Single browser-facing entry point |
 | DONE | Docker Compose | PostgreSQL, RabbitMQ, services and frontend |
-| DONE | GitHub Actions CI | Backend tests, frontend build, container build/start, smoke |
+| DONE | GitHub Actions CI | Backend tests, frontend/container builds; full-stack acceptance is opt-in |
 | DONE | E2E runbook | `docs/E2E_RUNBOOK.md` |
 
 ## Phase 1 — Core Business Services
@@ -101,8 +101,8 @@ This is the source of truth for baseline completion before OpenTelemetry.
 | DONE | Service health backend | API Gateway aggregates six service actuator health checks |
 | DONE | Service health UI acceptance | Operations health backend + focused acceptance verified; role-aware UI builds successfully |
 | PLANNED | Failure-scenario admin controls | Controlled slow/error/reset actions for live OTel demonstrations |
-| PLANNED | Correlation-ID operational search | Persist/index correlation ID or rely on log/trace backend once OTel is present |
-| PLANNED | Observability deep links | Trace/log links after Grafana/Tempo/Jaeger exists |
+| DONE | Correlation-ID operational search | Support UI links to Loki correlation/trace lookup; database correlation indexing remains separate |
+| DONE | Observability deep links | Support UI and Grafana trace/log links provisioned; live Grafana backend queries and browser dashboards verified |
 
 ## Phase 7 — API & Developer Experience
 
@@ -137,20 +137,25 @@ OpenTelemetry starts only after these are satisfied:
 
 ## Phase 9 implementation update
 
-The local OTel implementation is now present on the observability branch. Java agent, Collector, Tempo/Loki/Prometheus/Grafana, durable outbox propagation, dashboards and manual telemetry acceptance have been added. All items below remain **pending runtime verification** rather than DONE until the new manual workflow passes. See `POC_GUIDE.html` for exact implemented coverage and exclusions. The old immediate queue at the end describes the baseline handoff and is superseded by running/reviewing the new manual workflow.
+Verified by the [full manual run](https://github.com/srinu7893/otel-payment-platform-poc/actions/runs/37246451511) on `c614fc387693b78d131207ac8aecbbacfd3bcf8a`: 61 backend tests with zero failures/errors/skips; all 13 telemetry/security/recovery assertions; payment/refund/replay/risk/P2P scenarios; support health and API contract; 12 concurrent demonstration payments with SENT notifications; real error/slow tail sampling; customer/support browser checks and all three rendered Grafana dashboards.
+
+See `POC_GUIDE.html` for precise implemented coverage, reproduction, evidence and exclusions.
 
 ## Phase 9 — OpenTelemetry
 
-| Status | Feature | Work |
+| Status | Feature | Verified work |
 | --- | --- | --- |
-| PLANNED | OTel Java Agent | Primary zero/low-code instrumentation |
-| PLANNED | OTel Collector | OTLP receivers + resource/memory/batch processors |
-| PLANNED | Distributed traces | API Gateway → Payment → Gateway → Bank and async Rabbit path |
-| PLANNED | Metrics | HTTP/JVM/DB/RabbitMQ/business metrics |
-| PLANNED | Trace/log correlation | traceId/spanId injected into structured logs |
-| PLANNED | Jaeger/Tempo | Trace backend decision for local/final demo |
-| PLANNED | Prometheus + Grafana | Local metric dashboards |
-| PLANNED | Custom business spans | Add only after auto-instrumentation is working |
+| DONE | OTel Java Agent | Seven backend JVMs; checksum-verified pinned agent |
+| DONE | OTel Collector | OTLP, resource/privacy/memory/batch processors; live signal pipelines |
+| DONE | Distributed traces | Connected HTTP/JDBC/outbox/Rabbit consumer trace across six services |
+| DONE | Metrics | Seven service HTTP series, JVM, outbox attempt counter and service graphs; broker-depth metrics remain outside scope |
+| DONE | Trace/log correlation | Exact trace ID found in Loki; Grafana datasource proxy retrieves real Tempo spans |
+| DONE | Tempo | Selected trace backend with service-graph/span metrics generator |
+| DONE | Prometheus + Grafana | Three dashboards / 20 panels, rendered with real queries |
+| DONE | Custom span and durable context | outbox.publish, persisted W3C traceparent/tracestate, attempt metric |
+| DONE | Recovery acceptance | Broker outage catch-up; application availability and fresh traces after Collector recovery |
+| DONE | Advanced sampling | Actual error and seven-second slow traces retained; normal traffic reduced; full-trace mode restored |
+| DONE | Current handover | Regeneratable HTML, observed results, screenshots and manual-only workflow |
 
 ## Phase 10 — GCP Deployment & Observability
 
@@ -180,7 +185,6 @@ The local OTel implementation is now present on the observability branch. Java a
 
 ## Current immediate execution queue
 
-1. Merge the verified baseline to `main`.
-2. Verify the consolidated CI on `main`.
-3. Create a separate OpenTelemetry branch from verified `main`.
-4. Start OTel Java Agent + Collector and advanced observability integrations there.
+1. Review the verified observability PR and its manual-run evidence.
+2. Recreate the manager demo using `POC_GUIDE.html` / `scripts/run-poc.sh`.
+3. Choose the GCP runtime and production identity, ingress, retention and alert routing before Phase 10.

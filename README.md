@@ -1,6 +1,6 @@
 # OTel Payment Platform POC
 
-Enterprise-style full-stack payment platform for demonstrating Spring Boot microservices, authentication/authorization, synchronous REST calls, RabbitMQ messaging, PostgreSQL persistence, production-style logging, failure handling and—after the baseline is stable—OpenTelemetry traces, metrics and logs.
+Enterprise-style full-stack payment platform for demonstrating Spring Boot microservices, authentication/authorization, synchronous REST calls, RabbitMQ messaging, PostgreSQL persistence, production-style logging, failure handling and OpenTelemetry traces, metrics and logs.
 
 > All accounts, balances, gateways, email/SMS messages and money movement are simulated. Never use real bank credentials, card data or production secrets in this POC.
 
@@ -17,7 +17,7 @@ bash scripts/e2e/wait-ready.sh
 
 Grafana: http://localhost:3001 (`admin` / `otel-demo-admin`). The overlay adds Collector, Tempo, Prometheus, Loki and three provisioned dashboards. Backend JVMs export all three signals; the durable outbox now carries W3C trace context into RabbitMQ delivery. The baseline `docker compose` command remains available without OTel.
 
-Runtime validation is **pending** until the manual workflow passes. Local source checks are not a substitute for the evidence artifact. Regenerate the guide after changes with `python3 scripts/render-poc-guide.py`; each manual run also produces a current HTML report alongside its test evidence.
+Verified by the [full manual run](https://github.com/srinu7893/otel-payment-platform-poc/actions/runs/37246451511) on `c614fc387693b78d131207ac8aecbbacfd3bcf8a`: 61 backend tests with zero failures/errors/skips; all 13 telemetry/security/recovery assertions; payment/refund/replay/risk/P2P scenarios; support health and API contract; 12 concurrent demonstration payments with SENT notifications; real error/slow tail sampling; customer/support browser checks and all three rendered Grafana dashboards. Regenerate the guide after changes with `python3 scripts/render-poc-guide.py`; each manual run also produces a current HTML report alongside its test evidence.
 
 ## Current architecture
 
@@ -86,7 +86,7 @@ npm install
 npm run build
 ```
 
-GitHub Actions runs backend tests/package, frontend build, Compose validation and container builds on configured pushes/PRs. Full-stack smoke, failure scenarios and OTel E2E run only through the separate `manual-otel-e2e` workflow (`workflow_dispatch`).
+GitHub Actions runs backend tests/package, frontend build, Compose validation and container builds on configured pushes/PRs. Full-stack smoke, failure scenarios and OTel E2E run only through the separate `manual-otel-e2e` workflow (`workflow_dispatch`, or manually adding the `run-otel-e2e` label to a same-repository PR). No push or PR-update event triggers E2E.
 
 ## Run complete local stack
 

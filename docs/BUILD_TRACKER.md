@@ -1,6 +1,6 @@
-## Observability increment — implemented, runtime acceptance pending
+## Observability increment — verified live
 
-The following increment supersedes the historical pre-OTel checklist below. Do not mark runtime acceptance complete until the manual workflow evidence passes.
+Verified by the [full manual run](https://github.com/srinu7893/otel-payment-platform-poc/actions/runs/37246451511) on `c614fc387693b78d131207ac8aecbbacfd3bcf8a`: 61 backend tests with zero failures/errors/skips; all 13 telemetry/security/recovery assertions; payment/refund/replay/risk/P2P scenarios; support health and API contract; 12 concurrent demonstration payments with SENT notifications; real error/slow tail sampling; customer/support browser checks and all three rendered Grafana dashboards.
 
 - Added optional Java agent/Collector/Tempo/Loki/Prometheus/Grafana stack and three dashboards.
 - Added W3C outbox context persistence/restoration plus custom publish span and attempt metric.
@@ -8,8 +8,8 @@ The following increment supersedes the historical pre-OTel checklist below. Do n
 - Moved full-stack acceptance out of automatic CI to `.github/workflows/manual-otel-e2e.yml`.
 - Added actual trace/metric/log assertions, security negatives, broker and Collector recovery scenarios.
 - Added regeneratable `docs/POC_GUIDE.html` with expected vs observed results and source links.
-- Optional tail-sampling overlay is provided as an advanced manual experiment.
-- Pending: full Java 21/Docker runtime acceptance; GCP deployment and production controls remain separately scoped.
+- Tail sampling was exercised with actual bank HTTP requests: error and seven-second slow traces retained; normal traffic reduced.
+- Local runtime acceptance is complete. GCP deployment and production controls remain separately scoped.
 
 ---
 
