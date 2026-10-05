@@ -1,0 +1,10 @@
+const { chromium }=require('playwright');
+const fs=require('fs');const assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:1440,height:1100}});const page=await context.newPage();const errors=[];
+page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400&&r.url().includes('/api/ds/query'))errors.push(`${r.status()} ${r.url()}`)});
+fs.mkdirSync('artifacts/service-dashboards',{recursive:true});
+try{const r=await context.request.post('http://localhost:3001/login',{data:{user:'admin',password:process.env.GRAFANA_ADMIN_PASSWORD||'otel-demo-admin'}});assert.equal(r.status(),200);
+for(const file of fs.readdirSync('observability/grafana/dashboards').filter(x=>x.endsWith('.json'))){const d=JSON.parse(fs.readFileSync('observability/grafana/dashboards/'+file));const height=Math.max(...d.panels.map(p=>p.gridPos.y+p.gridPos.h));await page.setViewportSize({width:1440,height:Math.max(1100,height*40+220)});await page.goto(`http://localhost:3001/d/${d.uid}?from=now-30m&to=now&kiosk`);
+for(const panel of d.panels){const h=page.getByText(panel.title,{exact:true}).first();await h.waitFor({timeout:60000});await h.scrollIntoViewIfNeeded();}await page.waitForTimeout(3000);await page.screenshot({path:`artifacts/service-dashboards/${d.uid}.png`,fullPage:true});}
+assert.deepEqual(errors,[]);fs.writeFileSync('artifacts/dashboard-browser.json',JSON.stringify({status:'PASS',dashboards:fs.readdirSync('artifacts/service-dashboards'),errors},null,2));
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exit(1)});

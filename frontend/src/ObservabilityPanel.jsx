@@ -30,6 +30,7 @@ export default function ObservabilityPanel() {
       {' · '}<a href={`${GRAFANA}/d/telemetry-pipeline`} target="_blank" rel="noreferrer">Telemetry health</a>
       {' · '}<a href={`${GRAFANA}/d/payment-slo`} target="_blank" rel="noreferrer">Technical SLO dashboard</a></p>}
     {!CLOUD_PROJECT && <p><a href="http://localhost:9094" target="_blank" rel="noreferrer">Incident inbox</a>{' · '}<a href="http://localhost:9093" target="_blank" rel="noreferrer">Alert routing and silences</a></p>}
+    {!CLOUD_NATIVE && <details><summary>Service metrics dashboards</summary><p><a href={`${GRAFANA}/d/platform-overview`} target="_blank" rel="noreferrer">Consolidated platform overview</a></p><p>{['api-gateway','auth-service','customer-service','payment-service','gateway-service','mock-bank-service','notification-service','frontend'].map(name => <a key={name} href={`${GRAFANA}/d/service-${name}`} target="_blank" rel="noreferrer" style={{marginRight:12}}>{name}</a>)}</p></details>}
     <div className="inlineForm">
       <label>Lookup<select value={kind} onChange={e => setKind(e.target.value)}><option value="correlation">Correlation ID</option><option value="trace">Trace ID</option></select></label>
       <label className="grow">ID<input value={value} maxLength={100} onChange={e => setValue(e.target.value)} placeholder={kind === 'trace' ? '32 hexadecimal characters' : 'X-Correlation-Id from the response'} /></label>
