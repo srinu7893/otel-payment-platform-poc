@@ -17,7 +17,7 @@ bash scripts/e2e/wait-ready.sh
 
 Grafana: http://localhost:3001 (`admin` / `otel-demo-admin`). The overlay adds Collector, Tempo, Prometheus, Loki and three provisioned dashboards. Backend JVMs export all three signals; the durable outbox now carries W3C trace context into RabbitMQ delivery. The baseline `docker compose` command remains available without OTel.
 
-Verified by the [full manual run](https://github.com/srinu7893/otel-payment-platform-poc/actions/runs/37246451511) on `c614fc387693b78d131207ac8aecbbacfd3bcf8a`: 61 backend tests with zero failures/errors/skips; all 13 telemetry/security/recovery assertions; payment/refund/replay/risk/P2P scenarios; support health and API contract; 12 concurrent demonstration payments with SENT notifications; real error/slow tail sampling; customer/support browser checks and all three rendered Grafana dashboards. Regenerate the guide after changes with `python3 scripts/render-poc-guide.py`; each manual run also produces a current HTML report alongside its test evidence.
+Verified by the [full manual run](https://github.com/srinu7893/otel-payment-platform-poc/actions/runs/37261777696) on `8ac5ee021a9fc9845dccad2e7444692e89e68e9f`: 63 backend tests with zero failures/errors/skips; all 15 telemetry/security/recovery assertions; payment/refund/replay/risk/P2P scenarios; support health and API contract; 12 concurrent demonstration payments with SENT notifications; real error/slow tail sampling; customer/support browser checks and all three rendered Grafana dashboards. Regenerate the guide after changes with `python3 scripts/render-poc-guide.py`; each manual run also produces a current HTML report alongside its test evidence.
 
 ## Current architecture
 
@@ -153,16 +153,12 @@ CUSTOMER responses are scoped to their own records; SUPPORT/ADMIN operational vi
 
 ## Correlation logging
 
-Send or let the gateway generate `X-Correlation-Id`. It is propagated through HTTP calls and RabbitMQ headers and restored into the Notification Service MDC. This creates a pre-OpenTelemetry correlation baseline that we can compare with OTel `traceId`/`spanId` later.
+Send or let the gateway generate `X-Correlation-Id`. It is propagated through HTTP calls and RabbitMQ headers and restored into the Notification Service MDC. This business correlation ID complements the active OTel trace/span context exported to Loki. Durable outbox records separately persist W3C parent context to connect scheduled delivery to the original request.
 
 ## Delivery plan
 
-1. Finish and test the full-stack baseline without OpenTelemetry.
-2. Freeze business behavior.
-3. Add OpenTelemetry Java Agent + OTLP Collector.
-4. Export traces to Jaeger/Tempo, metrics to Prometheus/Grafana and correlate logs.
-5. Deploy the agreed architecture to GCP.
-6. Integrate Cloud Logging / Cloud Monitoring and BigQuery if required.
-7. Build the final Grafana/support demonstration.
+Completed locally: baseline business flows; Java agent/Collector; Tempo traces, Loki logs and Prometheus metrics; durable outbox context; operational/business/pipeline dashboards; support UI; manual full-stack recovery/browser acceptance and generated handover.
+
+Next deployment decisions: GCP runtime, identity/secrets/TLS, HA/storage/retention, SLO ownership and alert routing. Cloud Logging/Monitoring and BigQuery remain separate integrations if selected. The guide documents Grafana Cloud/Mimir/Alloy alternatives; none is silently treated as deployed.
 
 Detailed status is maintained in [`docs/BUILD_TRACKER.md`](docs/BUILD_TRACKER.md).

@@ -137,7 +137,7 @@ OpenTelemetry starts only after these are satisfied:
 
 ## Phase 9 implementation update
 
-Verified by the [full manual run](https://github.com/srinu7893/otel-payment-platform-poc/actions/runs/37246451511) on `c614fc387693b78d131207ac8aecbbacfd3bcf8a`: 61 backend tests with zero failures/errors/skips; all 13 telemetry/security/recovery assertions; payment/refund/replay/risk/P2P scenarios; support health and API contract; 12 concurrent demonstration payments with SENT notifications; real error/slow tail sampling; customer/support browser checks and all three rendered Grafana dashboards.
+Verified by the [full manual run](https://github.com/srinu7893/otel-payment-platform-poc/actions/runs/37261777696) on `8ac5ee021a9fc9845dccad2e7444692e89e68e9f`: 63 backend tests with zero failures/errors/skips; all 15 telemetry/security/recovery assertions; payment/refund/replay/risk/P2P scenarios; support health and API contract; 12 concurrent demonstration payments with SENT notifications; real error/slow tail sampling; customer/support browser checks and all three rendered Grafana dashboards.
 
 See `POC_GUIDE.html` for precise implemented coverage, reproduction, evidence and exclusions.
 
@@ -148,12 +148,12 @@ See `POC_GUIDE.html` for precise implemented coverage, reproduction, evidence an
 | DONE | OTel Java Agent | Seven backend JVMs; checksum-verified pinned agent |
 | DONE | OTel Collector | OTLP, resource/privacy/memory/batch processors; live signal pipelines |
 | DONE | Distributed traces | Connected HTTP/JDBC/outbox/Rabbit consumer trace across six services |
-| DONE | Metrics | Seven service HTTP series, JVM, outbox attempt counter and service graphs; broker-depth metrics remain outside scope |
+| DONE | Metrics | Seven service HTTP series, JVM, outbox attempt counter and service graphs; Collector ingress/export queues and RabbitMQ depth/consumers/DLQ |
 | DONE | Trace/log correlation | Exact trace ID found in Loki; Grafana datasource proxy retrieves real Tempo spans |
 | DONE | Tempo | Selected trace backend with service-graph/span metrics generator |
-| DONE | Prometheus + Grafana | Three dashboards / 20 panels, rendered with real queries |
+| DONE | Prometheus + Grafana | Three dashboards / 26 panels, rendered with real queries |
 | DONE | Custom span and durable context | outbox.publish, persisted W3C traceparent/tracestate, attempt metric |
-| DONE | Recovery acceptance | Broker outage catch-up; application availability and fresh traces after Collector recovery |
+| DONE | Recovery acceptance | Broker outage catch-up; application availability and fresh traces after Collector recovery; persisted trace/log queues recover after backend outage and Collector SIGKILL |
 | DONE | Advanced sampling | Actual error and seven-second slow traces retained; normal traffic reduced; full-trace mode restored |
 | DONE | Current handover | Regeneratable HTML, observed results, screenshots and manual-only workflow |
 

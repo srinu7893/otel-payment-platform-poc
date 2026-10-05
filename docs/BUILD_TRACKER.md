@@ -1,8 +1,11 @@
 ## Observability increment — verified live
 
-Verified by the [full manual run](https://github.com/srinu7893/otel-payment-platform-poc/actions/runs/37246451511) on `c614fc387693b78d131207ac8aecbbacfd3bcf8a`: 61 backend tests with zero failures/errors/skips; all 13 telemetry/security/recovery assertions; payment/refund/replay/risk/P2P scenarios; support health and API contract; 12 concurrent demonstration payments with SENT notifications; real error/slow tail sampling; customer/support browser checks and all three rendered Grafana dashboards.
+Verified by the [full manual run](https://github.com/srinu7893/otel-payment-platform-poc/actions/runs/37261777696) on `8ac5ee021a9fc9845dccad2e7444692e89e68e9f`: 63 backend tests with zero failures/errors/skips; all 15 telemetry/security/recovery assertions; payment/refund/replay/risk/P2P scenarios; support health and API contract; 12 concurrent demonstration payments with SENT notifications; real error/slow tail sampling; customer/support browser checks and all three rendered Grafana dashboards.
 
-- Added optional Java agent/Collector/Tempo/Loki/Prometheus/Grafana stack and three dashboards.
+- Added optional Java agent/Collector/Tempo/Loki/Prometheus/Grafana stack and three dashboards with 26 panels.
+- Added Collector ingress/export-queue metrics, RabbitMQ ready/unacknowledged/consumer/DLQ metrics and four additional alert rules.
+- Added persistent Tempo/Loki export queues and an actual backend-outage/Collector-SIGKILL recovery test.
+- Fixed customer notification filtering without widening ownership; validated payment/transfer filter bindings and owner-scoped database queries.
 - Added W3C outbox context persistence/restoration plus custom publish span and attempt metric.
 - Added operations UI trace/log lookup and dashboard links.
 - Moved full-stack acceptance out of automatic CI to `.github/workflows/manual-otel-e2e.yml`.
@@ -197,20 +200,20 @@ This file is the source of truth for what is built, what is being hardened, and 
 - [x] GitHub Actions Node frontend install/build.
 - [x] Frontend container-image build validation.
 - [x] Full-stack Docker Compose build/start/health/login/payment/transfer smoke test added to CI.
-- [ ] Latest Flyway/full-stack smoke run must complete green; fix runtime issues before moving to the next hardening block.
+- [x] Flyway startup and the full-stack smoke/acceptance checks passed in the linked manual run.
 
-## OpenTelemetry phase - do not start until baseline is stable
+## OpenTelemetry phase — implemented and verified
 
-- [ ] OTel Java Agent primary integration.
-- [ ] OTLP receiver on OTel Collector.
-- [ ] Distributed traces through Gateway -> Payment -> Gateway Service -> Bank and RabbitMQ -> Notification.
-- [ ] JVM/HTTP/DB/RabbitMQ metrics.
-- [ ] `traceId`/`spanId` injected into structured logs.
-- [ ] Jaeger or Tempo trace backend.
-- [ ] Prometheus + Grafana local metrics.
-- [ ] Collector processors: resource, memory limiter, batch, filter and sampling.
+- [x] OTel Java Agent primary integration.
+- [x] OTLP receiver on OTel Collector.
+- [x] Distributed traces through Gateway -> Payment -> Gateway Service -> Bank and RabbitMQ -> Notification.
+- [x] JVM/HTTP metrics, JDBC traces and RabbitMQ queue depth/consumer/DLQ metrics. Database infrastructure metrics remain a future extension.
+- [x] `traceId`/`spanId` injected into structured logs.
+- [x] Jaeger or Tempo trace backend.
+- [x] Prometheus + Grafana local metrics.
+- [x] Collector resource, memory limiter, batch, selected privacy-attribute deletion and optional tail sampling. Generic application-log filtering is not configured.
 - [ ] Compare zero-code Java Agent vs Spring Boot OTel Starter/library instrumentation.
-- [ ] Add a few meaningful custom spans only after auto-instrumentation (for example `payment.authorize`, `bank.balance.check`).
+- [x] Custom outbox.publish span with restored durable W3C context and bounded outcome attempt counter.
 
 ## GCP phase
 
@@ -238,13 +241,6 @@ These decisions do not block the local enterprise baseline; work should continue
 
 ## Current implementation order
 
-1. Finish Flyway/runtime Docker smoke validation and fix any schema/startup issue.
-2. Add common JSON error contract and structured JSON logging.
-3. Add explicit REST connect/read timeouts and safe resilience rules.
-4. Add Support/Admin frontend views and service-health page.
-5. Add Testcontainers PostgreSQL/RabbitMQ integration tests.
-6. Add refund/reversal scenarios and notification preference/customer-contact integration.
-7. Add Outbox pattern and OpenAPI documentation.
-8. Freeze/test baseline application.
-9. Add OpenTelemetry Java Agent + Collector and all three signals.
-10. Deploy to GCP and wire Cloud Logging/Monitoring/BigQuery/Grafana as agreed.
+1. Review the observability PR and its recorded manual-run evidence.
+2. Recreate the manager demo using the HTML guide and `scripts/run-poc.sh`.
+3. Choose production/GCP runtime, identity, storage, SLO ownership and alert routing; validate each separately.
