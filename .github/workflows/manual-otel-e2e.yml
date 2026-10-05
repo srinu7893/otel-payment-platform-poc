@@ -118,7 +118,9 @@ jobs:
       run: python3 scripts/e2e/capture-evidence.py
     - name: Generate current HTML handover
       if: always()
-      run: python3 scripts/render-poc-guide.py
+      run: 'python3 scripts/render-poc-guide.py
+
+        python3 scripts/render-simple-guide.py'
       env:
         POC_PIPELINE_OUTCOMES: '{"Incident routing configuration": "${{ steps.incident_config.outcome }}", "Synthetic journey":
           "${{ steps.synthetic.outcome }}", "Durable metrics and alert delivery": "${{ steps.support.outcome }}", "Log body
@@ -146,6 +148,9 @@ jobs:
         path: 'artifacts/
 
           docs/POC_GUIDE.html
+
+
+          docs/POC_SIMPLE_GUIDE.html
 
           **/target/surefire-reports/'
         retention-days: 7
