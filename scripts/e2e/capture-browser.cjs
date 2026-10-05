@@ -49,6 +49,12 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
       const dashboard=JSON.parse(fs.readFileSync(`observability/grafana/dashboards/${uid}.json`,'utf8'));
       for (const panel of dashboard.panels) {
         const heading=page.getByText(panel.title,{exact:true}).first();
+        // Grafana mounts lower panels only after scrolling their row into view.
+        for (let attempt=0;attempt<12 && !await heading.isVisible();attempt++) {
+          await page.mouse.move(1300,900);
+          await page.mouse.wheel(0,600);
+          await page.waitForTimeout(400);
+        }
         await heading.waitFor({timeout:60000});
         await heading.scrollIntoViewIfNeeded();
         await page.waitForTimeout(500);

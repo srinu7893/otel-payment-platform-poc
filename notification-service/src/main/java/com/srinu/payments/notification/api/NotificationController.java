@@ -32,7 +32,10 @@ public class NotificationController {
                                          @RequestParam(defaultValue = "20") int size) {
         var pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
         if (!privileged(jwt)) {
-            return repo.findAllByCustomerId(customerId(jwt), pageable);
+            String owner = customerId(jwt);
+            if (paymentId != null) return repo.findAllByCustomerIdAndPaymentId(owner, paymentId, pageable);
+            if (transferId != null) return repo.findAllByCustomerIdAndTransferId(owner, transferId, pageable);
+            return repo.findAllByCustomerId(owner, pageable);
         }
         if (paymentId != null) return repo.findAllByPaymentId(paymentId, pageable);
         if (transferId != null) return repo.findAllByTransferId(transferId, pageable);

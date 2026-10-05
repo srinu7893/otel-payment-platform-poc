@@ -50,4 +50,33 @@ class NotificationSecurityTest {
             .andExpect(jsonPath("$.path").value("/api/v1/notifications"))
             .andExpect(jsonPath("$.correlationId").value("notification-security-403"));
     }
+    @Test
+    void customerPaymentFilterIncludesOwnerScope() throws Exception {
+        var paymentId = java.util.UUID.randomUUID();
+        org.mockito.Mockito.when(repository.findAllByCustomerIdAndPaymentId(
+            org.mockito.ArgumentMatchers.eq("demo-customer"), org.mockito.ArgumentMatchers.eq(paymentId),
+            org.mockito.ArgumentMatchers.any())).thenReturn(org.springframework.data.domain.Page.empty());
+        mvc.perform(get("/api/v1/notifications").param("paymentId", paymentId.toString())
+                .with(jwt().jwt(token -> token.claim("customer_id", "demo-customer")
+                    .claim("roles", java.util.List.of("CUSTOMER")))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        org.mockito.Mockito.verify(repository).findAllByCustomerIdAndPaymentId(
+            org.mockito.ArgumentMatchers.eq("demo-customer"), org.mockito.ArgumentMatchers.eq(paymentId), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verifyNoMoreInteractions(repository);
+    }
+
+    @Test
+    void customerTransferFilterIncludesOwnerScope() throws Exception {
+        var transferId = java.util.UUID.randomUUID();
+        org.mockito.Mockito.when(repository.findAllByCustomerIdAndTransferId(
+            org.mockito.ArgumentMatchers.eq("demo-customer"), org.mockito.ArgumentMatchers.eq(transferId),
+            org.mockito.ArgumentMatchers.any())).thenReturn(org.springframework.data.domain.Page.empty());
+        mvc.perform(get("/api/v1/notifications").param("transferId", transferId.toString())
+                .with(jwt().jwt(token -> token.claim("customer_id", "demo-customer")
+                    .claim("roles", java.util.List.of("CUSTOMER")))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        org.mockito.Mockito.verify(repository).findAllByCustomerIdAndTransferId(
+            org.mockito.ArgumentMatchers.eq("demo-customer"), org.mockito.ArgumentMatchers.eq(transferId), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verifyNoMoreInteractions(repository);
+    }
 }
