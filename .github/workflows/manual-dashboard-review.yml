@@ -52,6 +52,11 @@ jobs:
       run: |
         python3 scripts/e2e/capture-evidence.py
         bash scripts/otel-compose.sh logs --no-color > artifacts/compose.log
+    - name: Refresh dashboard review guide
+      if: always()
+      run: |
+        python3 scripts/render-dashboard-guide.py
+        cp docs/DASHBOARDS_AND_DEPLOYMENT.html artifacts/
     - uses: actions/upload-artifact@v4
       if: always()
       with:

@@ -330,6 +330,15 @@ section('support-increment','SLO, privacy and support verification',
 
 section('new-support','Durable business state, alert delivery and synthetic journey',render_markdown((ROOT/'docs/SUPPORT_ENHANCEMENTS.md').read_text()))
 
+dashboard_review=read_artifact('dashboard-review.json', [])
+dashboard_browser=read_artifact('dashboard-browser.json', {})
+dashboard_body=render_markdown((ROOT/'docs/DASHBOARDS_AND_DEPLOYMENT.md').read_text())
+if dashboard_review:
+    dashboard_body+=p('Separate dashboard verification: '+str(len(dashboard_review))+' provisioning/query/coverage checks. Application E2E above remains tied to its own earlier source revision.')
+    dashboard_body+=p('Dashboard tested source: '+os.environ.get('POC_DASHBOARD_REVISION','see separate dashboard artifact')+'; manual dashboard run: '+os.environ.get('POC_DASHBOARD_RUN','see separate dashboard artifact'))
+    dashboard_body+=code(json.dumps(dashboard_browser,indent=2))
+section('service-dashboards','Service dashboards, review and Cloud Run steps',dashboard_body)
+
 section('coverage','OpenTelemetry coverage: basic to advanced' ,table(['Capability','This increment','Boundary / remaining work'],[
  ('Instrumentation','Java agent attached to all seven backend JVMs; HTTP/JDBC/RabbitMQ/JVM; Micrometer bridge enabled','Browser RUM, continuous profiling, host/Kubernetes metrics are not implemented; RabbitMQ queue-depth/consumer metrics are added in this increment.'),
  ('Signals and context','Traces, metrics, logs, W3C propagation, durable outbox context, trace/log links','Global baggage propagation is available; arbitrary baggage is not stored in outbox.'),

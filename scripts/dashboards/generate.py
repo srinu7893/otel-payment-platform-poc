@@ -6,7 +6,7 @@ ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'observability/grafana/dashboa
 SERVICES=['api-gateway','auth-service','customer-service','payment-service','gateway-service','mock-bank-service','notification-service']
 DB={'auth-service','customer-service','payment-service','mock-bank-service','notification-service'}
 def panel(title,expr,unit='short',description='',kind='timeseries',source='prometheus'):
- return {'title':title,'type':kind,'description':description,'datasource':{'type':source,'uid':source},'targets':[{'refId':'A','expr':expr,'legendFormat':'{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}'}],'fieldConfig':{'defaults':{'unit':unit},'overrides':[]}}
+ return {'title':title,'type':kind,'description':description,'datasource':{'type':source,'uid':source},'targets':[{'refId':'A','expr':expr,'legendFormat':'{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}'}],'fieldConfig':{'defaults':({'unit':unit,'min':0,'max':1} if unit=='percentunit' else {'unit':unit}),'overrides':[]}}
 def write(uid,title,panels,service=None):
  for i,p in enumerate(panels):p.update(id=i+1,gridPos={'x':12*(i%2),'y':8*(i//2),'w':12,'h':8})
  obj={'uid':uid,'title':title,'schemaVersion':39,'version':1,'refresh':'10s','time':{'from':'now-15m','to':'now'},'tags':['otel','payment-poc','service' if service else 'overview'],'links':[{'title':'All dashboards','type':'dashboards','tags':['payment-poc'],'asDropdown':True,'includeVars':True,'keepTime':True},{'title':'Support runbook','type':'link','url':'https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/DASHBOARDS_AND_DEPLOYMENT.md','targetBlank':True}],'panels':panels}

@@ -167,3 +167,8 @@ Detailed status is maintained in [`docs/BUILD_TRACKER.md`](docs/BUILD_TRACKER.md
 ## Durable state and incident demo increment
 
 Added cached SQL-backed payment/outbox/notification gauges with freshness/health, six business panels, local Alertmanager routing to a persistent acknowledgement/resolution inbox, an on-demand synthetic login/payment/replay/delivery journey, and opt-in real broker-delay alert lifecycle acceptance. See docs/SUPPORT_ENHANCEMENTS.md (or SUPPORT_ENHANCEMENTS.md from docs). Runtime verification is recorded in the current manual-run evidence; production paging, cloud deployment and final business SLOs remain separate gates.
+
+
+## Service dashboards and deployment checklist
+
+13 dashboards / 152 panels now include seven dedicated Java service views, an explicit frontend coverage view and a consolidated platform overview. Regenerate using `python3 scripts/dashboards/generate.py`. See [docs/DASHBOARDS_AND_DEPLOYMENT.md](docs/DASHBOARDS_AND_DEPLOYMENT.md) for queries, review findings and the Cloud Run sequence. The separate manual-dashboard-review workflow evaluates queries and renders dashboards; it is never part of ordinary push/build CI.
