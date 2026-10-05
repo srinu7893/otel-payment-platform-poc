@@ -159,6 +159,6 @@ Send or let the gateway generate `X-Correlation-Id`. It is propagated through HT
 
 Completed locally: baseline business flows; Java agent/Collector; Tempo traces, Loki logs and Prometheus metrics; durable outbox context; operational/business/pipeline dashboards; support UI; manual full-stack recovery/browser acceptance and generated handover.
 
-Next deployment decisions: GCP runtime, identity/secrets/TLS, HA/storage/retention, SLO ownership and alert routing. Cloud Logging/Monitoring and BigQuery remain separate integrations if selected. The guide documents Grafana Cloud/Mimir/Alloy alternatives; none is silently treated as deployed.
+Cloud Run runtime/release assets now include separate service manifests, workload identity, pinned Secret Manager references, managed telemetry exporters, manual release/readiness/rollback and separate cloud acceptance. The SRE assessment manual WIF deployment was used as a reference. BigQuery linked-log SQL and production support guidance are in [`docs/CLOUD_RUN_PLAN.md`](docs/CLOUD_RUN_PLAN.md). Four local dashboards include a technical SLO/error-budget view, with synthetic log privacy and rule tests. Live GCP/BigQuery execution, provisioning, HA/storage, approved SLOs and alert routing remain pending. The guide documents Grafana Cloud/Mimir/Alloy alternatives; none is silently treated as deployed.
 
 Detailed status is maintained in [`docs/BUILD_TRACKER.md`](docs/BUILD_TRACKER.md).

@@ -41,6 +41,13 @@ def validate(config, allow_example=False):
         raise ValueError('Rabbit host must not include credentials')
     for value in [*config['databaseSecrets'].values(), *config['rabbitSecrets'].values(), config['jwtSecret']]:
         if not re.fullmatch(SECRET_RE, value): raise ValueError('Invalid secret name')
+    grafana = config.get('grafana')
+    if grafana:
+        endpoint = urlparse(grafana.get('endpoint', ''))
+        if endpoint.scheme != 'https' or not (endpoint.hostname or '').endswith('.grafana.net') or endpoint.netloc != endpoint.hostname or endpoint.query or endpoint.fragment or endpoint.path != '/otlp':
+            raise ValueError('Expected the selected Grafana Cloud HTTPS OTLP gateway endpoint')
+        if not re.fullmatch(r'[0-9]+', grafana.get('username', '')) or not re.fullmatch(SECRET_RE, grafana.get('tokenSecret', '')):
+            raise ValueError('Grafana needs an instance ID and a Secret Manager token reference')
     return config
 
 def secret(config, name, key):
@@ -79,7 +86,7 @@ def render(config, service, image, collector, revision):
             'OTEL_METRICS_EXPORTER': 'otlp', 'OTEL_PROPAGATORS': 'tracecontext,baggage', 'OTEL_METRIC_EXPORT_INTERVAL': '10000',
             'OTEL_INSTRUMENTATION_MICROMETER_ENABLED': 'true', 'OTEL_TRACES_SAMPLER': 'parentbased_traceidratio',
             'OTEL_TRACES_SAMPLER_ARG': '1.0', # Full PoC traces; sampling is a separate, tested policy decision.
-            'OTEL_RESOURCE_ATTRIBUTES': f'service.namespace=payment-poc,deployment.environment.name=gcp-poc,service.version={revision}',
+            'OTEL_RESOURCE_ATTRIBUTES': f'service.namespace=payment-poc,deployment.environment.name=gcp-poc,service.version={os.getenv('COMMIT_SHA', revision)}',
             'MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED': 'true'})
     probe = '/health' if service == 'frontend' else '/actuator/health/liveness'
     containers = [{'name': 'app', 'image': image, 'ports': [{'containerPort': 8080}],
@@ -98,6 +105,13 @@ def render(config, service, image, collector, revision):
         containers.append({'name': 'collector', 'image': collector, 'resources': {'limits': {'cpu': '1', 'memory': '256Mi'}},
                            'env': [{'name': 'GOOGLE_CLOUD_PROJECT', 'value': config['project']}],
                            'startupProbe': {'httpGet': {'path': '/', 'port': 13133}, 'periodSeconds': 3, 'timeoutSeconds': 3, 'failureThreshold': 20}})
+    if config.get('grafana') and service != 'frontend':
+        sidecar = containers[-1]
+        sidecar['args'] = ['--config=/etc/otelcol-contrib/config.yaml', '--config=/etc/otelcol-contrib/grafana.yaml']
+        sidecar['env'].extend([
+            {'name': 'GRAFANA_OTLP_ENDPOINT', 'value': config['grafana']['endpoint']},
+            {'name': 'GRAFANA_OTLP_USERNAME', 'value': config['grafana']['username']},
+            secret(config, 'GRAFANA_OTLP_TOKEN', config['grafana']['tokenSecret'])])
     return {'apiVersion': 'serving.knative.dev/v1', 'kind': 'Service', 'metadata': {'name': config['prefix'] + '-' + service,
               'annotations': {'run.googleapis.com/ingress': 'all'}},
             'spec': {'template': {'metadata': {'name': config['prefix'] + '-' + service + '-' + revision,

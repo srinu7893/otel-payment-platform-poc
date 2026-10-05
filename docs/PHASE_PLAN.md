@@ -188,3 +188,10 @@ See `POC_GUIDE.html` for precise implemented coverage, reproduction, evidence an
 1. Review the verified observability PR and its manual-run evidence.
 2. Recreate the manager demo using `POC_GUIDE.html` / `scripts/run-poc.sh`.
 3. Choose the GCP runtime and production identity, ingress, retention and alert routing before Phase 10.
+
+
+## Cloud preparation and advanced support increment
+
+Implemented: Cloud Run PORT support and agent-baked containers; private caller ID tokens alongside customer JWT; support probe authentication; per-service runtime manifests with Secret Manager references, VPC/TLS broker settings and Collector managed exports; manual WIF/digest/readiness/traffic/rollback release; separate opt-in cloud business/signal acceptance; linked BigQuery SQL/runbook; fourth technical SLO dashboard, burn rules and deterministic tests; Collector body redaction and synthetic stored-log acceptance.
+
+Status is evidence-specific: local builds and manual integration checks are recorded in the current guide. Live cloud execution requires this repo's GCP environment settings, existing service slots, durable DB/broker, identities and secrets. Infrastructure bootstrap, actual BigQuery link/schema validation, cloud/Grafana datasource mapping, paging, rolling worker safety, load/HA/DR and complete privacy/RUM/profiling remain pending. See [CLOUD_RUN_PLAN.md](CLOUD_RUN_PLAN.md).

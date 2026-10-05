@@ -244,3 +244,10 @@ These decisions do not block the local enterprise baseline; work should continue
 1. Review the observability PR and its recorded manual-run evidence.
 2. Recreate the manager demo using the HTML guide and `scripts/run-poc.sh`.
 3. Choose production/GCP runtime, identity, storage, SLO ownership and alert routing; validate each separately.
+
+
+## Cloud preparation and advanced support increment
+
+Implemented: Cloud Run PORT support and agent-baked containers; private caller ID tokens alongside customer JWT; support probe authentication; per-service runtime manifests with Secret Manager references, VPC/TLS broker settings and Collector managed exports; manual WIF/digest/readiness/traffic/rollback release; separate opt-in cloud business/signal acceptance; linked BigQuery SQL/runbook; fourth technical SLO dashboard, burn rules and deterministic tests; Collector body redaction and synthetic stored-log acceptance.
+
+Status is evidence-specific: local builds and manual integration checks are recorded in the current guide. Live cloud execution requires this repo's GCP environment settings, existing service slots, durable DB/broker, identities and secrets. Infrastructure bootstrap, actual BigQuery link/schema validation, cloud/Grafana datasource mapping, paging, rolling worker safety, load/HA/DR and complete privacy/RUM/profiling remain pending. See [CLOUD_RUN_PLAN.md](CLOUD_RUN_PLAN.md).

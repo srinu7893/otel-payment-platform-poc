@@ -6,6 +6,10 @@ server {
   location /api/ {
     proxy_pass ${API_GATEWAY_URL};
     proxy_ssl_server_name on;
+    proxy_ssl_name ${API_GATEWAY_HOST};
+    proxy_ssl_verify on;
+    proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+    proxy_ssl_verify_depth 3;
     proxy_set_header Host ${API_GATEWAY_HOST};
     proxy_set_header Authorization $http_authorization;
     proxy_set_header X-Serverless-Authorization "";

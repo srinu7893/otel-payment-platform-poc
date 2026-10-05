@@ -3,6 +3,9 @@ WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
+ARG VITE_GOOGLE_CLOUD_PROJECT
+ARG VITE_GRAFANA_URL
+ENV VITE_GOOGLE_CLOUD_PROJECT=$VITE_GOOGLE_CLOUD_PROJECT VITE_GRAFANA_URL=$VITE_GRAFANA_URL
 RUN npm run build
 FROM nginx:1.27-alpine
 COPY deploy/cloud-run/frontend.conf.template /etc/nginx/templates/default.conf.template

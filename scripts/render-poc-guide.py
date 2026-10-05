@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import xml.etree.ElementTree as ET
+from guide_markdown import render_markdown
 
 ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
@@ -45,7 +46,7 @@ def table(headers,rows):
 def bullets(items): return '<ul>'+''.join('<li>'+x+'</li>' for x in items)+'</ul>'
 
 section('summary','Manager overview',p('A simulated payment platform demonstrating synchronous HTTP calls, database transactions, durable asynchronous delivery and OpenTelemetry across seven Java services. No real money, bank, SMS or email providers are involved.')+
-p('This increment implements the local observability stack and executable acceptance gates. Configuration and source presence do not prove runtime success: use the Evidence section to see what actually ran. GCP deployment and production hardening remain separate decisions.')+
+p('This increment implements the local observability stack and executable acceptance gates. Configuration and source presence do not prove runtime success: use the Evidence section to see what actually ran. Cloud Run runtime/release assets and optional BigQuery queries are now prepared; actual cloud execution and production hardening remain separate evidence gates.')+
 table(['Outcome','Implementation / acceptance'],[
  ('Follow a payment end to end','Java agent → HTTP/JDBC spans → persisted outbox trace context → RabbitMQ consumer; asserted by a single connected trace in Tempo.'),
  ('Diagnose delays and failures','HTTP rate/error/duration, JVM metrics, business event logs, outbox attempt counter, service graph and trace/log navigation.'),
@@ -95,7 +96,7 @@ table(['Pipeline stage in order','Our setting','What it does / boundary'],[
  ('OTLP receiver','0.0.0.0:4318 HTTP; 0.0.0.0:4317 gRPC','Accept and decode supported OTLP signal requests. Internal accepted/refused counters describe ingress; receiver acceptance is not a final backend acknowledgement.'),
  ('memory_limiter','Check every 1s; limit 384 MiB; spike allowance 96 MiB','Restrict processing under memory pressure. It can refuse incoming data; upstream retries/buffers have limits.'),
  ('resource','Upsert service.namespace=payment-poc','Apply common resource identity consistently before exporting.'),
- ('attributes/privacy','Trace/log pipelines delete authorization/cookie attributes and selected database query text attributes','Remove the listed attributes. This is not complete redaction of log bodies or an exhaustive PII policy.'),
+ ('attributes/privacy + log transform','Trace/log pipelines delete authorization/workload-token/cookie attributes and selected database query text attributes; logs also redact selected secret-like body patterns','Remove the listed attributes. The log pipeline additionally redacts selected password/access-token/API-key/Bearer body patterns. Neither policy covers all PII or console output.'),
  ('Optional tail_sampling','Separate overlay; wait 30s; error policy, latency >2s, 10% probabilistic baseline','Buffer/decide on traces in memory. Disabled for deterministic main acceptance; enabled in a separate experiment. Multiple replicas require trace-aware routing for complete decisions.'),
  ('batch','Flush at 1s timeout or 512-item batch threshold','Group export work to reduce request overhead. Timeout is not an end-to-end freshness guarantee. This processor’s buffer remains in memory.'),
  ('Exporter queue','Tempo/Loki queues: 1000 queued requests; file_storage/queue on collector-data volume','Persist queued export requests, decouple slow backends and retry. Queue capacity, full/corrupt disk, retry expiry, agent loss and pre-queue buffers still permit data loss.'),
@@ -118,7 +119,7 @@ table(['Backend','PoC persistence / retention','Important interpretation'],[
  ('Tempo','Local trace blocks/WAL on tempo-data; 24h retention','Trace waterfalls show overlapping operations and parent relationships. Do not sum overlapping spans or treat a sampled trace count as total traffic.'),
  ('Loki','Filesystem chunks/TSDB on loki-data; structured metadata; 24h retention','Search event text plus service/trace metadata. A missing record can mean time-range, ingest, sampling/context or retention issues.'),
  ('Prometheus','Local TSDB on prometheus-data; 24h retention; remote-write receiver enabled','Counters accumulate; rate/increase use a range and handle resets. Histogram p95 describes many observations, not one request.'),
- ('Grafana','Provisioned datasource/dashboard files plus grafana-data','Operations, business and pipeline dashboards; Explore queries; configured Loki trace links, Tempo log links and exemplar destinations.')])+
+ ('Grafana','Provisioned datasource/dashboard files plus grafana-data','Operations, business, pipeline and technical SLO dashboards; Explore queries; configured Loki trace links, Tempo log links and exemplar destinations.')])+
 p('Start the stack first. In Grafana → Explore choose the datasource named below, switch to the code editor and run one query at a time over the request’s time range. Replace identifiers with those from the new run; archived trace IDs do not exist in a fresh backend. In Prometheus, the same PromQL can be run in its query UI. A valid empty result is different from a query error.')+
 '<h3>Loki / LogQL: events, business IDs and trace correlation</h3>'+code('{service_name="payment-service"} |= "REPLACE_WITH_PAYMENT_ID"\n\n{service_name=~".+"} | trace_id="REPLACE_WITH_TRACE_ID"\n\n{service_name="payment-service"} |= "OUTBOX_PUBLISH_FAILED"\n\nsum(count_over_time({service_name="payment-service"} |= "event=PAYMENT_RECONCILIATION_REQUIRED" [5m]))')+
 p('The first query finds the business transaction. Expand its log metadata to copy trace_id, then the second query joins service logs for that trace. The last query counts log events in a rolling five-minute window; it is not a durable count of unique transactions.')+
@@ -188,7 +189,7 @@ log_body+= '<h3>From payment ID to logs to trace</h3>'+bullets([
  'Choose Explore → Loki. Select a time window covering the request. Search the payment-service using the payment-ID query below. Expand a matching business log to read the event, outcome and trace_id.',
  'Use the configured Tempo link beside trace_id, or paste that trace ID into Explore → Tempo. Inspect the waterfall, each span’s service/status/duration and parent relationships. This validates an operation, rather than merely showing that containers are UP.',
  'Search all service logs using the same trace ID. Follow payment → gateway/bank/JDBC and the saved outbox.publish → RabbitMQ → notification path. Async delivery can finish after the HTTP response.',
- 'Open the three dashboards to compare the particular request with request-rate, latency, business-outcome and outbox trends. A p95 panel is an aggregate over a time window, not the duration of the selected trace.'
+ 'Open the four dashboards to compare the particular request with request-rate, latency, business-outcome and outbox trends. A p95 panel is an aggregate over a time window, not the duration of the selected trace.'
 ])+code('{service_name="payment-service"} |= "REPLACE_WITH_PAYMENT_ID"\n\n{service_name=~".+"} | trace_id="'+example_trace+'"\n\n{service_name="payment-service"} |= "OUTBOX_PUBLISH_FAILED"\n\n{service_name="notification-service"} |~ "NOTIFICATION_(EVENT_RECEIVED|DUPLICATE_SKIPPED|RETRY_REUSED)"')
 log_body+=p('The captured trace ID above belongs to the completed evidence run. That temporary stack was removed; its old records are in the evidence ZIP, not in a new local Tempo/Loki instance. For a new live demo, use the new payment and trace IDs. If a link has no result, check the time range, backend health and whether that trace was retained.')
 log_body+='<h3>Where logs appear</h3>'+table(['View','What you see','When to use it'],[
@@ -209,7 +210,7 @@ section('worked-cases','Worked investigations: what to show and why it matters',
  ('Broker outage','Payment still commits; OUTBOX_PUBLISH_FAILED events and failure counter increase; warning alert; notification catches up after restart.','Identify delivery delay separately from payment failure. The live suite verified catch-up; do not create a duplicate payment.'),
  ('Collector outage','Payment remains available; agent/exporter errors can appear in container logs; a complete fresh trace is observed after restart/readiness recovery.','Separate a telemetry outage from an application outage. In-flight telemetry can be lost; missing logs are not evidence that a request never happened.'),
  ('Telemetry backend outage and Collector crash','Stop Tempo/Loki, observe queued export requests, complete a payment, kill/restart the Collector, restore backends and find the same trace and logs.','Distinguish durable exporter backlog from the application outbox. The live result records queue depth before the crash and confirms the backlog drained; disk/node loss and pre-queue buffers remain separate risks.'),
- ('Notification duplicate / poison payload','Real RabbitMQ integration tests verify one delivery for duplicate events and bounded retries ending in DLQ.','Investigate consumer deduplication/redrive safely. This is Testcontainers evidence; the three dashboard screenshots do not independently prove DLQ behavior.'),
+ ('Notification duplicate / poison payload','Real RabbitMQ integration tests verify one delivery for duplicate events and bounded retries ending in DLQ.','Investigate consumer deduplication/redrive safely. This is Testcontainers evidence; the four dashboard screenshots do not independently prove DLQ behavior.'),
  ('Tail sampling','A real bank error trace and seven-second slow trace are retained; normal traffic is reduced; full-trace Collector restored.','Understand retention/cost trade-offs. Sampled trace-derived rates are not total request counts; use application metrics for request-volume/SLO calculations.')])+
 p('For the manager: demonstrate one successful payment, one slow/error payment and one broker outage. For each, show the user-facing outcome, the matching log, the trace/dependency responsible, the affected metric panel and the operational next step. The value is this connected investigation; a screenshot of a running server alone does not establish it.'))
 
@@ -309,17 +310,33 @@ histogram_quantile(0.95, sum by (le,service_name) (rate(http_server_request_dura
 # Prometheus: outbox publish failures
 sum(increase(poc_outbox_publish_attempts_total{outcome="failure"}[5m]))'''))
 
-section('coverage','OpenTelemetry coverage: basic to advanced',table(['Capability','This increment','Boundary / remaining work'],[
+section('cloud','Cloud Run architecture, production support and BigQuery',
+    render_markdown((ROOT/'docs/CLOUD_RUN_PLAN.md').read_text())+
+    '<h3>BigQuery query templates</h3>'+code((ROOT/'deploy/bigquery/queries.sql').read_text())+
+    p('Repository implementation: ')+file('.github/workflows/manual-cloud-run.yml')+' · '+file('.github/workflows/manual-cloud-acceptance.yml')+' · '+file('deploy/cloud-run')+' · '+file('scripts/cloud')+' · '+file('cloud-runtime'))
+
+privacy=read_artifact('privacy-results.json', {})
+section('support-increment','SLO, privacy and support verification',
+    p('The payment-slo Grafana dashboard adds six panels for technical availability, latency <=2.5 seconds, 5m/1h budget burn, request rate and alert state. It uses HTTP server metrics independently of trace sampling. The target and burn threshold are demonstration choices; business completion is a separate outcome and no pager destination is configured.')+
+    table(['Check','Recorded result / boundary'],[
+        ('Synthetic stored-log privacy test', e(privacy.get('status','Not recorded in this evidence snapshot'))+' — only Collector-exported log bodies; stdout and complete PII redaction remain outside this check.'),
+        ('SLO alert scenarios', e(pipeline.get('SLO rule scenarios','Not recorded in this evidence snapshot'))+' — deterministic healthy/no-traffic/2% 5xx rule evaluation, not a production incident trial.'),
+        ('Cloud container/config contracts', e(pipeline.get('Cloud asset validation','Not recorded in this evidence snapshot'))+' — image/config build checks without cloud authentication; not a live GCP deployment.'),
+        ('Live GCP and BigQuery', 'Not executed in this local evidence snapshot. Configure the isolated GCP environment and run the two separate cloud workflows.')])+
+    (code('\n'.join(privacy.get('storedLines',[]))) if privacy else '')+
+    p('Manual drill sources: ')+file('scripts/e2e/privacy_acceptance.py')+' · '+file('observability/slo-rule-tests.yaml')+' · '+file('observability/grafana/dashboards/payment-slo.json'))
+
+section('coverage','OpenTelemetry coverage: basic to advanced' ,table(['Capability','This increment','Boundary / remaining work'],[
  ('Instrumentation','Java agent attached to all seven backend JVMs; HTTP/JDBC/RabbitMQ/JVM; Micrometer bridge enabled','Browser RUM, continuous profiling, host/Kubernetes metrics are not implemented; RabbitMQ queue-depth/consumer metrics are added in this increment.'),
  ('Signals and context','Traces, metrics, logs, W3C propagation, durable outbox context, trace/log links','Global baggage propagation is available; arbitrary baggage is not stored in outbox.'),
  ('Business observability','Custom outbox.publish span and attempt metric; business outcome log panels','No full custom payment SLO/error-budget instrumentation or complete domain audit store.'),
  ('Collector','OTLP gRPC/HTTP receivers; resource, memory limit, privacy attribute deletion, batching, bounded exporter queues/retry','Trace/log exporter queues use file_storage on a named volume; receiver/batch/tail-sampler buffering, agent buffers, queue capacity, disk failure and retry expiry still permit loss.'),
- ('Visualization','Provisioned operations, business and pipeline dashboards; trace search, service graph, exemplars configured','The Evidence section records rendered dashboards and backend queries. Exemplars depend on sampled data and compatible panels.'),
+ ('Visualization','Provisioned operations, business, pipeline and technical SLO dashboards; trace search, service graph, exemplars configured','The Evidence section records rendered dashboards and backend queries. Exemplars depend on sampled data and compatible panels.'),
  ('Sampling','Default always_on for deterministic demo; isolated tail experiment retains errors/slow traces + 10% baseline','The manual workflow runs a separate real-request sampling experiment after deterministic full-trace E2E. Error/slow rules require all spans for a trace to reach one sampling Collector.'),
  ('Alerts','Prometheus rules for telemetry scrape failure, outbox failure, span error ratio, Collector queue pressure/export failures, notification backlog and DLQ','No Alertmanager routing, pager/email delivery or production SLO policy.'),
  ('Resilience','Business idempotency/reconciliation plus broker/Collector outage tests','Not a load, capacity, HA, disaster recovery or production-readiness certification.'),
  ('Security/privacy','No authorization/cookie capture; selected sensitive DB attributes removed; bounded metric labels','Existing logs contain synthetic customer/business data. Attribute deletion does not sanitize arbitrary log bodies. Review/redact before using real data.'),
- ('Deployment','Local single-node Compose with retained telemetry volumes and 24h backend retention','GCP runtime, workload identity, secrets, TLS, ingress, scaling, multi-node queue durability and backups remain decisions.')])+
+ ('Deployment','Local Compose plus Cloud Run IAM/runtime/container/manual release assets; optional BigQuery SQL','Cloud account provisioning, durable data services, live deployment/acceptance, HA/backups and cloud datasource validation remain pending.')])+
 p('Optional sampling experiment (do not run deterministic trace assertions with it enabled):')+
 code('''docker compose -f docker-compose.yml -f docker-compose.otel.yml -f docker-compose.sampling.yml \
   run --rm --no-deps otel-collector validate --config=/etc/otelcol/config.yaml --config=/etc/otelcol/tail.yaml
@@ -334,8 +351,8 @@ section('findings','Review findings and remaining decisions',bullets([
  '<strong>Fixed after live testing:</strong> async React form reset, browser locale, Loki all-service selection, Collector recovery readiness, customer notification filter/pagination correctness, Grafana lower-panel lazy rendering and the OpenAPI curl pipe race; repeated manual runs capture these behaviors.',
  '<strong>Fixed:</strong> no telemetry backends or operational trace/log entry point. The overlay provisions all three signal paths and support UI links.',
  '<strong>Known baseline boundary:</strong> internal customer/bank endpoints rely on trusted-network deployment; demo JWT secrets/accounts and exposed service ports must not be deployed publicly. See '+file('docs/SECURITY_BASELINE.md')+' and '+file('docs/SERVICE_IDENTITY_STRATEGY.md')+'.',
- ('<strong>Verified live:</strong> agent/library compatibility, backend configurations, connected payment traces, metrics/logs, recovery scenarios, browser screens, three rendered dashboards and tail sampling passed in the recorded manual run.' if verified else '<strong>Verification gate:</strong> check recorded workflow outcomes and assertion results below. Only a fully passing run verifies the live integration.'),
- '<strong>Production scope:</strong> choose GCP runtime, backend/vendor, IAM/secrets, retention/cost, broker management and support escalation policy. All OpenTelemetry ecosystem features cannot meaningfully be declared complete by one local PoC.'
+ ('<strong>Verified live:</strong> agent/library compatibility, backend configurations, connected payment traces, metrics/logs, recovery scenarios, browser screens, four rendered dashboards and tail sampling passed in the recorded manual run.' if verified else '<strong>Verification gate:</strong> check recorded workflow outcomes and assertion results below. Only a fully passing run verifies the live integration.'),
+ '<strong>Production scope:</strong> choose GCP accounts/storage/live acceptance, backend/vendor, IAM/secrets, retention/cost, broker management and support escalation policy. All OpenTelemetry ecosystem features cannot meaningfully be declared complete by one local PoC.'
 ]))
 
 evidence=p('Live integration status: '+('VERIFIED — every recorded workflow stage and acceptance assertion passed.' if verified else 'See individual recorded outcomes; full live verification is not established by source configuration alone.'))
@@ -373,6 +390,7 @@ screen_captions={
  '04-support-operations':'Support view: live service health, problem payments and notification activity; use IDs to investigate the corresponding telemetry.',
  '05-payment-poc':'Operations dashboard: locate the bank latency/error spike, compare request/JVM trends and read correlated service logs.',
  '06-payment-business':'Business dashboard: distinguish completed payments, declines and unknown outcomes; inspect notification and reconciliation/risk events.',
+ '08-payment-slo':'Technical SLO dashboard: unsampled HTTP availability/latency and error budget trends; example targets, not a business completion guarantee.',
  '07-telemetry-pipeline':'Telemetry health: scrape targets, Collector ingress/export queues, RabbitMQ depth/consumers/DLQ, Tempo ingestion and outbox retry/failure activity.'
 }
 screens=sorted((ROOT/'artifacts/screenshots').glob('*.png')) if os.environ.get('POC_EMBED_SCREENSHOTS','true').lower()=='true' else []

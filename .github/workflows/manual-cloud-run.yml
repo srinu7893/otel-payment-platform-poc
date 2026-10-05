@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 45
     env:
       CLOUD_CONFIG: ${{ vars.CLOUD_RUN_CONFIG_JSON }}
+      FRONTEND_GRAFANA_URL: ${{ vars.GRAFANA_URL }}
       GCP_DEPLOY_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
     steps:
     - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -59,9 +60,11 @@ jobs:
         for service in auth-service customer-service mock-bank-service gateway-service notification-service payment-service api-gateway; do
           docker build --label "org.opencontainers.image.revision=$REVISION" --build-arg SERVICE="$service" -f deploy/cloud-run/Dockerfile.java -t "otel-$service:$REVISION" .
         done
-        docker build --label "org.opencontainers.image.revision=$REVISION" -f deploy/cloud-run/Dockerfile.frontend -t "otel-frontend:$REVISION" .
+        frontend_project=$(python3 -c 'import json,os; print(json.loads(os.getenv("CLOUD_CONFIG") or "{}").get("project", ""))')
+        docker build --build-arg "VITE_GOOGLE_CLOUD_PROJECT=$frontend_project" --build-arg "VITE_GRAFANA_URL=$FRONTEND_GRAFANA_URL" --label "org.opencontainers.image.revision=$REVISION" -f deploy/cloud-run/Dockerfile.frontend -t "otel-frontend:$REVISION" .
         docker build --label "org.opencontainers.image.revision=$REVISION" -f deploy/cloud-run/Dockerfile.collector -t "otel-collector:$REVISION" .
         docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation "otel-collector:$REVISION" validate --config=/etc/otelcol-contrib/config.yaml
+        docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation -e GRAFANA_OTLP_ENDPOINT=https://otlp-validation.grafana.net/otlp -e GRAFANA_OTLP_USERNAME=1 -e GRAFANA_OTLP_TOKEN=synthetic-validation-token "otel-collector:$REVISION" validate --config=/etc/otelcol-contrib/config.yaml --config=/etc/otelcol-contrib/grafana.yaml
     - name: Validate concrete cloud configuration
       if: inputs.action == 'deploy'
       run: |
@@ -83,6 +86,8 @@ jobs:
         COMMIT_SHA: ${{ github.sha }}
       run: python3 scripts/cloud/publish_images.py --config /tmp/otel-cloud-config.json --out /tmp/otel-cloud-images.json
     - name: Deploy candidates, check readiness, promote and verify traffic
+      env:
+        COMMIT_SHA: ${{ github.sha }}
       if: inputs.action == 'deploy'
       run: python3 scripts/cloud/run_release.py deploy --config /tmp/otel-cloud-config.json --images /tmp/otel-cloud-images.json --revision "gh-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
     - name: Upload release evidence

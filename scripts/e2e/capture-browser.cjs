@@ -39,6 +39,7 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
     await page.getByRole('button',{name:'Sign in',exact:true}).click();
     await page.getByRole('heading',{name:'Support / Admin dashboard'}).waitFor();
     await page.getByRole('link',{name:'Operations dashboard',exact:true}).waitFor();
+    await page.getByRole('link',{name:'Technical SLO dashboard',exact:true}).waitFor();
     await page.waitForTimeout(3000);
     await screenshot('04-support-operations');
     const response=await context.request.post('http://localhost:3001/login',{data:{user:'admin',password:process.env.GRAFANA_ADMIN_PASSWORD||'otel-demo-admin'}});

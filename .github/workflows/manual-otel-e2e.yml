@@ -57,10 +57,12 @@ jobs:
         python3 -m unittest discover -s scripts/cloud -p 'test_*.py'
         docker build -f deploy/cloud-run/Dockerfile.collector -t otel-cloud-collector .
         docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation otel-cloud-collector validate --config=/etc/otelcol-contrib/config.yaml
+        docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation -e GRAFANA_OTLP_ENDPOINT=https://otlp-validation.grafana.net/otlp -e GRAFANA_OTLP_USERNAME=1 -e GRAFANA_OTLP_TOKEN=synthetic-validation-token otel-cloud-collector validate --config=/etc/otelcol-contrib/config.yaml --config=/etc/otelcol-contrib/grafana.yaml
         for service in auth-service customer-service mock-bank-service gateway-service notification-service payment-service api-gateway; do
           docker build --build-arg SERVICE="$service" -f deploy/cloud-run/Dockerfile.java -t "otel-cloud-$service" .
         done
-        docker build -f deploy/cloud-run/Dockerfile.frontend -t otel-cloud-frontend .
+        docker build --build-arg VITE_GOOGLE_CLOUD_PROJECT=syntax-validation -f deploy/cloud-run/Dockerfile.frontend -t otel-cloud-frontend .
+        docker run --rm --entrypoint sh -e PORT=8080 -e API_GATEWAY_URL=https://example.com -e API_GATEWAY_HOST=example.com otel-cloud-frontend -c '/docker-entrypoint.d/20-envsubst-on-templates.sh && nginx -t'
     - name: Start instrumented demo
       run: 'bash scripts/otel-compose.sh config --quiet
 

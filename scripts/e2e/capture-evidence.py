@@ -9,6 +9,7 @@ urls={
  'prometheus-alerts':'http://localhost:9090/api/v1/alerts',
  'prometheus-series':'http://localhost:9090/api/v1/label/__name__/values',
  'http-metrics':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'http_server_request_duration_seconds_count'}),
+ 'slo-recordings':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'poc:payment_api_availability:5m or poc:payment_api_latency_good_ratio:5m or poc:payment_api_error_ratio:1h'}),
  'outbox-metrics':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'poc_outbox_publish_attempts_total'}),
  'collector-ingress':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'otelcol_receiver_accepted_spans or otelcol_receiver_accepted_log_records or otelcol_receiver_accepted_metric_points'}),
  'collector-queues':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'otelcol_exporter_queue_size or otelcol_exporter_queue_capacity'}),

@@ -1,0 +1,24 @@
+# Optional fan-out overlay; credentials are runtime Secret Manager references, never browser config.
+extensions:
+  basicauth/grafana:
+    client_auth:
+      username: ${env:GRAFANA_OTLP_USERNAME}
+      password: ${env:GRAFANA_OTLP_TOKEN}
+exporters:
+  otlphttp/grafana:
+    endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
+    auth:
+      authenticator: basicauth/grafana
+    sending_queue:
+      queue_size: 200
+    retry_on_failure:
+      max_elapsed_time: 2m
+service:
+  extensions: [health_check, basicauth/grafana]
+  pipelines:
+    traces:
+      exporters: [googlecloud, otlphttp/grafana]
+    logs:
+      exporters: [googlecloud, otlphttp/grafana]
+    metrics:
+      exporters: [googlemanagedprometheus, otlphttp/grafana]
