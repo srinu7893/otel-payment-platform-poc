@@ -15,11 +15,13 @@ tests:
     exp_alerts:
     - exp_labels:
         severity: warning
+        owner: poc-support
       exp_annotations:
         summary: Payment API burns the 99.9% technical availability budget quickly
         description: Both 1h and 5m windows exceed 14.4x budget burn. Inspect ingress
           metrics, correlated logs and dependency traces. HTTP success does not guarantee
           payment completion.
+        runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
 - name: healthy-and-no-traffic-do-not-page
   interval: 1m
   input_series:

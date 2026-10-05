@@ -28,12 +28,14 @@ pipeline=json.loads(os.environ.get('POC_PIPELINE_OUTCOMES','{}'))
 browser=read_artifact('browser-results.json', {})
 traffic=read_artifact('traffic.json', {})
 sampling=read_artifact('advanced-sampling.json', {})
+support_results=read_artifact('support-results.json', [])
+synthetic=read_artifact('synthetic-journey.json', {})
 test_totals={k:0 for k in ('tests','failures','errors','skipped')}
 for path in ROOT.glob('**/target/surefire-reports/TEST-*.xml'):
     suite=ET.parse(path).getroot()
     for key in test_totals:
         test_totals[key]+=int(suite.attrib.get(key,0))
-verified=bool(results) and all(x['status']=='PASS' for x in results) and browser.get('status')=='PASS' and sampling.get('status')=='PASS' and bool(pipeline) and all(x=='success' for x in pipeline.values())
+verified=bool(support_results) and all(x['status']=='PASS' for x in support_results) and synthetic.get('status')=='PASS' and bool(results) and all(x['status']=='PASS' for x in results) and browser.get('status')=='PASS' and sampling.get('status')=='PASS' and bool(pipeline) and all(x=='success' for x in pipeline.values())
 sections=[]
 def section(key,title,body):
     sections.append((key,title,body))
@@ -326,6 +328,8 @@ section('support-increment','SLO, privacy and support verification',
     (code('\n'.join(privacy.get('storedLines',[]))) if privacy else '')+
     p('Manual drill sources: ')+file('scripts/e2e/privacy_acceptance.py')+' · '+file('observability/slo-rule-tests.yaml')+' · '+file('observability/grafana/dashboards/payment-slo.json'))
 
+section('new-support','Durable business state, alert delivery and synthetic journey',render_markdown((ROOT/'docs/SUPPORT_ENHANCEMENTS.md').read_text()))
+
 section('coverage','OpenTelemetry coverage: basic to advanced' ,table(['Capability','This increment','Boundary / remaining work'],[
  ('Instrumentation','Java agent attached to all seven backend JVMs; HTTP/JDBC/RabbitMQ/JVM; Micrometer bridge enabled','Browser RUM, continuous profiling, host/Kubernetes metrics are not implemented; RabbitMQ queue-depth/consumer metrics are added in this increment.'),
  ('Signals and context','Traces, metrics, logs, W3C propagation, durable outbox context, trace/log links','Global baggage propagation is available; arbitrary baggage is not stored in outbox.'),
@@ -333,7 +337,7 @@ section('coverage','OpenTelemetry coverage: basic to advanced' ,table(['Capabili
  ('Collector','OTLP gRPC/HTTP receivers; resource, memory limit, privacy attribute deletion, batching, bounded exporter queues/retry','Trace/log exporter queues use file_storage on a named volume; receiver/batch/tail-sampler buffering, agent buffers, queue capacity, disk failure and retry expiry still permit loss.'),
  ('Visualization','Provisioned operations, business, pipeline and technical SLO dashboards; trace search, service graph, exemplars configured','The Evidence section records rendered dashboards and backend queries. Exemplars depend on sampled data and compatible panels.'),
  ('Sampling','Default always_on for deterministic demo; isolated tail experiment retains errors/slow traces + 10% baseline','The manual workflow runs a separate real-request sampling experiment after deterministic full-trace E2E. Error/slow rules require all spans for a trace to reach one sampling Collector.'),
- ('Alerts','Prometheus rules for telemetry scrape failure, outbox failure, span error ratio, Collector queue pressure/export failures, notification backlog and DLQ','No Alertmanager routing, pager/email delivery or production SLO policy.'),
+ ('Alerts','Prometheus rules for telemetry scrape failure, outbox failure, span error ratio, Collector queue pressure/export failures, notification backlog and DLQ','Local Alertmanager routing/inbox delivery now have manual acceptance; real pager/email delivery and production SLO policy remain unconfigured.'),
  ('Resilience','Business idempotency/reconciliation plus broker/Collector outage tests','Not a load, capacity, HA, disaster recovery or production-readiness certification.'),
  ('Security/privacy','No authorization/cookie capture; selected sensitive DB attributes removed; bounded metric labels','Existing logs contain synthetic customer/business data. Attribute deletion does not sanitize arbitrary log bodies. Review/redact before using real data.'),
  ('Deployment','Local Compose plus Cloud Run IAM/runtime/container/manual release assets; optional BigQuery SQL','Cloud account provisioning, durable data services, live deployment/acceptance, HA/backups and cloud datasource validation remain pending.')])+
@@ -380,7 +384,7 @@ if metric_names:
 alerts=read_artifact('prometheus-alerts.json', {}).get('data',{}).get('alerts',[])
 if alerts:
     evidence+=table(['Recorded alert','Observed state'],[(e(x['labels'].get('alertname','')),e(x['state'])) for x in alerts])
-for title, data in [('Browser acceptance',browser),('Measured demonstration traffic',traffic),('Advanced tail-sampling experiment',sampling),('Persistent export queue recovery',read_artifact('persistent-queue.json',{}))]:
+for title, data in [('Browser acceptance',browser),('Measured demonstration traffic',traffic),('Advanced tail-sampling experiment',sampling),('Persistent export queue recovery',read_artifact('persistent-queue.json',{})),('Synthetic journey',synthetic),('Durable state and incident lifecycle',support_results)]:
     if data:
         evidence+='<h3>'+e(title)+'</h3>'+code(json.dumps(data,indent=2))
 screen_captions={
@@ -388,6 +392,7 @@ screen_captions={
  '02-browser-payment-completed':'Payment completed: the customer outcome to correlate with PAYMENT_COMPLETED, bank spans and eventual notification.',
  '03-browser-transfer-completed':'Transfer completed: the P2P customer flow exercised by the browser.',
  '04-support-operations':'Support view: live service health, problem payments and notification activity; use IDs to investigate the corresponding telemetry.',
+ '09-incident-inbox':'Local Alertmanager delivery into the incident inbox; acknowledgement and resolved lifecycle are verified in the separate support acceptance.',
  '05-payment-poc':'Operations dashboard: locate the bank latency/error spike, compare request/JVM trends and read correlated service logs.',
  '06-payment-business':'Business dashboard: distinguish completed payments, declines and unknown outcomes; inspect notification and reconciliation/risk events.',
  '08-payment-slo':'Technical SLO dashboard: unsampled HTTP availability/latency and error budget trends; example targets, not a business completion guarantee.',

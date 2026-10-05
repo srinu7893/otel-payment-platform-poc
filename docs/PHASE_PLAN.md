@@ -195,3 +195,8 @@ See `POC_GUIDE.html` for precise implemented coverage, reproduction, evidence an
 Implemented: Cloud Run PORT support and agent-baked containers; private caller ID tokens alongside customer JWT; support probe authentication; per-service runtime manifests with Secret Manager references, VPC/TLS broker settings and Collector managed exports; manual WIF/digest/readiness/traffic/rollback release; separate opt-in cloud business/signal acceptance; linked BigQuery SQL/runbook; fourth technical SLO dashboard, burn rules and deterministic tests; Collector body redaction and synthetic stored-log acceptance.
 
 Status is evidence-specific: local builds and manual integration checks are recorded in the current guide. Live cloud execution requires this repo's GCP environment settings, existing service slots, durable DB/broker, identities and secrets. Infrastructure bootstrap, actual BigQuery link/schema validation, cloud/Grafana datasource mapping, paging, rolling worker safety, load/HA/DR and complete privacy/RUM/profiling remain pending. See [CLOUD_RUN_PLAN.md](CLOUD_RUN_PLAN.md).
+
+
+## Durable state and incident demo increment
+
+Added cached SQL-backed payment/outbox/notification gauges with freshness/health, six business panels, local Alertmanager routing to a persistent acknowledgement/resolution inbox, an on-demand synthetic login/payment/replay/delivery journey, and opt-in real broker-delay alert lifecycle acceptance. See docs/SUPPORT_ENHANCEMENTS.md (or SUPPORT_ENHANCEMENTS.md from docs). Runtime verification is recorded in the current manual-run evidence; production paging, cloud deployment and final business SLOs remain separate gates.

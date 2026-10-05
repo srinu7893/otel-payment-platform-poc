@@ -207,9 +207,28 @@ services:
     volumes:
     - collector-data:/storage
     restart: 'no'
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    command:
+    - --config.file=/etc/alertmanager/config.yaml
+    - --storage.path=/alertmanager
+    - --web.external-url=http://localhost:9093
+    volumes:
+    - ./observability/alertmanager.yaml:/etc/alertmanager/config.yaml:ro
+    - alertmanager-data:/alertmanager
+    ports:
+    - 127.0.0.1:9093:9093
+  incident-inbox:
+    build: ./observability/incident-inbox
+    volumes:
+    - incident-data:/data
+    ports:
+    - 127.0.0.1:9094:8090
 volumes:
   tempo-data: {}
   loki-data: {}
   prometheus-data: {}
   grafana-data: {}
   collector-data: {}
+  alertmanager-data: {}
+  incident-data: {}

@@ -25,3 +25,12 @@ scrape_configs:
   static_configs:
   - targets:
     - rabbitmq:15692
+- job_name: alertmanager
+  static_configs:
+  - targets:
+    - alertmanager:9093
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - alertmanager:9093

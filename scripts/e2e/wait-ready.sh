@@ -17,3 +17,11 @@ for port in "${ports[@]}"; do
     sleep 2
   done
 done
+
+for url in http://localhost:9093/-/ready http://localhost:9094/health; do
+  for attempt in {1..60}; do
+    if curl --fail --silent "$url" >/dev/null; then break; fi
+    if [ "$attempt" -eq 60 ]; then echo "Support component not ready: $url"; exit 1; fi
+    sleep 2
+  done
+done

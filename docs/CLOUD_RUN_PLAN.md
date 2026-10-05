@@ -56,7 +56,7 @@ Automatic rollback only changes HTTP traffic; it does not roll back Flyway migra
 
 Cloud Run also automatically collects application stdout and request/system logs. OTLP-exported application events use a distinct `payment-poc-otel` log name. Do not sum both paths as unique business outcomes: duplicates can occur. The Collector body-redaction policy protects its own exported path, not application stdout. Never log credentials in the first place. Linked datasets are read-only; do not target one with an ordinary BigQuery export sink.
 
-The new `payment-slo` dashboard uses unsampled HTTP server metrics at the edge. Its example technical availability target is 99.9%; 5xx count as failures. It shows a latency-good ratio <=2.5 seconds and fast burn when both 1h/5m windows exceed 14.4 times the 0.1% error budget. No traffic gives no meaningful SLI, rather than proving 100% health. HTTP 200 with RECONCILIATION_REQUIRED remains a business failure: business completion/delivery SLIs require an independent, durable source and approved domain targets. These SLO targets are PoC examples, not an agreed production SLA. Prometheus alerts are not paging until routing/ownership is configured. Local rules/dashboard are not automatically uploaded as Cloud Monitoring policies.
+The new `payment-slo` dashboard uses unsampled HTTP server metrics at the edge. Its example technical availability target is 99.9%; 5xx count as failures. It shows a latency-good ratio <=2.5 seconds and fast burn when both 1h/5m windows exceed 14.4 times the 0.1% error budget. No traffic gives no meaningful SLI, rather than proving 100% health. HTTP 200 with RECONCILIATION_REQUIRED remains a business failure: business completion/delivery SLIs require an independent, durable source and approved domain targets. These SLO targets are PoC examples, not an agreed production SLA. Local Prometheus warnings now route through Alertmanager to a local incident inbox; production pager delivery is still unconfigured. Local rules/dashboard are not automatically uploaded as Cloud Monitoring policies.
 
 ## Production support triage, from report to verification
 
@@ -98,7 +98,7 @@ Recommended first integration: OTLP logs → Cloud Logging analytics-enabled log
 | Local persistent export queues | Crash/recovery test | Cloud sidecar queue is ephemeral; use a durable central gateway if needed |
 | Baggage | Propagator configured, not a tested business baggage feature | Allowlist safe fields; never put credentials/PII in baggage; no durable baggage persistence |
 | Secret-pattern body redaction + selected header/DB attribute deletion | Implemented with synthetic stored-log test | Structured fields, payload paths, stdout and privacy review; regex is not exhaustive |
-| Technical SLO/burn-rate alerts | Rules/dashboard and deterministic rule tests | Approved domain objectives, production load/windows and pager routing |
+| Technical SLO/burn-rate alerts | Rules/dashboard, deterministic rule tests and local inbox routing | Approved domain objectives, production load/windows and pager routing |
 | Cloud IAM, Secret Manager references, Collector managed exporters | Runtime/release assets implemented | Actual accounts, permissions, storage and live manual acceptance |
 | BigQuery linked analytics | SQL/runbook prepared | Create analytics bucket/link, access, retention and live schema/query validation |
 | Exemplars | Datasource destination configured | Verify actual emitted exemplars and click-through on selected metric/backend |
@@ -123,3 +123,8 @@ OpenTelemetry has an extensible ecosystem, not a finite switch labelled “all f
 - https://docs.cloud.google.com/logging/docs/analyze/query-linked-dataset
 - https://docs.cloud.google.com/logging/docs/analyze/examples
 - https://opentelemetry.io/docs/specs/status/
+
+
+## Local support enhancements and cloud boundary
+
+SUPPORT_ENHANCEMENTS.md describes new durable-state gauges, freshness checks, on-demand synthetic journey and local Alertmanager/inbox lifecycle. Their local acceptance does not certify cloud alert delivery. Deploy the metrics with the Java services, validate backend label/name mapping, and implement rules/routing in the chosen managed monitoring platform. The local inbox/Alertmanager are not Cloud Run services in this release.

@@ -4,6 +4,8 @@ import json, os, subprocess, urllib.request, urllib.parse
 from pathlib import Path
 root=Path('artifacts');root.mkdir(exist_ok=True)
 urls={
+ 'incident-inbox':'http://localhost:9094/api/incidents',
+ 'durable-business-metrics':'http://localhost:9090/api/v1/query?'+urllib.parse.urlencode({'query':'poc_payment_records or poc_outbox_pending or poc_outbox_oldest_pending_seconds or poc_notification_records or poc_business_snapshot_healthy or poc_synthetic_journey_success'}),
  'grafana-frontend-settings':'http://localhost:3001/api/frontend/settings',
  'prometheus-targets':'http://localhost:9090/api/v1/targets',
  'prometheus-alerts':'http://localhost:9090/api/v1/alerts',

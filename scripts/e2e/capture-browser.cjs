@@ -40,6 +40,7 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
     await page.getByRole('heading',{name:'Support / Admin dashboard'}).waitFor();
     await page.getByRole('link',{name:'Operations dashboard',exact:true}).waitFor();
     await page.getByRole('link',{name:'Technical SLO dashboard',exact:true}).waitFor();
+    await page.getByRole('link',{name:'Incident inbox',exact:true}).waitFor();
     await page.waitForTimeout(3000);
     await screenshot('04-support-operations');
     const response=await context.request.post('http://localhost:3001/login',{data:{user:'admin',password:process.env.GRAFANA_ADMIN_PASSWORD||'otel-demo-admin'}});
@@ -69,9 +70,14 @@ fs.mkdirSync('artifacts/screenshots', {recursive:true});
       }
       await screenshot(`0${i+5}-${uid}`);
     }
+    await page.setViewportSize({width:1440,height:1100});
+    await page.goto('http://localhost:9094');
+    await page.getByRole('heading',{name:'PoC incident inbox',exact:true}).waitFor();
+    await page.getByRole('cell',{name:'OutboxDeliveryDelayed',exact:true}).first().waitFor();
+    await screenshot('09-incident-inbox');
     assert.deepEqual(errors,[],'Browser runtime errors');
     assert.deepEqual(diagnostics.filter(x=>x.type==='http' && x.url.includes('/api/ds/query')),[],'Grafana datasource query errors');
-    fs.writeFileSync('artifacts/browser-results.json',JSON.stringify({status:'PASS',checks:['customer payment submit/reset','customer transfer submit/reset','support dashboard','four live Grafana screenshots'],errors},null,2));
+    fs.writeFileSync('artifacts/browser-results.json',JSON.stringify({status:'PASS',checks:['customer payment submit/reset','customer transfer submit/reset','support dashboard','four live Grafana screenshots','delivered incident inbox'],errors},null,2));
   } catch (error) {
     await screenshot('99-browser-failure').catch(()=>{});
     fs.writeFileSync('artifacts/browser-results.json',JSON.stringify({status:'FAIL',error:error.message,errors},null,2));

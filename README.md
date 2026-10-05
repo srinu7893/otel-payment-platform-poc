@@ -162,3 +162,8 @@ Completed locally: baseline business flows; Java agent/Collector; Tempo traces, 
 Cloud Run runtime/release assets now include separate service manifests, workload identity, pinned Secret Manager references, managed telemetry exporters, manual release/readiness/rollback and separate cloud acceptance. The SRE assessment manual WIF deployment was used as a reference. BigQuery linked-log SQL and production support guidance are in [`docs/CLOUD_RUN_PLAN.md`](docs/CLOUD_RUN_PLAN.md). Four local dashboards include a technical SLO/error-budget view, with synthetic log privacy and rule tests. Live GCP/BigQuery execution, provisioning, HA/storage, approved SLOs and alert routing remain pending. The guide documents Grafana Cloud/Mimir/Alloy alternatives; none is silently treated as deployed.
 
 Detailed status is maintained in [`docs/BUILD_TRACKER.md`](docs/BUILD_TRACKER.md).
+
+
+## Durable state and incident demo increment
+
+Added cached SQL-backed payment/outbox/notification gauges with freshness/health, six business panels, local Alertmanager routing to a persistent acknowledgement/resolution inbox, an on-demand synthetic login/payment/replay/delivery journey, and opt-in real broker-delay alert lifecycle acceptance. See docs/SUPPORT_ENHANCEMENTS.md (or SUPPORT_ENHANCEMENTS.md from docs). Runtime verification is recorded in the current manual-run evidence; production paging, cloud deployment and final business SLOs remain separate gates.

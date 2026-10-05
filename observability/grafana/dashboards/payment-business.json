@@ -140,6 +140,180 @@
           "queryType": "range"
         }
       ]
+    },
+    {
+      "id": 7,
+      "title": "Durable payment rows by current status",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (status) (poc_payment_records)",
+          "legendFormat": "{{status}}{{service_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "description": "Cached durable-state gauge; check snapshot freshness. Use max across replicas sharing the same database. Synthetic checks are on demand, not continuous availability."
+    },
+    {
+      "id": 8,
+      "title": "Durable notification rows by current status",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (status) (poc_notification_records)",
+          "legendFormat": "{{status}}{{service_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "description": "Cached durable-state gauge; check snapshot freshness. Use max across replicas sharing the same database. Synthetic checks are on demand, not continuous availability."
+    },
+    {
+      "id": 9,
+      "title": "Oldest saved outbox work",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(poc_outbox_oldest_pending_seconds)",
+          "legendFormat": "{{status}}{{service_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "description": "Cached durable-state gauge; check snapshot freshness. Use max across replicas sharing the same database. Synthetic checks are on demand, not continuous availability."
+    },
+    {
+      "id": 10,
+      "title": "Oldest unsent notification record",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(poc_notification_oldest_unsent_seconds)",
+          "legendFormat": "{{status}}{{service_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "description": "Cached durable-state gauge; check snapshot freshness. Use max across replicas sharing the same database. Synthetic checks are on demand, not continuous availability."
+    },
+    {
+      "id": 11,
+      "title": "Business snapshot freshness",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (service_name) (time() - poc_business_snapshot_last_success_timestamp_seconds)",
+          "legendFormat": "{{status}}{{service_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "description": "Cached durable-state gauge; check snapshot freshness. Use max across replicas sharing the same database. Synthetic checks are on demand, not continuous availability."
+    },
+    {
+      "id": 12,
+      "title": "Synthetic journey outcome (on demand)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "poc_synthetic_journey_success",
+          "legendFormat": "{{status}}{{service_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "description": "Cached durable-state gauge; check snapshot freshness. Use max across replicas sharing the same database. Synthetic checks are on demand, not continuous availability."
     }
   ]
 }
