@@ -25,6 +25,10 @@ jobs:
     environment: gcp-poc
     timeout-minutes: 60
     env:
+      REGISTRY_PROJECT: ${{ vars.GCP_PROJECT_ID || 'project-c9bd3d0e-266f-47bf-852' }}
+      REGISTRY_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      REGISTRY_REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY || 'otel-payment-platform' }}
+      REQUESTED_ACTION: ${{ inputs.action }}
       CLOUD_CONFIG: ${{ vars.CLOUD_RUN_CONFIG_JSON }}
       FRONTEND_GRAFANA_URL: ${{ vars.GRAFANA_URL }}
       COMMIT_SHA: ${{ github.sha }}
@@ -38,9 +42,18 @@ jobs:
     - name: Configuration and exact-source gates
       run: |
         set -euo pipefail
-        test -n "$CLOUD_CONFIG"
-        printf '%s' "$CLOUD_CONFIG" > /tmp/otel-cloud-config.json
-        python3 scripts/cloud/run_release.py validate --config /tmp/otel-cloud-config.json
+        python3 - <<'PY'
+        import json,os
+        config={key:os.environ[env] for key,env in [('project','REGISTRY_PROJECT'),('region','REGISTRY_REGION'),('repository','REGISTRY_REPOSITORY')]}
+        with open('/tmp/otel-registry-config.json','w') as f: json.dump(config,f,sort_keys=True)
+        with open('/tmp/otel-build-settings.json','w') as f: json.dump(dict(config,grafanaUrl=os.environ['FRONTEND_GRAFANA_URL']),f,sort_keys=True)
+        PY
+        if [ "$REQUESTED_ACTION" = deploy ]; then
+          test -n "$CLOUD_CONFIG"
+          printf '%s' "$CLOUD_CONFIG" > /tmp/otel-cloud-config.json
+          python3 scripts/cloud/run_release.py validate --config /tmp/otel-cloud-config.json
+          python3 -c 'import json; c=json.load(open("/tmp/otel-cloud-config.json")); r=json.load(open("/tmp/otel-registry-config.json")); assert all(c[k]==v for k,v in r.items()), "Deployment registry must match publication registry"'
+        fi
         for workflow in ci.yml manual-otel-e2e.yml; do
           run_id=$(gh api "repos/$GH_REPO/actions/workflows/$workflow/runs" --method GET -f head_sha="$COMMIT_SHA" -f status=success --jq '.workflow_runs[0].id // empty')
           test -n "$run_id" || { echo "Successful $workflow required for this exact commit."; exit 1; }
@@ -72,7 +85,7 @@ jobs:
         for service in auth-service customer-service mock-bank-service gateway-service notification-service payment-service api-gateway; do
           docker build --label "org.opencontainers.image.revision=$REVISION" --build-arg SERVICE="$service" -f deploy/cloud-run/Dockerfile.java -t "otel-$service:$REVISION" .
         done
-        frontend_project=$(python3 -c 'import json,os; print(json.loads(os.getenv("CLOUD_CONFIG") or "{}").get("project", ""))')
+        frontend_project="$REGISTRY_PROJECT"
         docker build --build-arg "VITE_GOOGLE_CLOUD_PROJECT=$frontend_project" --build-arg "VITE_GRAFANA_URL=$FRONTEND_GRAFANA_URL" --label "org.opencontainers.image.revision=$REVISION" -f deploy/cloud-run/Dockerfile.frontend -t "otel-frontend:$REVISION" .
         docker build --label "org.opencontainers.image.revision=$REVISION" -f deploy/cloud-run/Dockerfile.collector -t "otel-collector:$REVISION" .
         docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation "otel-collector:$REVISION" validate --config=/etc/otelcol-contrib/config.yaml
@@ -82,15 +95,14 @@ jobs:
       uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
       with:
         workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        service_account: ${{ inputs.action == 'publish' && secrets.GCP_SERVICE_ACCOUNT || secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
     - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db
     - name: Publish without changing Cloud Run
       if: inputs.action == 'publish'
       run: |
-        python3 scripts/cloud/publish_images.py --config /tmp/otel-cloud-config.json --out artifacts/cloud-release/images.json
+        python3 scripts/cloud/publish_images.py --config /tmp/otel-registry-config.json --out artifacts/cloud-release/images.json
         printf '%s\n' "$COMMIT_SHA" > artifacts/cloud-release/commit.txt
-        cp /tmp/otel-cloud-config.json artifacts/cloud-release/config.json
-        python3 scripts/cloud/render_yaml.py --config /tmp/otel-cloud-config.json --images artifacts/cloud-release/images.json --revision "gh-$GITHUB_RUN_ID"
+        cp /tmp/otel-build-settings.json artifacts/cloud-release/build-settings.json
     - name: Retrieve exact published digests without rebuilding
       if: inputs.action == 'deploy'
       run: |
@@ -100,7 +112,7 @@ jobs:
         python3 -c 'import json,os; r=json.load(open("/tmp/publish-run.json")); assert r["conclusion"]=="success" and r["head_sha"]==os.environ["COMMIT_SHA"] and r["head_branch"]=="main" and r["event"]=="workflow_dispatch" and r["path"]==".github/workflows/manual-cloud-images.yml", "Publish must be a successful main run of this workflow at this exact commit"'
         gh run download "$PUBLISH_RUN_ID" --repo "$GH_REPO" --name "published-images-$PUBLISH_RUN_ID" --dir published
         test "$(cat published/commit.txt)" = "$COMMIT_SHA"
-        cmp /tmp/otel-cloud-config.json published/config.json
+        cmp /tmp/otel-build-settings.json published/build-settings.json
         mkdir -p artifacts/cloud-release
         cp published/images.json artifacts/cloud-release/images.json
         python3 scripts/cloud/render_yaml.py --config /tmp/otel-cloud-config.json --images published/images.json --revision "gh-$GITHUB_RUN_ID"
