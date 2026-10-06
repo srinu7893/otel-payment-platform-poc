@@ -1,0 +1,134 @@
+groups:
+- name: payment-poc
+  rules:
+  - alert: TelemetryScrapeUnavailable
+    expr: up{job="otel-applications"} == 0
+    for: 1m
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Collector metrics endpoint cannot be scraped
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+  - alert: PaymentOutboxPublishFailures
+    expr: sum(increase(poc_outbox_publish_attempts_total{outcome="failure"}[5m]))
+      > 0
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Outbox publish failed; inspect broker and retry logs
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+  - alert: ServiceSpanErrorRatio
+    expr: sum by (service) (rate(traces_spanmetrics_calls_total{status_code="STATUS_CODE_ERROR"}[5m]))
+      / clamp_min(sum by (service) (rate(traces_spanmetrics_calls_total[5m])), 0.001)
+      > 0.05
+    for: 2m
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: More than five percent of recorded spans have errors
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+  - alert: CollectorExportQueueNearCapacity
+    expr: otelcol_exporter_queue_size / clamp_min(otelcol_exporter_queue_capacity,
+      1) > 0.8
+    for: 1m
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Collector export queue above 80 percent; inspect backend and storage
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+  - alert: CollectorExportFailures
+    expr: sum(increase(otelcol_exporter_send_failed_spans[5m])) + sum(increase(otelcol_exporter_send_failed_log_records[5m]))
+      > 0
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Collector export failures; inspect queues and downstream backends
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+  - alert: NotificationQueueBacklog
+    expr: rabbitmq_queue_messages_ready{queue="payments.notification"} > 20
+    for: 1m
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Notification backlog growing; inspect consumer health
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+  - alert: NotificationDeadLetters
+    expr: rabbitmq_queue_messages_ready{queue="payments.notification.dlq"} > 0
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Notification DLQ contains messages; inspect before redrive
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+- name: payment-api-slo
+  rules:
+  - record: poc:payment_api_error_ratio:5m
+    expr: (sum(rate(http_server_request_duration_seconds_count{service_name="api-gateway",http_route=~"payment-service|transfer-service",http_response_status_code=~"5.."}[5m]))
+      or vector(0)) / sum(rate(http_server_request_duration_seconds_count{service_name="api-gateway",http_route=~"payment-service|transfer-service"}[5m]))
+  - record: poc:payment_api_error_ratio:1h
+    expr: (sum(rate(http_server_request_duration_seconds_count{service_name="api-gateway",http_route=~"payment-service|transfer-service",http_response_status_code=~"5.."}[1h]))
+      or vector(0)) / sum(rate(http_server_request_duration_seconds_count{service_name="api-gateway",http_route=~"payment-service|transfer-service"}[1h]))
+  - record: poc:payment_api_availability:5m
+    expr: 1 - poc:payment_api_error_ratio:5m
+  - record: poc:payment_api_latency_good_ratio:5m
+    expr: sum(rate(http_server_request_duration_seconds_bucket{service_name="api-gateway",http_route=~"payment-service|transfer-service",le="2.5"}[5m]))
+      / sum(rate(http_server_request_duration_seconds_count{service_name="api-gateway",http_route=~"payment-service|transfer-service"}[5m]))
+  - alert: PaymentApiFastErrorBudgetBurn
+    expr: (poc:payment_api_error_ratio:1h > 14.4 * 0.001) and (poc:payment_api_error_ratio:5m
+      > 14.4 * 0.001)
+    for: 2m
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Payment API burns the 99.9% technical availability budget quickly
+      description: Both 1h and 5m windows exceed 14.4x budget burn. Inspect ingress
+        metrics, correlated logs and dependency traces. HTTP success does not guarantee
+        payment completion.
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+- name: durable-business-state
+  rules:
+  - alert: BusinessSnapshotStale
+    expr: (time() - poc_business_snapshot_last_success_timestamp_seconds > 40) or
+      (poc_business_snapshot_healthy == 0)
+    for: 30s
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Business metrics are stale; do not interpret cached counts as current
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+  - alert: PaymentReconciliationPending
+    expr: max(poc_payment_records{status="RECONCILIATION_REQUIRED"}) > 0
+    for: 30s
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Payment outcome requires reconciliation; do not blindly repeat the
+        payment
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+  - alert: OutboxDeliveryDelayed
+    expr: max(poc_outbox_oldest_pending_seconds) > 60
+    for: 30s
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Saved outbox work has waited over 60 seconds; inspect broker/publishing
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+  - alert: NotificationDeliveryDelayed
+    expr: max(poc_notification_oldest_unsent_seconds) > 60
+    for: 30s
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Notification records remain unsent; inspect retries and consumer errors
+      runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md

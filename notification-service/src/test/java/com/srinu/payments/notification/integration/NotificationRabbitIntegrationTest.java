@@ -57,6 +57,8 @@ class NotificationRabbitIntegrationTest {
         assertThat(record.getChannel()).isEqualTo("EMAIL_SIMULATED");
         assertThat(record.getStatus()).isEqualTo("SENT");
         assertThat(record.getAttempts()).isEqualTo(1);
+        assertThat(repository.findAllByCustomerIdAndPaymentId("demo-customer", paymentId, PageRequest.of(0, 10)).getTotalElements()).isEqualTo(1);
+        assertThat(repository.findAllByCustomerIdAndPaymentId("other-customer", paymentId, PageRequest.of(0, 10))).isEmpty();
     }
 
     @Test

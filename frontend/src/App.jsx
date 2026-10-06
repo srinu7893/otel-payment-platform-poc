@@ -27,7 +27,8 @@ export default function App() {
 
   async function handleLogin(event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setLoading(true);
     setError('');
     setSuccess('');
@@ -67,7 +68,8 @@ export default function App() {
 
   async function handlePayment(event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setLoading(true);
     setError('');
     setSuccess('');
@@ -79,7 +81,7 @@ export default function App() {
         amount: Number(form.get('amount'))
       });
       setSuccess(`Payment ${String(result.paymentId).slice(0, 8)} is ${result.status}`);
-      event.currentTarget.reset();
+      formElement.reset();
       await refreshAll();
     } catch (e) {
       setError(formatError(e));
@@ -90,7 +92,8 @@ export default function App() {
 
   async function handleTransfer(event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setLoading(true);
     setError('');
     setSuccess('');
@@ -103,7 +106,7 @@ export default function App() {
         currency: form.get('currency') || 'INR'
       });
       setSuccess(`Transfer ${String(result.transferId).slice(0, 8)} is ${result.status}`);
-      event.currentTarget.reset();
+      formElement.reset();
       await refreshAll();
     } catch (e) {
       setError(formatError(e));
@@ -185,7 +188,7 @@ export default function App() {
             <article className="card metric"><span>Linked account</span><strong>{profile?.accountNumber || '—'}</strong><small>{profile?.active ? 'Active' : 'Inactive'}</small></article>
             <article className="card metric"><span>Payments</span><strong>{payments.length}</strong><small>recent records</small></article>
             <article className="card metric"><span>Transfers</span><strong>{transfers.length}</strong><small>recent records</small></article>
-            <article className="card architecture wide"><h2>Request flow</h2><code>React → API Gateway → JWT authorization → Payment Service → Gateway Service → Mock Bank → PostgreSQL<br/>Payment/Transfer/Refund → Outbox → RabbitMQ → Notification Service<br/>Later: OTel Java Agent → Collector → traces / metrics / correlated logs</code></article>
+            <article className="card architecture wide"><h2>Request flow</h2><code>React → API Gateway → JWT authorization → Payment Service → Gateway Service → Mock Bank → PostgreSQL<br/>Payment/Transfer/Refund → Outbox → RabbitMQ → Notification Service<br/>OTel profile: Java Agent → Collector → traces / metrics / correlated logs</code></article>
           </section>}
 
           {tab === 'payment' && <section className="twoCol">

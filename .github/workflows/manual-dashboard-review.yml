@@ -1,0 +1,68 @@
+name: manual-dashboard-review
+'on':
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+permissions:
+  contents: read
+concurrency:
+  group: dashboard-review-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  dashboards:
+    if: github.event_name == 'workflow_dispatch' || (github.event.label.name == 'run-dashboard-review' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: otel-dashboards
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+    - uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '21'
+        cache: maven
+    - name: Package previously tested application code
+      run: mvn -B package -DskipTests
+    - name: Prepare instrumentation
+      run: bash scripts/setup-otel-agent.sh
+    - name: Start disposable instrumented services
+      run: bash scripts/otel-compose.sh up --build -d
+    - name: Wait for services
+      run: bash scripts/e2e/wait-ready.sh
+    - name: Generate business and synthetic observations
+      run: |
+        bash scripts/e2e/business-smoke.sh
+        python3 scripts/e2e/synthetic-journey.py
+        python3 scripts/e2e/live-traffic.py
+    - name: Verify dashboard queries and metric coverage
+      run: python3 scripts/e2e/dashboard-review.py
+    - name: Install browser
+      run: |
+        npm install --prefix /tmp/dashboard-browser --no-audit --no-fund playwright@1.56.1
+        /tmp/dashboard-browser/node_modules/.bin/playwright install --with-deps chromium
+    - name: Render every dashboard
+      env:
+        NODE_PATH: /tmp/dashboard-browser/node_modules
+      run: node scripts/e2e/capture-service-dashboards.cjs
+    - name: Capture diagnostics
+      if: always()
+      run: |
+        python3 scripts/e2e/capture-evidence.py
+        bash scripts/otel-compose.sh logs --no-color > artifacts/compose.log
+    - name: Refresh dashboard review guide
+      if: always()
+      run: |
+        python3 scripts/render-dashboard-guide.py
+        cp docs/DASHBOARDS_AND_DEPLOYMENT.html artifacts/
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: dashboard-review-${{ github.run_number }}
+        path: artifacts/
+        retention-days: 7
+    - name: Remove disposable stack
+      if: always()
+      run: bash scripts/otel-compose.sh down -v --remove-orphans

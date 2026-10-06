@@ -1,3 +1,9 @@
+## OpenTelemetry acceptance
+
+For the current OTel stack, dashboards, backend assertions and failure/recovery cases, use [POC_GUIDE.html](POC_GUIDE.html). Full-stack E2E is now manual-only via `manual-otel-e2e`; ordinary CI does not start the full stack. Verified by the [full manual run](https://github.com/srinu7893/otel-payment-platform-poc/actions/runs/37246451511) on `c614fc387693b78d131207ac8aecbbacfd3bcf8a`: 61 backend tests with zero failures/errors/skips; all 13 telemetry/security/recovery assertions; payment/refund/replay/risk/P2P scenarios; support health and API contract; 12 concurrent demonstration payments with SENT notifications; real error/slow tail sampling; customer/support browser checks and all three rendered Grafana dashboards.
+
+Before merge, add the `run-otel-e2e` label to PR #3 (remove/re-add for another run). After merge, use Actions → manual-otel-e2e → Run workflow. Start a local demo with `bash scripts/run-poc.sh start`; run core live checks with `bash scripts/run-poc.sh test`. The HTML includes the separate sampling commands and expected outcomes. The historical baseline procedures below remain useful for individual API checks.
+
 # Full-Stack End-to-End Runbook
 
 This is the baseline runbook for the Spring Boot + React payment platform before OpenTelemetry is added.

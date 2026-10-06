@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ObservabilityPanel from './ObservabilityPanel';
 import {
   getOperationsHealth,
   getPayment,
@@ -75,6 +76,7 @@ export default function OperationsPanel({ token, roles }) {
       </div>
 
       {error && <p className="error">{error}</p>}
+      <ObservabilityPanel />
 
       <section className="dashboardGrid">
         <article className="card metric"><span>Services</span><strong>{health?.services?.length ?? '—'}</strong><small>{health?.allHealthy ? 'All healthy' : 'Attention required'}</small></article>
@@ -93,7 +95,7 @@ export default function OperationsPanel({ token, roles }) {
 
       <section className="card">
         <h2>Operational lookup</h2>
-        <p>Search a specific payment or transfer ID. Correlation-ID search will be added once correlation IDs are persisted/indexed for operations.</p>
+        <p>Search a specific payment or transfer ID. Use Observability above to search correlation IDs in centralized logs.</p>
         <form className="inlineForm" onSubmit={runSearch}>
           <label>Type<select value={searchType} onChange={e => setSearchType(e.target.value)}><option value="payment">Payment</option><option value="transfer">Transfer</option></select></label>
           <label className="grow">ID<input value={searchId} onChange={e => setSearchId(e.target.value)} placeholder="UUID" required /></label>

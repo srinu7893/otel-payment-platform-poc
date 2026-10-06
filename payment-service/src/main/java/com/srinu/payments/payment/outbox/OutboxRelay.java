@@ -11,6 +11,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
@@ -45,6 +51,27 @@ public class OutboxRelay {
     }
 
     private void publish(OutboxEvent event) {
+        Span span = GlobalOpenTelemetry.getTracer("payment-poc.outbox")
+            .spanBuilder("outbox.publish")
+            .setParent(event.traceContext())
+            .setAttribute("messaging.system", "rabbitmq")
+            .setAttribute("poc.event.type", event.getEventType())
+            .startSpan();
+        try (Scope ignored = span.makeCurrent()) {
+            publishWithContext(event, span);
+        } finally {
+            span.end();
+        }
+    }
+
+    private void recordAttempt(String outcome) {
+        GlobalOpenTelemetry.getMeter("payment-poc.outbox")
+            .counterBuilder("poc.outbox.publish.attempts")
+            .setDescription("Broker-confirmed publish attempts; not committed unique business events")
+            .build().add(1, Attributes.of(AttributeKey.stringKey("outcome"), outcome));
+    }
+
+    private void publishWithContext(OutboxEvent event, Span span) {
         CorrelationData correlationData = new CorrelationData(event.getId().toString());
         try {
             rabbitTemplate.convertAndSend(EXCHANGE, event.getRoutingKey(), event.getPayload(), message -> {
@@ -64,16 +91,23 @@ public class OutboxRelay {
             }
 
             event.markPublished();
+            recordAttempt("success");
             log.info("event=OUTBOX_PUBLISHED outboxEventId={} aggregateType={} aggregateId={} routingKey={} attempts={} correlationId={}",
                 event.getId(), event.getAggregateType(), event.getAggregateId(), event.getRoutingKey(),
                 event.getAttempts(), event.getCorrelationId());
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             event.markFailed(ex);
+            span.recordException(ex);
+            span.setStatus(StatusCode.ERROR);
+            recordAttempt("failure");
             log.warn("event=OUTBOX_PUBLISH_FAILED outboxEventId={} routingKey={} attempts={} reason=INTERRUPTED",
                 event.getId(), event.getRoutingKey(), event.getAttempts());
         } catch (Exception ex) {
             event.markFailed(ex);
+            span.recordException(ex);
+            span.setStatus(StatusCode.ERROR);
+            recordAttempt("failure");
             log.warn("event=OUTBOX_PUBLISH_FAILED outboxEventId={} routingKey={} attempts={} errorType={} message={}",
                 event.getId(), event.getRoutingKey(), event.getAttempts(), ex.getClass().getSimpleName(), ex.getMessage());
         }

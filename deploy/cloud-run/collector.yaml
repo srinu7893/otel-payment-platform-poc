@@ -1,0 +1,93 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:4318
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 192
+    spike_limit_mib: 48
+  resourcedetection:
+    detectors:
+    - gcp
+    timeout: 5s
+    override: false
+  attributes/privacy:
+    actions:
+    - key: http.request.header.authorization
+      action: delete
+    - key: http.request.header.x_serverless_authorization
+      action: delete
+    - key: http.request.header.x-serverless-authorization
+      action: delete
+    - key: http.request.header.cookie
+      action: delete
+    - key: db.statement
+      action: delete
+    - key: db.query.text
+      action: delete
+  batch:
+    timeout: 5s
+    send_batch_size: 200
+    send_batch_max_size: 200
+  transform/log-secrets:
+    error_mode: propagate
+    log_statements:
+    - context: log
+      statements:
+      - replace_pattern(body, "(?i)(password|access_token|api_key)[=:][^ ,;]+", "[REDACTED]")
+        where IsString(body)
+      - replace_pattern(body, "(?i)bearer [a-zA-Z0-9._~-]+", "Bearer [REDACTED]")
+        where IsString(body)
+exporters:
+  googlecloud:
+    project: ${env:GOOGLE_CLOUD_PROJECT}
+    log:
+      default_log_name: payment-poc-otel
+    sending_queue:
+      queue_size: 200
+  googlemanagedprometheus:
+    project: ${env:GOOGLE_CLOUD_PROJECT}
+    sending_queue:
+      queue_size: 200
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+service:
+  extensions:
+  - health_check
+  pipelines:
+    traces:
+      receivers:
+      - otlp
+      processors:
+      - memory_limiter
+      - resourcedetection
+      - attributes/privacy
+      - batch
+      exporters:
+      - googlecloud
+    logs:
+      receivers:
+      - otlp
+      processors:
+      - memory_limiter
+      - resourcedetection
+      - attributes/privacy
+      - transform/log-secrets
+      - batch
+      exporters:
+      - googlecloud
+    metrics:
+      receivers:
+      - otlp
+      processors:
+      - memory_limiter
+      - resourcedetection
+      - batch
+      exporters:
+      - googlemanagedprometheus
+  telemetry:
+    logs:
+      encoding: json

@@ -1,0 +1,100 @@
+name: manual-cloud-run
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Validate assets or deploy to the configured GCP PoC environment
+        type: choice
+        options: [validate, deploy]
+        default: validate
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+concurrency:
+  group: otel-gcp-poc
+  cancel-in-progress: false
+jobs:
+  release:
+    if: inputs.action == 'validate' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: gcp-poc
+    timeout-minutes: 45
+    env:
+      CLOUD_CONFIG: ${{ vars.CLOUD_RUN_CONFIG_JSON }}
+      FRONTEND_GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+      GCP_DEPLOY_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      with:
+        persist-credentials: false
+    - name: Verify successful exact-commit build and manual acceptance
+      if: inputs.action == 'deploy'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        COMMIT_SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+        for workflow in ci.yml manual-otel-e2e.yml; do
+          run_id=$(gh api "repos/$GH_REPO/actions/workflows/$workflow/runs" --method GET -f head_sha="$COMMIT_SHA" -f status=success --jq '.workflow_runs[0].id // empty')
+          test -n "$run_id" || { echo "No successful $workflow run for this exact commit; finish it before deploying."; exit 1; }
+        done
+    - name: Java 21
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '21'
+        cache: maven
+    - name: Build and test this exact source revision
+      run: mvn -B clean verify
+    - name: Prepare checksum-verified Java agent
+      run: bash scripts/setup-otel-agent.sh
+    - name: Test deployment contracts
+      run: python3 -m unittest discover -s scripts/cloud -p 'test_*.py'
+    - name: Build cloud images and validate Collector
+      env:
+        REVISION: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+        for service in auth-service customer-service mock-bank-service gateway-service notification-service payment-service api-gateway; do
+          docker build --label "org.opencontainers.image.revision=$REVISION" --build-arg SERVICE="$service" -f deploy/cloud-run/Dockerfile.java -t "otel-$service:$REVISION" .
+        done
+        frontend_project=$(python3 -c 'import json,os; print(json.loads(os.getenv("CLOUD_CONFIG") or "{}").get("project", ""))')
+        docker build --build-arg "VITE_GOOGLE_CLOUD_PROJECT=$frontend_project" --build-arg "VITE_GRAFANA_URL=$FRONTEND_GRAFANA_URL" --label "org.opencontainers.image.revision=$REVISION" -f deploy/cloud-run/Dockerfile.frontend -t "otel-frontend:$REVISION" .
+        docker build --label "org.opencontainers.image.revision=$REVISION" -f deploy/cloud-run/Dockerfile.collector -t "otel-collector:$REVISION" .
+        docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation "otel-collector:$REVISION" validate --config=/etc/otelcol-contrib/config.yaml
+        docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation -e GRAFANA_OTLP_ENDPOINT=https://otlp-validation.grafana.net/otlp -e GRAFANA_OTLP_USERNAME=1 -e GRAFANA_OTLP_TOKEN=synthetic-validation-token "otel-collector:$REVISION" validate --config=/etc/otelcol-contrib/config.yaml --config=/etc/otelcol-contrib/grafana.yaml
+    - name: Validate concrete cloud configuration
+      if: inputs.action == 'deploy'
+      run: |
+        test -n "$CLOUD_CONFIG" || { echo 'Set the gcp-poc environment variable CLOUD_RUN_CONFIG_JSON from config.example.json.'; exit 1; }
+        printf '%s' "$CLOUD_CONFIG" > /tmp/otel-cloud-config.json
+        python3 scripts/cloud/run_release.py validate --config /tmp/otel-cloud-config.json
+    - name: Authenticate using Workload Identity Federation
+      if: inputs.action == 'deploy'
+      uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    - name: Install gcloud
+      if: inputs.action == 'deploy'
+      uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+    - name: Publish images as immutable digests
+      if: inputs.action == 'deploy'
+      env:
+        COMMIT_SHA: ${{ github.sha }}
+      run: python3 scripts/cloud/publish_images.py --config /tmp/otel-cloud-config.json --out /tmp/otel-cloud-images.json
+    - name: Deploy candidates, check readiness, promote and verify traffic
+      env:
+        COMMIT_SHA: ${{ github.sha }}
+      if: inputs.action == 'deploy'
+      run: python3 scripts/cloud/run_release.py deploy --config /tmp/otel-cloud-config.json --images /tmp/otel-cloud-images.json --revision "gh-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+    - name: Upload release evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cloud-release-${{ github.run_id }}
+        path: artifacts/cloud-release/
+        if-no-files-found: ignore
+        retention-days: 30

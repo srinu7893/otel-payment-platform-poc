@@ -1,6 +1,6 @@
 # OTel Payment Platform POC — Phase-by-Phase Delivery Plan
 
-This is the source of truth for baseline completion before OpenTelemetry.
+This records baseline and local OpenTelemetry completion, followed by separately scoped cloud deployment work.
 
 ## Status flags
 
@@ -21,7 +21,7 @@ This is the source of truth for baseline completion before OpenTelemetry.
 | DONE | React + Vite frontend | Customer + role-aware support/admin UI |
 | DONE | Spring Cloud API Gateway | Single browser-facing entry point |
 | DONE | Docker Compose | PostgreSQL, RabbitMQ, services and frontend |
-| DONE | GitHub Actions CI | Backend tests, frontend build, container build/start, smoke |
+| DONE | GitHub Actions CI | Backend tests, frontend/container builds; full-stack acceptance is opt-in |
 | DONE | E2E runbook | `docs/E2E_RUNBOOK.md` |
 
 ## Phase 1 — Core Business Services
@@ -101,8 +101,8 @@ This is the source of truth for baseline completion before OpenTelemetry.
 | DONE | Service health backend | API Gateway aggregates six service actuator health checks |
 | DONE | Service health UI acceptance | Operations health backend + focused acceptance verified; role-aware UI builds successfully |
 | PLANNED | Failure-scenario admin controls | Controlled slow/error/reset actions for live OTel demonstrations |
-| PLANNED | Correlation-ID operational search | Persist/index correlation ID or rely on log/trace backend once OTel is present |
-| PLANNED | Observability deep links | Trace/log links after Grafana/Tempo/Jaeger exists |
+| DONE | Correlation-ID operational search | Support UI links to Loki correlation/trace lookup; database correlation indexing remains separate |
+| DONE | Observability deep links | Support UI and Grafana trace/log links provisioned; live Grafana backend queries and browser dashboards verified |
 
 ## Phase 7 — API & Developer Experience
 
@@ -135,18 +135,27 @@ OpenTelemetry starts only after these are satisfied:
 - DONE — OpenAPI documented endpoint contract + Swagger UI.
 - DONE — security baseline and known limitations documented.
 
+## Phase 9 implementation update
+
+Verified by the [full manual run](https://github.com/srinu7893/otel-payment-platform-poc/actions/runs/37261777696) on `8ac5ee021a9fc9845dccad2e7444692e89e68e9f`: 63 backend tests with zero failures/errors/skips; all 15 telemetry/security/recovery assertions; payment/refund/replay/risk/P2P scenarios; support health and API contract; 12 concurrent demonstration payments with SENT notifications; real error/slow tail sampling; customer/support browser checks and all three rendered Grafana dashboards.
+
+See `POC_GUIDE.html` for precise implemented coverage, reproduction, evidence and exclusions.
+
 ## Phase 9 — OpenTelemetry
 
-| Status | Feature | Work |
+| Status | Feature | Verified work |
 | --- | --- | --- |
-| PLANNED | OTel Java Agent | Primary zero/low-code instrumentation |
-| PLANNED | OTel Collector | OTLP receivers + resource/memory/batch processors |
-| PLANNED | Distributed traces | API Gateway → Payment → Gateway → Bank and async Rabbit path |
-| PLANNED | Metrics | HTTP/JVM/DB/RabbitMQ/business metrics |
-| PLANNED | Trace/log correlation | traceId/spanId injected into structured logs |
-| PLANNED | Jaeger/Tempo | Trace backend decision for local/final demo |
-| PLANNED | Prometheus + Grafana | Local metric dashboards |
-| PLANNED | Custom business spans | Add only after auto-instrumentation is working |
+| DONE | OTel Java Agent | Seven backend JVMs; checksum-verified pinned agent |
+| DONE | OTel Collector | OTLP, resource/privacy/memory/batch processors; live signal pipelines |
+| DONE | Distributed traces | Connected HTTP/JDBC/outbox/Rabbit consumer trace across six services |
+| DONE | Metrics | Seven service HTTP series, JVM, outbox attempt counter and service graphs; Collector ingress/export queues and RabbitMQ depth/consumers/DLQ |
+| DONE | Trace/log correlation | Exact trace ID found in Loki; Grafana datasource proxy retrieves real Tempo spans |
+| DONE | Tempo | Selected trace backend with service-graph/span metrics generator |
+| DONE | Prometheus + Grafana | Three dashboards / 26 panels, rendered with real queries |
+| DONE | Custom span and durable context | outbox.publish, persisted W3C traceparent/tracestate, attempt metric |
+| DONE | Recovery acceptance | Broker outage catch-up; application availability and fresh traces after Collector recovery; persisted trace/log queues recover after backend outage and Collector SIGKILL |
+| DONE | Advanced sampling | Actual error and seven-second slow traces retained; normal traffic reduced; full-trace mode restored |
+| DONE | Current handover | Regeneratable HTML, observed results, screenshots and manual-only workflow |
 
 ## Phase 10 — GCP Deployment & Observability
 
@@ -176,7 +185,18 @@ OpenTelemetry starts only after these are satisfied:
 
 ## Current immediate execution queue
 
-1. Merge the verified baseline to `main`.
-2. Verify the consolidated CI on `main`.
-3. Create a separate OpenTelemetry branch from verified `main`.
-4. Start OTel Java Agent + Collector and advanced observability integrations there.
+1. Review the verified observability PR and its manual-run evidence.
+2. Recreate the manager demo using `POC_GUIDE.html` / `scripts/run-poc.sh`.
+3. Choose the GCP runtime and production identity, ingress, retention and alert routing before Phase 10.
+
+
+## Cloud preparation and advanced support increment
+
+Implemented: Cloud Run PORT support and agent-baked containers; private caller ID tokens alongside customer JWT; support probe authentication; per-service runtime manifests with Secret Manager references, VPC/TLS broker settings and Collector managed exports; manual WIF/digest/readiness/traffic/rollback release; separate opt-in cloud business/signal acceptance; linked BigQuery SQL/runbook; fourth technical SLO dashboard, burn rules and deterministic tests; Collector body redaction and synthetic stored-log acceptance.
+
+Status is evidence-specific: local builds and manual integration checks are recorded in the current guide. Live cloud execution requires this repo's GCP environment settings, existing service slots, durable DB/broker, identities and secrets. Infrastructure bootstrap, actual BigQuery link/schema validation, cloud/Grafana datasource mapping, paging, rolling worker safety, load/HA/DR and complete privacy/RUM/profiling remain pending. See [CLOUD_RUN_PLAN.md](CLOUD_RUN_PLAN.md).
+
+
+## Durable state and incident demo increment
+
+Added cached SQL-backed payment/outbox/notification gauges with freshness/health, six business panels, local Alertmanager routing to a persistent acknowledgement/resolution inbox, an on-demand synthetic login/payment/replay/delivery journey, and opt-in real broker-delay alert lifecycle acceptance. See SUPPORT_ENHANCEMENTS.md. Runtime verification is recorded in the current manual-run evidence; production paging, cloud deployment and final business SLOs remain separate gates.

@@ -1,0 +1,40 @@
+rule_files:
+- alerts.yaml
+evaluation_interval: 1m
+tests:
+- name: two-percent-5xx-burns-budget
+  interval: 1m
+  input_series:
+  - series: http_server_request_duration_seconds_count{service_name="api-gateway",http_route="payment-service",http_response_status_code="200"}
+    values: 0+98x70
+  - series: http_server_request_duration_seconds_count{service_name="api-gateway",http_route="payment-service",http_response_status_code="500"}
+    values: 0+2x70
+  alert_rule_test:
+  - eval_time: 65m
+    alertname: PaymentApiFastErrorBudgetBurn
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        owner: poc-support
+      exp_annotations:
+        summary: Payment API burns the 99.9% technical availability budget quickly
+        description: Both 1h and 5m windows exceed 14.4x budget burn. Inspect ingress
+          metrics, correlated logs and dependency traces. HTTP success does not guarantee
+          payment completion.
+        runbook_url: https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/SUPPORT_ENHANCEMENTS.md
+- name: healthy-and-no-traffic-do-not-page
+  interval: 1m
+  input_series:
+  - series: http_server_request_duration_seconds_count{service_name="api-gateway",http_route="payment-service",http_response_status_code="200"}
+    values: 0+100x70
+  alert_rule_test:
+  - eval_time: 65m
+    alertname: PaymentApiFastErrorBudgetBurn
+    exp_alerts: []
+- name: no-traffic-is-not-an-incident-or-proven-success
+  interval: 1m
+  input_series: []
+  alert_rule_test:
+  - eval_time: 65m
+    alertname: PaymentApiFastErrorBudgetBurn
+    exp_alerts: []

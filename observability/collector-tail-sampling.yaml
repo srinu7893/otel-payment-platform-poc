@@ -1,0 +1,20 @@
+# Optional demo overlay; not used by deterministic E2E acceptance.
+processors:
+  tail_sampling:
+    decision_wait: 30s
+    num_traces: 10000
+    expected_new_traces_per_sec: 100
+    policies:
+      - name: errors
+        type: status_code
+        status_code: {status_codes: [ERROR]}
+      - name: slow
+        type: latency
+        latency: {threshold_ms: 2000}
+      - name: baseline
+        type: probabilistic
+        probabilistic: {sampling_percentage: 10}
+service:
+  pipelines:
+    traces:
+      processors: [memory_limiter, resource, attributes/privacy, tail_sampling, batch]

@@ -1,0 +1,161 @@
+name: manual-otel-e2e
+'on':
+  workflow_dispatch:
+    inputs:
+      resilience:
+        description: Also stop/restart the demo broker and collector
+        type: boolean
+        default: true
+  pull_request:
+    types:
+    - labeled
+permissions:
+  contents: read
+concurrency:
+  group: manual-otel-e2e-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      COMPOSE_PROJECT_NAME: otel-e2e
+      RESILIENCE: ${{ github.event_name == 'pull_request' || inputs.resilience }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+    - name: Java 21
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '21'
+        cache: maven
+    - name: Backend tests including PostgreSQL/RabbitMQ integration
+      run: mvn -B clean verify
+      id: backend
+    - name: Prepare verified Java agent
+      run: bash scripts/setup-otel-agent.sh
+    - name: Prepare Collector queue storage
+      run: bash scripts/otel-compose.sh run --rm --no-deps otel-storage-init
+    - name: Validate Collector configuration
+      run: 'bash scripts/otel-compose.sh run --rm --no-deps otel-collector validate --config=/etc/otelcol/config.yaml
+
+        docker compose -f docker-compose.yml -f docker-compose.otel.yml -f docker-compose.sampling.yml run --rm --no-deps
+        otel-collector validate --config=/etc/otelcol/config.yaml --config=/etc/otelcol/tail.yaml'
+      id: collector_config
+    - name: Validate Prometheus configuration and rules
+      run: bash scripts/otel-compose.sh run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
+      id: prometheus_config
+    - name: Test SLO rules
+      id: slo_rules
+      run: docker run --rm --entrypoint promtool -v "$PWD/observability:/work:ro" -w /work prom/prometheus:v3.6.0 test rules
+        slo-rule-tests.yaml
+    - name: Validate cloud release assets without credentials
+      id: cloud_assets
+      run: "python3 -m unittest discover -s scripts/cloud -p 'test_*.py'\ndocker build -f deploy/cloud-run/Dockerfile.collector\
+        \ -t otel-cloud-collector .\ndocker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation otel-cloud-collector validate\
+        \ --config=/etc/otelcol-contrib/config.yaml\ndocker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation -e GRAFANA_OTLP_ENDPOINT=https://otlp-validation.grafana.net/otlp\
+        \ -e GRAFANA_OTLP_USERNAME=1 -e GRAFANA_OTLP_TOKEN=synthetic-validation-token otel-cloud-collector validate --config=/etc/otelcol-contrib/config.yaml\
+        \ --config=/etc/otelcol-contrib/grafana.yaml\nfor service in auth-service customer-service mock-bank-service gateway-service\
+        \ notification-service payment-service api-gateway; do\n  docker build --build-arg SERVICE=\"$service\" -f deploy/cloud-run/Dockerfile.java\
+        \ -t \"otel-cloud-$service\" .\ndone\ndocker build --build-arg VITE_GOOGLE_CLOUD_PROJECT=syntax-validation -f deploy/cloud-run/Dockerfile.frontend\
+        \ -t otel-cloud-frontend .\ndocker run --rm --entrypoint sh -e PORT=8080 -e API_GATEWAY_URL=https://example.com -e\
+        \ API_GATEWAY_HOST=example.com otel-cloud-frontend -c '/docker-entrypoint.d/20-envsubst-on-templates.sh && nginx -t'\n"
+    - name: Validate incident routing and receiver
+      id: incident_config
+      run: 'python3 -m unittest discover -s observability/incident-inbox -p "test_*.py"
+
+        bash scripts/otel-compose.sh run --rm --no-deps --entrypoint amtool alertmanager check-config /etc/alertmanager/config.yaml'
+    - name: Start instrumented demo
+      run: 'bash scripts/otel-compose.sh config --quiet
+
+        bash scripts/otel-compose.sh up --build -d'
+      id: stack
+    - name: Wait for all services
+      run: bash scripts/e2e/wait-ready.sh
+      id: health
+    - name: Payment, refund, replay, risk, notification and P2P
+      run: bash scripts/e2e/business-smoke.sh
+      id: business
+    - name: Assert real traces, metrics, logs and access controls
+      run: python3 scripts/e2e/otel_acceptance.py
+      id: telemetry
+    - name: Bank timeout, bank error, support health and API docs
+      run: bash scripts/pre_otel_acceptance.sh
+      id: failures
+    - name: Verify synthetic log body redaction
+      id: privacy
+      run: python3 scripts/e2e/privacy_acceptance.py
+    - name: Synthetic login payment replay and delivery journey
+      id: synthetic
+      run: python3 scripts/e2e/synthetic-journey.py
+    - name: Durable state alert delivery acknowledgement and recovery
+      id: support
+      run: python3 scripts/e2e/support-acceptance.py
+    - name: Generate measured demo traffic
+      if: success()
+      id: traffic
+      run: python3 scripts/e2e/live-traffic.py
+    - name: Verify advanced error and latency tail sampling
+      id: sampling
+      run: python3 scripts/e2e/advanced-sampling.py
+    - name: Install browser capture dependencies
+      if: always() && steps.health.outcome == 'success'
+      id: browser_setup
+      run: 'npm install --prefix /tmp/poc-browser --no-audit --no-fund playwright@1.56.1
+
+        /tmp/poc-browser/node_modules/.bin/playwright install --with-deps chromium'
+    - name: Exercise UI and capture live dashboards
+      if: always() && steps.browser_setup.outcome == 'success'
+      id: browser
+      env:
+        NODE_PATH: /tmp/poc-browser/node_modules
+      run: node scripts/e2e/capture-browser.cjs
+    - name: Capture backend evidence
+      if: always()
+      run: python3 scripts/e2e/capture-evidence.py
+    - name: Generate current HTML handover
+      if: always()
+      run: 'python3 scripts/render-poc-guide.py
+
+        python3 scripts/render-simple-guide.py'
+      env:
+        POC_PIPELINE_OUTCOMES: '{"Incident routing configuration": "${{ steps.incident_config.outcome }}", "Synthetic journey":
+          "${{ steps.synthetic.outcome }}", "Durable metrics and alert delivery": "${{ steps.support.outcome }}", "Log body
+          privacy probe": "${{ steps.privacy.outcome }}", "SLO rule scenarios": "${{ steps.slo_rules.outcome }}", "Cloud asset
+          validation": "${{ steps.cloud_assets.outcome }}", "Backend tests including PostgreSQL/RabbitMQ integration": "${{
+          steps.backend.outcome }}", "Validate Collector configuration": "${{ steps.collector_config.outcome }}", "Validate
+          Prometheus configuration and rules": "${{ steps.prometheus_config.outcome }}", "Start instrumented demo": "${{ steps.stack.outcome
+          }}", "Wait for all services": "${{ steps.health.outcome }}", "Payment, refund, replay, risk, notification and P2P":
+          "${{ steps.business.outcome }}", "Assert real traces, metrics, logs and access controls": "${{ steps.telemetry.outcome
+          }}", "Bank timeout, bank error, support health and API docs": "${{ steps.failures.outcome }}", "Measured demo traffic":
+          "${{ steps.traffic.outcome }}", "Browser UI and screenshots": "${{ steps.browser.outcome }}", "Advanced tail-sampling
+          experiment": "${{ steps.sampling.outcome }}"}'
+    - name: Capture diagnostic logs
+      if: always()
+      run: 'mkdir -p artifacts
+
+        bash scripts/otel-compose.sh ps > artifacts/compose-status.txt
+
+        bash scripts/otel-compose.sh logs --no-color > artifacts/compose.log'
+    - name: Upload evidence and HTML
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: otel-poc-evidence-${{ github.run_number }}
+        path: 'artifacts/
+
+          docs/POC_GUIDE.html
+
+
+          docs/POC_SIMPLE_GUIDE.html
+
+          **/target/surefire-reports/'
+        retention-days: 7
+    - name: Remove disposable stack
+      if: always()
+      run: bash scripts/otel-compose.sh down -v --remove-orphans
+    if: github.event_name == 'workflow_dispatch' || (github.event.label.name == 'run-otel-e2e' && github.event.pull_request.head.repo.full_name
+      == github.repository)

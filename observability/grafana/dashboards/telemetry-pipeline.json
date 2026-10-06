@@ -1,0 +1,277 @@
+{
+  "uid": "telemetry-pipeline",
+  "title": "Telemetry pipeline health",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Prometheus scrape targets",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Tempo received spans / second",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(tempo_distributor_spans_received_total[$__rate_interval]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Outbox retry attempts",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(poc_outbox_publish_attempts_total{outcome=\"failure\"}[$__range]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Alert state",
+      "type": "table",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ALERTS",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Service graph edges",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (client,server) (rate(traces_service_graph_request_total[$__rate_interval]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Outbox failure logs",
+      "type": "logs",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service_name=\"payment-service\"} |= \"OUTBOX_PUBLISH_FAILED\"",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Collector accepted spans / second",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(otelcol_receiver_accepted_spans[$__rate_interval]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Collector queued export batches",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (exporter) (otelcol_exporter_queue_size)",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Collector failed exports / second",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(otelcol_exporter_send_failed_spans[$__rate_interval])) + sum(rate(otelcol_exporter_send_failed_log_records[$__rate_interval]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "RabbitMQ ready and unacknowledged messages",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_queue_messages_ready{queue=~\"payments.notification.*\"} or rabbitmq_queue_messages_unacked{queue=~\"payments.notification.*\"}",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "RabbitMQ notification consumers",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_queue_consumers{queue=\"payments.notification\"}",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Notification dead letters",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_queue_messages_ready{queue=\"payments.notification.dlq\"}",
+          "queryType": "range"
+        }
+      ]
+    }
+  ]
+}

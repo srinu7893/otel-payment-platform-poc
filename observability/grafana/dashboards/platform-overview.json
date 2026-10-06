@@ -1,0 +1,390 @@
+{
+  "uid": "platform-overview",
+  "title": "Platform \u2014 consolidated service comparison",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "tags": [
+    "otel",
+    "payment-poc",
+    "overview"
+  ],
+  "links": [
+    {
+      "title": "All dashboards",
+      "type": "dashboards",
+      "tags": [
+        "payment-poc"
+      ],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true
+    },
+    {
+      "title": "Support runbook",
+      "type": "link",
+      "url": "https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/DASHBOARDS_AND_DEPLOYMENT.md",
+      "targetBlank": true
+    }
+  ],
+  "panels": [
+    {
+      "title": "Request rate by service",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service_name) (rate(http_server_request_duration_seconds_count[$__rate_interval]))",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "p95 latency by service",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by (le,service_name) (rate(http_server_request_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "5xx ratio by service",
+      "type": "timeseries",
+      "description": "HTTP success is distinct from completed business work. No traffic yields undefined ratios.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum by (service_name) (rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[$__rate_interval])) or (0 * sum by (service_name) (rate(http_server_request_duration_seconds_count[$__rate_interval])))) / sum by (service_name) (rate(http_server_request_duration_seconds_count[$__rate_interval]))",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "id": 3,
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "JVM memory by service",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service_name) (jvm_memory_used_bytes{jvm_memory_type=~\".+\"})",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "JVM CPU by service",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (service_name) (jvm_cpu_recent_utilization_ratio)",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "DB connection waiters by service",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service_name) (db_client_connections_pending_requests)",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Collector scrape status",
+      "type": "timeseries",
+      "description": "This checks the shared exporter, not every application health endpoint.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"otel-applications\"}",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Exporter queue utilization",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "otelcol_exporter_queue_size / clamp_min(otelcol_exporter_queue_capacity,1)",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "id": 8,
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Waiting outbox work",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(poc_outbox_pending)",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 9,
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Notification queue depth",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rabbitmq_queue_messages_ready{queue=\"payments.notification\"}",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Business snapshot age by service",
+      "type": "timeseries",
+      "description": "Only initialized timestamps are shown. Inspect refresh health when a service has no successful snapshot.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (service_name) (time()-(poc_business_snapshot_last_success_timestamp_seconds > 0))",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "id": 11,
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Active warnings by name",
+      "type": "timeseries",
+      "description": "Empty means no firing series. Also check scrape/telemetry freshness.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (alertname) (ALERTS{alertstate=\"firing\"})",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 12,
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      }
+    }
+  ]
+}
