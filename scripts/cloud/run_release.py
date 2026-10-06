@@ -58,7 +58,7 @@ def render(config, service, image, collector, revision):
         expected = f"{config['region']}-docker.pkg.dev/{config['project']}/{config['repository']}/"
         if not digest.startswith(expected) or not re.fullmatch(r'.+@sha256:[a-f0-9]{64}', digest):
             raise ValueError('Images require immutable digests in the configured registry')
-    env = {'MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE': 'health,info', 'PORT': '8080'}
+    env = {'MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE': 'health,info'}
     secrets = []
     if service in DATABASE:
         for name, key in [('SPRING_DATASOURCE_URL', 'url'), ('SPRING_DATASOURCE_USERNAME', 'username'), ('SPRING_DATASOURCE_PASSWORD', 'password')]:
@@ -79,7 +79,7 @@ def render(config, service, image, collector, revision):
         for key, target in [('AUTH', 'auth-service'), ('CUSTOMER', 'customer-service'), ('PAYMENT', 'payment-service'), ('NOTIFICATION', 'notification-service'), ('GATEWAY', 'gateway-service'), ('BANK', 'mock-bank-service')]:
             env[f'SERVICES_{key}_URL'] = config['urls'][target]
     if service == 'frontend':
-        env = {'PORT': '8080', 'API_GATEWAY_URL': config['urls']['api-gateway'], 'API_GATEWAY_HOST': urlparse(config['urls']['api-gateway']).hostname}
+        env = {'API_GATEWAY_URL': config['urls']['api-gateway'], 'API_GATEWAY_HOST': urlparse(config['urls']['api-gateway']).hostname}
     else:
         env.update({'OTEL_SERVICE_NAME': service, 'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://127.0.0.1:4318',
             'OTEL_EXPORTER_OTLP_PROTOCOL': 'http/protobuf', 'OTEL_TRACES_EXPORTER': 'otlp', 'OTEL_LOGS_EXPORTER': 'otlp',
