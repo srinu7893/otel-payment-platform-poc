@@ -1,0 +1,125 @@
+name: manual-cloud-images
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        description: Publish images only or deploy a previous successful publish
+        options: [publish, deploy]
+        default: publish
+      publish_run_id:
+        type: string
+        description: Successful publish run ID (required for deploy; same source commit)
+        required: false
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+concurrency:
+  group: otel-gcp-poc
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: gcp-poc
+    timeout-minutes: 60
+    env:
+      CLOUD_CONFIG: ${{ vars.CLOUD_RUN_CONFIG_JSON }}
+      FRONTEND_GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+      COMMIT_SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PUBLISH_RUN_ID: ${{ inputs.publish_run_id }}
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        persist-credentials: false
+    - name: Configuration and exact-source gates
+      run: |
+        set -euo pipefail
+        test -n "$CLOUD_CONFIG"
+        printf '%s' "$CLOUD_CONFIG" > /tmp/otel-cloud-config.json
+        python3 scripts/cloud/run_release.py validate --config /tmp/otel-cloud-config.json
+        for workflow in ci.yml manual-otel-e2e.yml; do
+          run_id=$(gh api "repos/$GH_REPO/actions/workflows/$workflow/runs" --method GET -f head_sha="$COMMIT_SHA" -f status=success --jq '.workflow_runs[0].id // empty')
+          test -n "$run_id" || { echo "Successful $workflow required for this exact commit."; exit 1; }
+        done
+    - name: YAML dependency
+      run: python3 -m pip install PyYAML==6.0.2
+    - name: Java 21
+      if: inputs.action == 'publish'
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '21'
+        cache: maven
+    - name: Build and test this exact source revision
+      if: inputs.action == 'publish'
+      run: mvn -B clean verify
+    - name: Prepare checksum-verified Java agent
+      if: inputs.action == 'publish'
+      run: bash scripts/setup-otel-agent.sh
+    - name: Test deployment contracts
+      if: inputs.action == 'publish'
+      run: python3 -m unittest discover -s scripts/cloud -p 'test_*.py'
+    - name: Build cloud images and validate Collector
+      if: inputs.action == 'publish'
+      env:
+        REVISION: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+        for service in auth-service customer-service mock-bank-service gateway-service notification-service payment-service api-gateway; do
+          docker build --label "org.opencontainers.image.revision=$REVISION" --build-arg SERVICE="$service" -f deploy/cloud-run/Dockerfile.java -t "otel-$service:$REVISION" .
+        done
+        frontend_project=$(python3 -c 'import json,os; print(json.loads(os.getenv("CLOUD_CONFIG") or "{}").get("project", ""))')
+        docker build --build-arg "VITE_GOOGLE_CLOUD_PROJECT=$frontend_project" --build-arg "VITE_GRAFANA_URL=$FRONTEND_GRAFANA_URL" --label "org.opencontainers.image.revision=$REVISION" -f deploy/cloud-run/Dockerfile.frontend -t "otel-frontend:$REVISION" .
+        docker build --label "org.opencontainers.image.revision=$REVISION" -f deploy/cloud-run/Dockerfile.collector -t "otel-collector:$REVISION" .
+        docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation "otel-collector:$REVISION" validate --config=/etc/otelcol-contrib/config.yaml
+        docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation -e GRAFANA_OTLP_ENDPOINT=https://otlp-validation.grafana.net/otlp -e GRAFANA_OTLP_USERNAME=1 -e GRAFANA_OTLP_TOKEN=synthetic-validation-token "otel-collector:$REVISION" validate --config=/etc/otelcol-contrib/config.yaml --config=/etc/otelcol-contrib/grafana.yaml
+
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db
+    - name: Publish without changing Cloud Run
+      if: inputs.action == 'publish'
+      run: |
+        python3 scripts/cloud/publish_images.py --config /tmp/otel-cloud-config.json --out artifacts/cloud-release/images.json
+        printf '%s\n' "$COMMIT_SHA" > artifacts/cloud-release/commit.txt
+        cp /tmp/otel-cloud-config.json artifacts/cloud-release/config.json
+        python3 scripts/cloud/render_yaml.py --config /tmp/otel-cloud-config.json --images artifacts/cloud-release/images.json --revision "gh-$GITHUB_RUN_ID"
+    - name: Retrieve exact published digests without rebuilding
+      if: inputs.action == 'deploy'
+      run: |
+        set -euo pipefail
+        [[ "$PUBLISH_RUN_ID" =~ ^[0-9]+$ ]]
+        gh api "repos/$GH_REPO/actions/runs/$PUBLISH_RUN_ID" > /tmp/publish-run.json
+        python3 -c 'import json,os; r=json.load(open("/tmp/publish-run.json")); assert r["conclusion"]=="success" and r["head_sha"]==os.environ["COMMIT_SHA"] and r["head_branch"]=="main" and r["event"]=="workflow_dispatch" and r["path"]==".github/workflows/manual-cloud-images.yml", "Publish must be a successful main run of this workflow at this exact commit"'
+        gh run download "$PUBLISH_RUN_ID" --repo "$GH_REPO" --name "published-images-$PUBLISH_RUN_ID" --dir published
+        test "$(cat published/commit.txt)" = "$COMMIT_SHA"
+        cmp /tmp/otel-cloud-config.json published/config.json
+        mkdir -p artifacts/cloud-release
+        cp published/images.json artifacts/cloud-release/images.json
+        python3 scripts/cloud/render_yaml.py --config /tmp/otel-cloud-config.json --images published/images.json --revision "gh-$GITHUB_RUN_ID"
+    - name: Guarded release of already-published images
+      if: inputs.action == 'deploy'
+      run: python3 scripts/cloud/run_release.py deploy --config /tmp/otel-cloud-config.json --images published/images.json --revision "gh-$GITHUB_RUN_ID"
+    - name: Preserve published digests and manifests
+      if: success() && inputs.action == 'publish'
+      uses: actions/upload-artifact@v4
+      with:
+        name: published-images-${{ github.run_id }}
+        path: artifacts/cloud-release/
+        if-no-files-found: error
+        retention-days: 30
+    - name: Preserve release evidence
+      if: always() && inputs.action == 'deploy'
+      uses: actions/upload-artifact@v4
+      with:
+        name: cloud-release-${{ github.run_id }}
+        path: artifacts/cloud-release/
+        if-no-files-found: ignore
+        retention-days: 30
