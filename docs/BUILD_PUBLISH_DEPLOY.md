@@ -13,7 +13,9 @@ No Cloud Run service or traffic mutation occurs in publish mode.
 A successful run uploads published-images-RUN_ID with:
 - images.json: nine immutable registry digest references
 - commit.txt: exact source commit
-- config.json: non-secret deployment configuration, used to reject config drift
+- build-settings.json: registry coordinates and frontend Grafana URL, checked before deployment
+
+The following manifests are generated during deploy, once real deployment configuration exists:
 - manifests/cloudrun-frontend.yaml
 - manifests/cloudrun-api-gateway.yaml
 - manifests/cloudrun-auth-service.yaml
@@ -32,7 +34,7 @@ The Collector is a sidecar image, not a ninth independent Cloud Run service.
 
 Run the SAME workflow at the SAME main commit with action=deploy and publish_run_id=successful publish run ID.
 Build and Docker steps are skipped. The run identity, workflow path, main branch, event, success,
-source commit, config equality and artifact source are checked.
+source commit, build-settings equality and artifact source are checked. Deployment configuration is validated at deploy time.
 The run uses published immutable digests; no image rebuild or repush is performed.
 Fresh YAML artifacts are rendered. The existing guarded release uses equivalent JSON service manifests
 to preserve current traffic, stage candidate revisions, verify readiness, promote exact revisions
@@ -47,11 +49,13 @@ Pushing a new image alone does not update running revisions.
 Create Artifact Registry, WIF trust for this repo, deployment/runtime accounts, Secret Manager values,
 network/subnet, durable PostgreSQL and RabbitMQ/TLS, initial eight Cloud Run services, canonical URLs,
 and private/public caller IAM as described in CLOUD_RUN_PLAN.md.
-The current publish helper/config still requires the complete CLOUD_RUN_CONFIG_JSON;
-this workflow does not bootstrap infrastructure or eliminate the canonical URL requirement.
+Publishing needs only registry coordinates; CLOUD_RUN_CONFIG_JSON is required only for deploy.
+This workflow does not bootstrap infrastructure or eliminate the deployment canonical URL requirement.
 
 GitHub environment gcp-poc:
-- secrets WIF_PROVIDER, GCP_SERVICE_ACCOUNT
+- secrets WIF_PROVIDER, GCP_SERVICE_ACCOUNT (registry publisher)
+- secret GCP_DEPLOY_SERVICE_ACCOUNT (separate deployment identity, required only for deploy)
+- optional variables GCP_PROJECT_ID, GCP_REGION, ARTIFACT_REGISTRY_REPOSITORY; defaults are project-c9bd3d0e-266f-47bf-852, us-central1, otel-payment-platform
 - variable CLOUD_RUN_CONFIG_JSON from deploy/cloud-run/config.example.json with real values
 - optional variable GRAFANA_URL
 
@@ -75,5 +79,5 @@ A publish-only run cleanly separates image preparation from deployment failure.
 ## Validation boundary
 
 Source reviewed against existing build/publish/render/release contracts.
-Execution environment unavailable; new workflow/YAML generation not yet executed.
+Local validation: seven release unit tests pass; workflow YAML parses; mocked publication verifies minimal configuration, nine pushes, immutable digests and output directory creation. These checks are not evidence of a live registry push.
 Run publish only after review, exact-commit CI/manual E2E and GCP setup; do not infer live cloud success.
