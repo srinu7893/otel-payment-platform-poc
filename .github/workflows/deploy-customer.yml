@@ -39,6 +39,7 @@ jobs:
         distribution: temurin
         java-version: '21'
         cache: maven
+    # Only Customer URL/account and database secrets are required; see config.example.json.
     - name: Validate required deployment configuration
       run: |
         set -euo pipefail

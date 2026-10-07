@@ -69,17 +69,20 @@ def render(config, service, image, collector, revision):
         env.update({'SPRING_RABBITMQ_HOST': config['rabbitHost'], 'SPRING_RABBITMQ_PORT': '5671', 'SPRING_RABBITMQ_SSL_ENABLED': 'true'})
         for name, key in [('SPRING_RABBITMQ_USERNAME', 'username'), ('SPRING_RABBITMQ_PASSWORD', 'password')]:
             secrets.append(secret(config, name, config['rabbitSecrets'][key]))
-    targets = CALLS.get(service, [])
+    targets = [target for target in CALLS.get(service, []) if target in config['urls']]
     if targets:
         env.update({'CLOUD_RUN_IAM_ENABLED': 'true', 'CLOUD_RUN_AUDIENCES': ','.join(config['urls'][target] for target in targets)})
     if service == 'payment-service':
-        env.update({'CLIENTS_GATEWAY_BASE_URL': config['urls']['gateway-service'], 'CLIENTS_CUSTOMER_BASE_URL': config['urls']['customer-service']})
-    if service == 'gateway-service': env['CLIENTS_BANK_BASE_URL'] = config['urls']['mock-bank-service']
+        for key, target in [('CLIENTS_GATEWAY_BASE_URL', 'gateway-service'), ('CLIENTS_CUSTOMER_BASE_URL', 'customer-service')]:
+            if target in config['urls']: env[key] = config['urls'][target]
+    if service == 'gateway-service' and 'mock-bank-service' in config['urls']: env['CLIENTS_BANK_BASE_URL'] = config['urls']['mock-bank-service']
     if service == 'api-gateway':
         for key, target in [('AUTH', 'auth-service'), ('CUSTOMER', 'customer-service'), ('PAYMENT', 'payment-service'), ('NOTIFICATION', 'notification-service'), ('GATEWAY', 'gateway-service'), ('BANK', 'mock-bank-service')]:
-            env[f'SERVICES_{key}_URL'] = config['urls'][target]
+            if target in config['urls']: env[f'SERVICES_{key}_URL'] = config['urls'][target]
     if service == 'frontend':
-        env = {'API_GATEWAY_URL': config['urls']['api-gateway'], 'API_GATEWAY_HOST': urlparse(config['urls']['api-gateway']).hostname}
+        env = {}
+        if 'api-gateway' in config['urls']:
+            env = {'API_GATEWAY_URL': config['urls']['api-gateway'], 'API_GATEWAY_HOST': urlparse(config['urls']['api-gateway']).hostname}
     else:
         env.update({'OTEL_SERVICE_NAME': service, 'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://127.0.0.1:4318',
             'OTEL_EXPORTER_OTLP_PROTOCOL': 'http/protobuf', 'OTEL_TRACES_EXPORTER': 'otlp', 'OTEL_LOGS_EXPORTER': 'otlp',
@@ -95,9 +98,10 @@ def render(config, service, image, collector, revision):
                    'startupProbe': {'httpGet': {'path': probe, 'port': 8080}, 'periodSeconds': 5, 'timeoutSeconds': 3, 'failureThreshold': 36},
                    'livenessProbe': {'httpGet': {'path': probe, 'port': 8080}, 'periodSeconds': 30, 'timeoutSeconds': 3}}]
     annotations = {'autoscaling.knative.dev/maxScale': '1', 'run.googleapis.com/cpu-throttling': 'false',
-                   'run.googleapis.com/startup-cpu-boost': 'true', 'run.googleapis.com/execution-environment': 'gen2',
-                   'run.googleapis.com/network-interfaces': json.dumps([{'network': config['network'], 'subnetwork': config['subnetwork']}]),
-                   'run.googleapis.com/vpc-access-egress': 'private-ranges-only'}
+                   'run.googleapis.com/startup-cpu-boost': 'true', 'run.googleapis.com/execution-environment': 'gen2'}
+    if config.get('network') and config.get('subnetwork'):
+        annotations.update({'run.googleapis.com/network-interfaces': json.dumps([{'network': config['network'], 'subnetwork': config['subnetwork']}]),
+                            'run.googleapis.com/vpc-access-egress': 'private-ranges-only'})
     # minScale matters for the existing scheduler/consumer implementation. Revisions can overlap during a rollout.
     if service in {'payment-service', 'notification-service'}: annotations['autoscaling.knative.dev/minScale'] = '1'
     if service != 'frontend':
@@ -112,9 +116,10 @@ def render(config, service, image, collector, revision):
             {'name': 'GRAFANA_OTLP_ENDPOINT', 'value': config['grafana']['endpoint']},
             {'name': 'GRAFANA_OTLP_USERNAME', 'value': config['grafana']['username']},
             secret(config, 'GRAFANA_OTLP_TOKEN', config['grafana']['tokenSecret'])])
-    return {'apiVersion': 'serving.knative.dev/v1', 'kind': 'Service', 'metadata': {'name': config['prefix'] + '-' + service,
+    prefix = config.get('prefix', 'otel-poc')
+    return {'apiVersion': 'serving.knative.dev/v1', 'kind': 'Service', 'metadata': {'name': prefix + '-' + service,
               'annotations': {'run.googleapis.com/ingress': 'all'}},
-            'spec': {'template': {'metadata': {'name': config['prefix'] + '-' + service + '-' + revision,
+            'spec': {'template': {'metadata': {'name': prefix + '-' + service + '-' + revision,
                                 'annotations': annotations}, 'spec': {'serviceAccountName': config['serviceAccounts'][service],
                                 'containerConcurrency': 20, 'timeoutSeconds': 60, 'containers': containers}}}}
 

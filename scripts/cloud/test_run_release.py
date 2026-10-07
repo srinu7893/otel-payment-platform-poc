@@ -5,7 +5,7 @@ from run_release import validate,render,allocation,SERVICES
 ROOT=Path(__file__).resolve().parents[2]
 class ReleaseContractTest(unittest.TestCase):
     def setUp(self):
-        self.config=json.loads((ROOT/'deploy/cloud-run/config.example.json').read_text())
+        self.config=json.loads((ROOT/'deploy/cloud-run/config.full-stack.example.json').read_text())
         self.image='us-central1-docker.pkg.dev/replace-project-id/otel-payment-poc/payment@sha256:'+'a'*64
     def test_examples_are_blocked_from_deployment(self):
         with self.assertRaises(ValueError):validate(self.config)
@@ -42,7 +42,7 @@ class ReleaseRollbackTest(unittest.TestCase):
     def test_later_candidate_failure_restores_prior_promoted_service_split(self):
         import tempfile,os
         from run_release import release,CALLS
-        config=json.loads((ROOT/'deploy/cloud-run/config.example.json').read_text())
+        config=json.loads((ROOT/'deploy/cloud-run/config.full-stack.example.json').read_text())
         image='us-central1-docker.pkg.dev/replace-project-id/otel-payment-poc/payment@sha256:'+'a'*64
         states={service:{'status':{'url':config['urls'][service],'traffic':[{'revisionName':'old-a','percent':70},{'revisionName':'old-b','percent':30}]}} for service in SERVICES}
         calls=[]

@@ -56,7 +56,7 @@ GitHub environment gcp-poc:
 - secrets WIF_PROVIDER, GCP_SERVICE_ACCOUNT (registry publisher)
 - secret GCP_DEPLOY_SERVICE_ACCOUNT (separate deployment identity, required only for deploy)
 - optional variables GCP_PROJECT_ID, GCP_REGION, ARTIFACT_REGISTRY_REPOSITORY; defaults are project-c9bd3d0e-266f-47bf-852, us-central1, otel-payment-platform
-- variable CLOUD_RUN_CONFIG_JSON from deploy/cloud-run/config.example.json with real values
+- variable CLOUD_RUN_CONFIG_JSON from deploy/cloud-run/config.full-stack.example.json with real values
 - optional variable GRAFANA_URL
 
 ## Manual YAML use

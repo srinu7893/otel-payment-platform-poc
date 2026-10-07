@@ -17,7 +17,7 @@ Environment variables:
 
 | Variable | Value |
 |---|---|
-| `CLOUD_RUN_CONFIG_JSON` | Complete JSON based on `deploy/cloud-run/service-config.example.json`, with real network/subnet, all canonical service URLs, distinct runtime accounts and pinned numeric Secret Manager versions |
+| `CLOUD_RUN_CONFIG_JSON` | Partial JSON based on `deploy/cloud-run/config.example.json`; only the selected service URL/account and its required secrets are mandatory |
 | `COLLECTOR_IMAGE` | Existing Collector image digest in the same registry, e.g. `us-central1-docker.pkg.dev/project-c9bd3d0e-266f-47bf-852/otel-payment-platform/collector@sha256:...` |
 | `GRAFANA_URL` | Optional Grafana UI URL for frontend links |
 
@@ -25,11 +25,54 @@ Backend workflows reuse the configured Collector digest; they never build anothe
 
 Enable Artifact Registry, Cloud Run, IAM credentials, Secret Manager and telemetry APIs, and provision the repository in `us-central1`. The deployment identity needs Artifact Registry writer, Cloud Run deployment permissions, `iam.serviceAccounts.actAs` on the runtime accounts, and token creation for the selected runtime health-check identities. Bind the WIF subject with `roles/iam.workloadIdentityUser`. Runtime accounts need access to their required secrets and telemetry writer roles.
 
-Provision PostgreSQL and TLS RabbitMQ reachable through the configured VPC/subnet. JDBC URL/user/password and JWT signing key are supplied through Secret Manager, never workflow text. All JWT-using services must use the same signing-key secret/version. The five database consumers are Auth, Customer, Bank, Payment and Notification. API Gateway and Gateway adapter have no datasource dependency. Payment and Notification need broker secrets; Payment's background relay and Notification's consumers use instance-based CPU and a minimum instance of one.
+Provision the database for each database consumer. Neon can be reached over public TLS without a VPC. Configure TLS RabbitMQ only for Payment and Notification; provide network/subnetwork together only when private networking is needed. JDBC URL/user/password and JWT signing key are supplied through Secret Manager, never workflow text. All JWT-using services must use the same signing-key secret/version. The five database consumers are Auth, Customer, Bank, Payment and Notification. API Gateway and Gateway adapter have no datasource dependency. Payment and Notification need broker secrets; Payment's background relay and Notification's consumers use instance-based CPU and a minimum instance of one.
 
-The deployer intentionally does not guess IAM or create infrastructure. Bootstrap all eight service slots once using vetted placeholder images and the dedicated names below to obtain stable canonical URLs. Set caller IAM and runtime self-invoker permissions. Internal services must reject anonymous requests; only frontend and API Gateway are public edges. This bootstrap step does not deploy the application. The first successful application revision must pass startup/readiness before receiving traffic. The frontend proxy expects an API Gateway accessible to the configured public edge.
+The deployer intentionally does not guess IAM or create infrastructure. Bootstrap only the selected service slot to obtain its stable canonical URL. Add other slots, URLs and accounts as they become available. A shared runtime service account is supported, including the existing Auth and Customer runtime identity. Set runtime self-invoker permissions and caller IAM as each caller is introduced. Internal services must reject anonymous requests; only frontend and API Gateway are public edges. This bootstrap step does not deploy the application. The first successful application revision must pass startup/readiness before receiving traffic. The frontend proxy expects an API Gateway accessible to the configured public edge.
 
-IAM caller graph: Payment → Customer/Gateway adapter; Gateway adapter → Bank; API Gateway → all six backend services for support health. Provision those bindings before the first release. The application already supports Cloud Run IAM tokens through `X-Serverless-Authorization`; customer JWTs stay in `Authorization`.
+IAM caller graph: Payment → Customer/Gateway adapter; Gateway adapter → Bank; API Gateway → all six backend services for support health. Provision each binding before enabling that caller. Selected-service deployment checks only its self-invoker binding; missing future callers do not block it. The application already supports Cloud Run IAM tokens through `X-Serverless-Authorization`; customer JWTs stay in `Authorization`.
+
+## Customer-only configuration
+
+Set `gcp-poc` environment variable `CLOUD_RUN_CONFIG_JSON` to:
+
+```json
+{
+  "project": "project-c9bd3d0e-266f-47bf-852",
+  "region": "us-central1",
+  "repository": "otel-payment-platform",
+  "urls": {
+    "customer-service": "https://customer-service-52916499838.us-central1.run.app"
+  },
+  "serviceAccounts": {
+    "customer-service": "otel-payment-runtime@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com"
+  },
+  "databaseSecrets": {
+    "url": "neon-jdbc-url",
+    "username": "neon-username",
+    "password": "neon-password"
+  },
+  "secretVersion": "1"
+}
+```
+
+This deploys Customer using only `neon-jdbc-url`, `neon-username` and `neon-password`, pinned to version `1`. Confirm that version exists and that the runtime account can access all three secrets. The JDBC secret should contain your Neon TLS JDBC connection URL. No JWT, RabbitMQ, VPC, other service URLs or other runtime accounts are required. Backend deployments still require `COLLECTOR_IMAGE` as an immutable digest.
+
+The actual customer workflow is `.github/workflows/deploy-customer.yml`, displayed as **Deploy customer-service** in Actions; there is no `deploy-customer-service.yml` duplicate. It remains manual-only and uses WIF.
+
+| Selected service | Required application secrets/configuration |
+|---|---|
+| Auth | Database + JWT |
+| Customer, Bank | Database |
+| Gateway adapter | None |
+| Payment, Notification | Database + JWT + Rabbit host/user/password |
+| API Gateway | JWT |
+| Frontend | None |
+
+Each secret-consuming deployment requires a numeric `secretVersion`; `latest` and `replace-` placeholders in consumed values are rejected. Optional Grafana export adds its token secret and pinned version requirement. Unrelated configuration is ignored. Shared accounts are permitted.
+
+Dependency URLs are optional during configuration validation. Supplied dependency URLs are validated and rendered into routing/IAM audience settings. Configure all actual dependencies before testing business requests: Payment needs Customer/Gateway, Gateway needs Bank, API Gateway needs its routed backends, and Frontend needs API Gateway. Frontend's Nginx proxy requires its API Gateway URL to start successfully, so a frontend-only configuration can validate but cannot pass deployment health verification without that URL. Validation is not a claim that an incomplete application graph is operational.
+
+The legacy full-stack validator still uses `deploy/cloud-run/config.full-stack.example.json` and its complete configuration contract. Do not pass the customer-only example to that legacy tool.
 
 ## Deployment order
 

@@ -7,7 +7,8 @@ import os
 from pathlib import Path
 import re
 import subprocess
-from run_release import SERVICES, CALLS, validate, render, gcloud, allocation, health
+from urllib.parse import urlparse
+from run_release import SERVICES, CALLS, DATABASE, JWT, SECRET_RE, render, gcloud, allocation, health
 
 PROJECT = 'project-c9bd3d0e-266f-47bf-852'
 REGISTRY = f'us-central1-docker.pkg.dev/{PROJECT}/otel-payment-platform'
@@ -15,8 +16,59 @@ REGISTRY = f'us-central1-docker.pkg.dev/{PROJECT}/otel-payment-platform'
 def service_name(service):
     return 'payment-frontend' if service == 'frontend' else service
 
+def validate_selected(config, service):
+    """Validate only configuration consumed by this application's manifest."""
+    if service not in SERVICES:
+        raise ValueError('Unknown service')
+    def value(value, pattern, label):
+        if not isinstance(value, str) or 'replace-' in value or not re.fullmatch(pattern, value):
+            raise ValueError('Invalid ' + label)
+    for key, pattern in [('project', r'[a-z][a-z0-9-]{4,61}[a-z0-9]'),
+                         ('region', r'[a-z]+-[a-z]+[0-9]'), ('repository', r'[a-z][a-z0-9_-]+')]:
+        value(config.get(key), pattern, key)
+    for key in ['urls', 'serviceAccounts']:
+        if not isinstance(config.get(key), dict):
+            raise ValueError('Expected object: ' + key)
+    # Optional dependency URLs are validated when supplied, never required to bootstrap.
+    targets = set(CALLS.get(service, [])) | ({'api-gateway'} if service == 'frontend' else set())
+    for target in {service} | (targets & config['urls'].keys()):
+        origin = config['urls'].get(target)
+        if not isinstance(origin, str) or 'replace-' in origin:
+            raise ValueError('Invalid Cloud Run URL: ' + target)
+        url = urlparse(origin)
+        if url.scheme != 'https' or not (url.hostname or '').endswith('.run.app') or url.netloc != url.hostname or url.path or url.query or url.fragment:
+            raise ValueError('Expected canonical Cloud Run origin: ' + target)
+    value(config['serviceAccounts'].get(service), r'[a-z][a-z0-9-]+@' + re.escape(config['project']) + r'\.iam\.gserviceaccount\.com', 'selected runtime account')
+    needs_secrets = service in DATABASE or service in JWT or (service != 'frontend' and bool(config.get('grafana')))
+    if needs_secrets:
+        value(config.get('secretVersion'), r'[1-9][0-9]*', 'pinned numeric secretVersion')
+    def secrets(key, names):
+        group = config.get(key)
+        if not isinstance(group, dict):
+            raise ValueError('Expected secret object: ' + key)
+        for name in names:
+            value(group.get(name), SECRET_RE, key + '.' + name)
+    if service in DATABASE:
+        secrets('databaseSecrets', ['url', 'username', 'password'])
+    if service in JWT:
+        value(config.get('jwtSecret'), SECRET_RE, 'jwtSecret')
+    if service in {'payment-service', 'notification-service'}:
+        value(config.get('rabbitHost'), r'[a-zA-Z0-9.-]+', 'rabbitHost')
+        secrets('rabbitSecrets', ['username', 'password'])
+    if config.get('network') or config.get('subnetwork'):
+        for key in ['network', 'subnetwork']:
+            value(config.get(key), r'[a-z][a-z0-9-]+', key)
+    if service != 'frontend' and config.get('grafana'):
+        grafana = config['grafana']
+        if not isinstance(grafana, dict):
+            raise ValueError('Expected Grafana configuration object')
+        value(grafana.get('endpoint'), r'https://[a-zA-Z0-9.-]+\.grafana\.net/otlp', 'Grafana endpoint')
+        value(grafana.get('username'), r'[0-9]+', 'Grafana username')
+        value(grafana.get('tokenSecret'), SECRET_RE, 'Grafana token secret')
+    return config
+
 def selected_manifest(config, service, image, collector, revision):
-    validate(config)
+    validate_selected(config, service)
     if (config['project'], config['region'], config['repository']) != (PROJECT, 'us-central1', 'otel-payment-platform'):
         raise ValueError('Use the requested project, region and Artifact Registry repository')
     manifest = render(config, service, image, collector, revision)
@@ -44,7 +96,7 @@ def deploy(config, service, image, collector, revision, out):
     if not public:
         if {'allUsers', 'allAuthenticatedUsers'} & members:
             raise ValueError('Internal service has public invoker access')
-        required = {config['serviceAccounts'][service]} | {config['serviceAccounts'][caller] for caller, targets in CALLS.items() if service in targets}
+        required = {config['serviceAccounts'][service]}
         if any('serviceAccount:' + account not in members for account in required):
             raise ValueError('Provision selected service caller/self-invoker permissions first')
     traffic = allocation(previous)
