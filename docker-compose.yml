@@ -27,6 +27,7 @@ services:
   auth-service:
     build: ./auth-service
     environment:
+      PORT: "8079"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
@@ -39,6 +40,7 @@ services:
   customer-service:
     build: ./customer-service
     environment:
+      PORT: "8084"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
@@ -50,6 +52,7 @@ services:
   mock-bank-service:
     build: ./mock-bank-service
     environment:
+      PORT: "8082"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
@@ -61,6 +64,7 @@ services:
   gateway-service:
     build: ./gateway-service
     environment:
+      PORT: "8081"
       CLIENTS_BANK_BASE_URL: http://mock-bank-service:8082
     depends_on:
       - mock-bank-service
@@ -69,6 +73,7 @@ services:
   payment-service:
     build: ./payment-service
     environment:
+      PORT: "8080"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
@@ -95,6 +100,7 @@ services:
   notification-service:
     build: ./notification-service
     environment:
+      PORT: "8083"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-payments}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-payments}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-payments}
@@ -112,6 +118,7 @@ services:
   api-gateway:
     build: ./api-gateway
     environment:
+      PORT: "8088"
       JWT_SECRET: ${JWT_SECRET:-change-this-demo-secret-change-this-demo-secret}
       SERVICES_AUTH_URL: http://auth-service:8079
       SERVICES_CUSTOMER_URL: http://customer-service:8084

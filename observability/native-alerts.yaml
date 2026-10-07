@@ -1,0 +1,38 @@
+groups:
+- name: native-domain-metrics
+  rules:
+  - alert: DomainSnapshotUnavailable
+    expr: poc_domain_snapshot_healthy == 0 or (time() - poc_domain_snapshot_last_success_timestamp_seconds > 90) or absent(poc_domain_snapshot_healthy)
+    for: 1m
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Domain outcome snapshot is stale or missing
+- name: native-availability
+  rules:
+  - alert: NativeServiceUnavailable
+    expr: poc_readiness_probe_success == 0
+    for: 30s
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Service readiness probe is failing
+      runbook_url: http://localhost:3001/d/platform-overview
+  - alert: NativeMonitorMissing
+    expr: up{job="native-monitor"} == 0 or absent(up{job="native-monitor"}) or (time() - poc_readiness_probe_last_run_timestamp_seconds > 30)
+    for: 30s
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Readiness monitoring is missing or stale; availability is unknown
+  - alert: NativeSyntheticJourneyFailed
+    expr: poc_scheduled_journey_success == 0 or (time() - poc_scheduled_journey_last_run_timestamp_seconds > 540) or absent(poc_scheduled_journey_last_run_timestamp_seconds)
+    for: 3m
+    labels:
+      severity: warning
+      owner: poc-support
+    annotations:
+      summary: Scheduled fake-payment journey failed or is stale

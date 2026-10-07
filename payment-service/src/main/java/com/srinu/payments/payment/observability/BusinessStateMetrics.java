@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.Map;
+import javax.sql.DataSource;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /** Cached database truth, not counts inferred from sampled traces or repeated logs. */
 @Component
@@ -19,8 +21,14 @@ public class BusinessStateMetrics {
     private volatile Map<String, Double> states = Map.of();
     private volatile double pending = Double.NaN, oldest = Double.NaN, lastSuccess = 0, healthy = 0;
 
+    @Autowired
+    public BusinessStateMetrics(DataSource source, MeterRegistry registry) {
+        this(new JdbcTemplate(source), registry);
+    }
+
     public BusinessStateMetrics(JdbcTemplate jdbc, MeterRegistry registry) {
         this.jdbc = jdbc;
+        jdbc.setQueryTimeout(3);
         for (PaymentStatus status : PaymentStatus.values()) {
             Gauge.builder("poc.payment.records", this, m -> m.states.getOrDefault(status.name(), Double.NaN))
                 .tag("status", status.name()).description("Current durable payment rows by status; not a counter").register(registry);

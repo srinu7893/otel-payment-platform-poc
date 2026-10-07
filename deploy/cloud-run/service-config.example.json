@@ -1,0 +1,40 @@
+{
+  "project": "project-c9bd3d0e-266f-47bf-852",
+  "region": "us-central1",
+  "repository": "otel-payment-platform",
+  "prefix": "otel-poc",
+  "network": "replace-vpc",
+  "subnetwork": "replace-subnet",
+  "urls": {
+    "auth-service": "https://replace-auth.run.app",
+    "customer-service": "https://replace-customer.run.app",
+    "mock-bank-service": "https://replace-bank.run.app",
+    "gateway-service": "https://replace-gateway.run.app",
+    "notification-service": "https://replace-notification.run.app",
+    "payment-service": "https://replace-payment.run.app",
+    "api-gateway": "https://replace-api.run.app",
+    "frontend": "https://replace-frontend.run.app"
+  },
+  "serviceAccounts": {
+    "auth-service": "otel-auth@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com",
+    "customer-service": "otel-customer@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com",
+    "mock-bank-service": "otel-bank@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com",
+    "gateway-service": "otel-gateway@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com",
+    "notification-service": "otel-notification@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com",
+    "payment-service": "otel-payment@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com",
+    "api-gateway": "otel-api@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com",
+    "frontend": "otel-frontend@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com"
+  },
+  "databaseSecrets": {
+    "url": "otel-jdbc-url",
+    "username": "otel-db-user",
+    "password": "otel-db-password"
+  },
+  "rabbitHost": "replace-rabbit-private-host",
+  "rabbitSecrets": {
+    "username": "otel-rabbit-user",
+    "password": "otel-rabbit-password"
+  },
+  "jwtSecret": "otel-jwt",
+  "secretVersion": "1"
+}

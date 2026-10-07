@@ -6,12 +6,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.data.domain.PageRequest;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.RabbitMQContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -19,16 +18,32 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-@Testcontainers
 class NotificationRabbitIntegrationTest {
 
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
-
-    @Container
-    @ServiceConnection
-    static final RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
+    @DynamicPropertySource
+    static void dependencies(DynamicPropertyRegistry properties) {
+        if (Boolean.getBoolean("poc.native.integration")) {
+            properties.add("spring.datasource.url", () -> "jdbc:postgresql://127.0.0.1:55432/poc_integration");
+            properties.add("spring.datasource.username", () -> "payments");
+            properties.add("spring.datasource.password", () -> "payments");
+            properties.add("spring.rabbitmq.host", () -> "127.0.0.1");
+            properties.add("spring.rabbitmq.port", () -> 5672);
+            properties.add("spring.rabbitmq.username", () -> "payments");
+            properties.add("spring.rabbitmq.password", () -> "payments");
+            properties.add("spring.rabbitmq.virtual-host", () -> "poc-integration");
+        } else {
+            var postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+            var rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
+            postgres.start(); rabbit.start();
+            properties.add("spring.datasource.url", postgres::getJdbcUrl);
+            properties.add("spring.datasource.username", postgres::getUsername);
+            properties.add("spring.datasource.password", postgres::getPassword);
+            properties.add("spring.rabbitmq.host", rabbit::getHost);
+            properties.add("spring.rabbitmq.port", rabbit::getAmqpPort);
+            properties.add("spring.rabbitmq.username", rabbit::getAdminUsername);
+            properties.add("spring.rabbitmq.password", rabbit::getAdminPassword);
+        }
+    }
 
     @Autowired
     private RabbitTemplate rabbitTemplate;

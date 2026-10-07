@@ -11,3 +11,4 @@ artifacts/
 frontend/node_modules/
 frontend/dist/
 __pycache__/
+erl_crash.dump

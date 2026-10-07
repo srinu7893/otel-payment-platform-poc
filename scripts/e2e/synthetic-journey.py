@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """On-demand isolated local fake-payment probe; never a production payment generator."""
 import json
+import os
 import time
 import uuid
 from pathlib import Path
@@ -35,7 +36,8 @@ finally:
       {'name':'poc.synthetic.journey.success','gauge':{'dataPoints':[{'timeUnixNano':now,'asDouble':1 if result['status']=='PASS' else 0}]}},
       {'name':'poc.synthetic.journey.duration','unit':'s','gauge':{'dataPoints':[{'timeUnixNano':now,'asDouble':result['seconds']}]}}
     ]}]}]}
-    try:request('http://localhost:4318/v1/metrics',payload)
+    endpoint=os.environ.get('OTEL_EXPORTER_OTLP_METRICS_ENDPOINT',os.environ.get('OTEL_EXPORTER_OTLP_ENDPOINT','http://localhost:4318').rstrip('/')+'/v1/metrics')
+    try:request(endpoint,payload)
     except Exception as error:
         result['metricExportErrorType']=type(error).__name__;Path('artifacts/synthetic-journey.json').write_text(json.dumps(result,indent=2))
         if result['status']=='PASS':raise

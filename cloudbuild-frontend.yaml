@@ -1,0 +1,7 @@
+steps:
+- name: gcr.io/cloud-builders/docker
+  args: ['build', '--target', 'cloud', '--label', 'org.opencontainers.image.revision=${_REVISION}', '-f', 'frontend/Dockerfile', '-t', 'us-central1-docker.pkg.dev/project-c9bd3d0e-266f-47bf-852/otel-payment-platform/payment-frontend:${_REVISION}', 'frontend']
+images:
+- 'us-central1-docker.pkg.dev/project-c9bd3d0e-266f-47bf-852/otel-payment-platform/payment-frontend:${_REVISION}'
+substitutions:
+  _REVISION: manual

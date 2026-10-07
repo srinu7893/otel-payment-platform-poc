@@ -136,6 +136,16 @@ def logs_present(trace):
 
 
 def compose(*args):
+    if os.environ.get('POC_NATIVE')=='true':
+        action=args[0]
+        if action=='kill':
+            assert args[1:3]==('-s','SIGKILL')
+            action='stop';names=args[3:]
+        else:names=args[1:]
+        assert action in ('start','stop') and names
+        for name in names:
+            subprocess.run(['node','scripts/native-poc.mjs',action,name],check=True,timeout=120)
+        return
     subprocess.run(['bash','scripts/otel-compose.sh',*args],check=True,timeout=120)
 
 

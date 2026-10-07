@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build service dashboards from metric families observed in passing run 14."""
 import json
+from urllib.parse import urlencode
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'observability/grafana/dashboards'
 SERVICES=['api-gateway','auth-service','customer-service','payment-service','gateway-service','mock-bank-service','notification-service']
@@ -10,7 +11,10 @@ def panel(title,expr,unit='short',description='',kind='timeseries',source='prome
 def write(uid,title,panels,service=None):
  for i,p in enumerate(panels):p.update(id=i+1,gridPos={'x':12*(i%2),'y':8*(i//2),'w':12,'h':8})
  obj={'uid':uid,'title':title,'schemaVersion':39,'version':1,'refresh':'10s','time':{'from':'now-15m','to':'now'},'tags':['otel','payment-poc','service' if service else 'overview'],'links':[{'title':'All dashboards','type':'dashboards','tags':['payment-poc'],'asDropdown':True,'includeVars':True,'keepTime':True},{'title':'Support runbook','type':'link','url':'https://github.com/srinu7893/otel-payment-platform-poc/blob/feature/otel-observability-manual-e2e/docs/DASHBOARDS_AND_DEPLOYMENT.md','targetBlank':True}],'panels':panels}
- if service:obj['links'] += [{'title':'Service traces','type':'link','url':'http://localhost:3001/explore','targetBlank':True}]
+ if service:
+  for label,query in [('Service traces','{ resource.service.name = "'+service+'" }'),('Error traces','{ resource.service.name = "'+service+'" && status = error }')]:
+   panes={'trace':{'datasource':'tempo','queries':[{'refId':'A','datasource':{'type':'tempo','uid':'tempo'},'queryType':'traceql','query':query}],'range':{'from':'now-1h','to':'now'}}}
+   obj['links'].append({'title':label,'type':'link','url':'/explore?'+urlencode({'schemaVersion':1,'panes':json.dumps(panes),'orgId':1}),'targetBlank':True})
  (OUT/(uid+'.json')).write_text(json.dumps(obj,indent=2)+'\n')
 for service in SERVICES:
  s='{service_name="'+service+'"}'
@@ -55,3 +59,58 @@ write('platform-overview','Platform — consolidated service comparison',[
  panel('Business snapshot age by service','max by (service_name) (time()-(poc_business_snapshot_last_success_timestamp_seconds > 0))','s','Only initialized timestamps are shown. Inspect refresh health when a service has no successful snapshot.'),
  panel('Active warnings by name','sum by (alertname) (ALERTS{alertstate="firing"})','short','Empty means no firing series. Also check scrape/telemetry freshness.')])
 print('Generated 7 backend dashboards, frontend coverage dashboard and consolidated overview')
+
+# Native readiness is a separate signal from HTTP traffic or JVM metric presence.
+for service in SERVICES+['frontend']:
+ p=OUT/('service-'+service+'.json');o=json.loads(p.read_text());s='{service_name="'+service+'"}'
+ additions=[
+  panel('Readiness now (fresh probe)','poc_readiness_probe_success'+s+' and (time()-poc_readiness_probe_last_run_timestamp_seconds'+s+' < 30)','short','1 ready, 0 failed. Missing/stale is unknown. Direct probes every 10s while native monitor runs.',kind='stat'),
+  panel('Observed readiness availability (selected window)','increase(poc_readiness_probe_successes_total'+s+'[$__range]) / increase(poc_readiness_probe_attempts_total'+s+'[$__range])','percentunit','Successful probe attempts / all completed attempts. Monitor outages are excluded, not successful; inspect monitor UP and freshness. Not a production SLA.',kind='stat'),
+  panel('Probe age','time()-poc_readiness_probe_last_run_timestamp_seconds'+s,'s')]
+ if service!='frontend':
+  route='{service_name="'+service+'",http_route!~".*actuator.*",http_route=~".+"}'
+  errors=route[:-1]+',http_response_status_code=~"[45].."}'
+  counts='sum by (http_route,http_request_method) (increase(http_server_request_duration_seconds_count'+route+'[$__range]))'
+  additions += [panel('API operation request count',counts,description='Estimated Prometheus counter increase in selected window, grouped by route template and method; excludes actuator. Not an audit count.',kind='table'),panel('API operation 4xx/5xx count','sum by (http_route,http_request_method) (increase(http_server_request_duration_seconds_count'+errors+'[$__range])) or (0 * '+counts+')',description='HTTP failures, including deliberate authentication/validation tests; business outcomes are separate.',kind='table')]
+  for percentile in [50,95,99]:additions.append(panel('API operation p'+str(percentile)+' latency','histogram_quantile('+str(percentile/100)+',sum by (le,http_route,http_request_method) (rate(http_server_request_duration_seconds_bucket'+route+'[$__rate_interval])))','s',kind='table'))
+  additions.append(panel('Business API traffic (health excluded)','sum(rate(http_server_request_duration_seconds_count'+route+'[$__rate_interval]))','reqps'))
+ for panel_ in additions:
+  if panel_['type'] in ('table','stat'):
+   panel_['targets'][0]['instant']=True
+   if panel_['type']=='table':panel_['targets'][0]['format']='table'
+ o['panels']+=additions
+ for i,panel_ in enumerate(o['panels']):panel_.update(id=i+1,gridPos={'x':12*(i%2),'y':8*(i//2),'w':12,'h':8})
+ if service=='frontend':
+  o['panels'][0]['options']['content']+='\nNative readiness checks the frontend HTTP endpoint. The scheduled fake-payment journey runs every five minutes; it still does not measure browser rendering.'
+ p.write_text(json.dumps(o,indent=2)+'\n')
+p=OUT/'platform-overview.json';o=json.loads(p.read_text());o['panels'] += [
+ panel('Readiness by service (fresh probes)','poc_readiness_probe_success and (time()-poc_readiness_probe_last_run_timestamp_seconds < 30)'),
+ panel('Observed readiness availability by service','increase(poc_readiness_probe_successes_total[$__range])/increase(poc_readiness_probe_attempts_total[$__range])','percentunit','Missing monitor intervals are unknown, not successful. Inspect monitor UP.'),
+ panel('Readiness monitor UP','up{job="native-monitor"}'),
+ panel('Scheduled fake-payment journey success','poc_scheduled_journey_success'),
+ panel('Scheduled journey age','time()-poc_scheduled_journey_last_run_timestamp_seconds','s'),
+ panel('Scheduled journey duration','poc_scheduled_journey_duration_seconds','s'),
+ panel('Host available memory','poc_host_memory_available_bytes','bytes'),
+ panel('Host CPU utilization','poc_host_cpu_utilization_ratio','percentunit'),
+ panel('PostgreSQL database size','poc_database_size_bytes','bytes'),
+ panel('PostgreSQL connections','poc_database_connections'),
+ panel('PostgreSQL lock waiters','poc_database_lock_waiters'),
+ panel('PostgreSQL rollback rate','rate(poc_database_rollbacks_total[$__rate_interval])','ops'),
+ panel('PostgreSQL deadlocks','poc_database_deadlocks_total'),
+ panel('PostgreSQL diagnostics healthy','poc_database_healthy'),
+ panel('PostgreSQL diagnostics age','time()-poc_database_timestamp','s')]
+for i,panel_ in enumerate(o['panels']):panel_.update(id=i+1,gridPos={'x':12*(i%2),'y':8*(i//2),'w':12,'h':8})
+p.write_text(json.dumps(o,indent=2)+'\n')
+write('domain-outcomes','Business operations — durable outcomes and delivery',[
+ panel('Current durable rows by operation/status','max by (operation,status) (poc_domain_records)',description='Database state, not event counters. Includes payment, transfer and refund.'),
+ panel('Completed creation-cohort ratio','max by (operation)(poc_domain_cohort_completed)/max by (operation)(poc_domain_cohort_records)','percentunit','Operations created between 60 and 2 minutes ago: current COMPLETED / all rows. Recent 2 minutes excluded for maturation; unresolved outcomes count against completion. Zero rows is unknown, not 100%.'),
+ panel('Creation-cohort size','max by (operation)(poc_domain_cohort_records)'),
+ panel('Event creation to notification SENT','max by (quantile)(poc_event_delivery_seconds)','s','SQL p50/p95/p99 over records SENT in the last hour, joined to durable source outbox events; includes publishing/queue/consumer delay. Start is event creation in the commit transaction, not an exact database commit timestamp. Per delivery record/channel.'),
+ panel('Delivered sample count (last hour)','max(poc_event_delivery_records)'),
+ panel('Domain snapshot healthy','min(poc_domain_snapshot_healthy)'),
+ panel('Domain snapshot age','max(time()-(poc_domain_snapshot_last_success_timestamp_seconds > 0))','s')])
+p=OUT/'service-frontend.json';o=json.loads(p.read_text());o['title']='Frontend — browser performance and readiness'
+o['panels'][0]['options']['content']='## Local browser measurements\nThe development app reports web-vitals (FCP, LCP, INP, CLS, TTFB), page views and JavaScript error counts to the loopback native monitor through Vite. No URLs, DOM, user IDs, error messages or tokens are collected. LCP/CLS/INP may finalize after interaction or leaving the page; no observation means unknown. Values describe local test browsers, not production users. Production builds do not enable this receiver.'
+o['panels'] += [panel('Latest browser timing observations','poc_browser_last_value{metric=~"FCP|LCP|INP|TTFB"}','ms','Latest observation per metric; not a population percentile.'),panel('Latest layout shift score','poc_browser_last_value{metric="CLS"}'),panel('Browser page views','poc_browser_observation_sum{metric="PAGE_VIEW"}'),panel('Browser JavaScript errors','poc_browser_observation_sum{metric="JS_ERROR"}','short','Count only; error text is not exported.'),panel('Browser observation age','time()-poc_browser_last_observation_timestamp_seconds','s')]
+for i,panel_ in enumerate(o['panels']):panel_.update(id=i+1,gridPos={'x':12*(i%2),'y':8*(i//2),'w':12,'h':8})
+p.write_text(json.dumps(o,indent=2)+'\n')

@@ -10,11 +10,10 @@ import com.srinu.payments.bank.service.BankTransferService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -22,12 +21,22 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@Testcontainers
 class BankPostgresIntegrationTest {
 
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+    @DynamicPropertySource
+    static void database(DynamicPropertyRegistry properties) {
+        if (Boolean.getBoolean("poc.native.integration")) {
+            properties.add("spring.datasource.url", () -> "jdbc:postgresql://127.0.0.1:55432/poc_integration");
+            properties.add("spring.datasource.username", () -> "payments");
+            properties.add("spring.datasource.password", () -> "payments");
+        } else {
+            var postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+            postgres.start();
+            properties.add("spring.datasource.url", postgres::getJdbcUrl);
+            properties.add("spring.datasource.username", postgres::getUsername);
+            properties.add("spring.datasource.password", postgres::getPassword);
+        }
+    }
 
     @Autowired
     private AccountRepository accounts;

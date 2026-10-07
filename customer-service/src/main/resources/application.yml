@@ -1,12 +1,12 @@
 server:
-  port: ${PORT:8084}
+  port: ${PORT:8080}
 spring:
   application:
     name: customer-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/payments
-    username: payments
-    password: payments
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/payments}
+    username: ${SPRING_DATASOURCE_USERNAME:payments}
+    password: ${SPRING_DATASOURCE_PASSWORD:payments}
   jpa:
     hibernate:
       ddl-auto: validate

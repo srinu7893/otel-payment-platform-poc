@@ -1,5 +1,12 @@
-FROM eclipse-temurin:21-jre
-WORKDIR /app
-COPY target/api-gateway-0.1.0-SNAPSHOT.jar app.jar
-EXPOSE 8088
-ENTRYPOINT ["java","-jar","/app/app.jar"]
+FROM eclipse-temurin:21-jre AS app
+ARG JAR_FILE=target/api-gateway-0.1.0-SNAPSHOT.jar
+COPY ${JAR_FILE} /app.jar
+ENTRYPOINT ["java","-jar","/app.jar"]
+
+FROM app AS cloud
+COPY target/opentelemetry-javaagent.jar /otel/opentelemetry-javaagent.jar
+ENV JAVA_TOOL_OPTIONS="-javaagent:/otel/opentelemetry-javaagent.jar"
+EXPOSE 8080
+
+# Default target preserves the local Compose image without requiring the agent.
+FROM app AS local

@@ -1,6 +1,6 @@
 {
   "uid": "service-frontend",
-  "title": "Frontend \u2014 journey visibility and coverage gaps",
+  "title": "Frontend \u2014 browser performance and readiness",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "10s",
@@ -51,7 +51,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "## What is measured today\nThe synthetic monitor calls the API and does not measure the browser or Nginx. Backend edge metrics show API experience only. Browser functional tests exist. Browser RUM, frontend web-vitals and Nginx metrics are not instrumented yet; no frontend CPU/latency values are invented."
+        "content": "## Local browser measurements\nThe development app reports web-vitals (FCP, LCP, INP, CLS, TTFB), page views and JavaScript error counts to the loopback native monitor through Vite. No URLs, DOM, user IDs, error messages or tokens are collected. LCP/CLS/INP may finalize after interaction or leaving the page; no observation means unknown. Values describe local test browsers, not production users. Production builds do not enable this receiver."
       }
     },
     {
@@ -137,6 +137,242 @@
       "gridPos": {
         "x": 12,
         "y": 8,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Readiness now (fresh probe)",
+      "type": "stat",
+      "description": "1 ready, 0 failed. Missing/stale is unknown. Direct probes every 10s while native monitor runs.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "poc_readiness_probe_success{service_name=\"frontend\"} and (time()-poc_readiness_probe_last_run_timestamp_seconds{service_name=\"frontend\"} < 30)",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Observed readiness availability (selected window)",
+      "type": "stat",
+      "description": "Successful probe attempts / all completed attempts. Monitor outages are excluded, not successful; inspect monitor UP and freshness. Not a production SLA.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(poc_readiness_probe_successes_total{service_name=\"frontend\"}[$__range]) / increase(poc_readiness_probe_attempts_total{service_name=\"frontend\"}[$__range])",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Probe age",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time()-poc_readiness_probe_last_run_timestamp_seconds{service_name=\"frontend\"}",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Latest browser timing observations",
+      "type": "timeseries",
+      "description": "Latest observation per metric; not a population percentile.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "poc_browser_last_value{metric=~\"FCP|LCP|INP|TTFB\"}",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "id": 8,
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Latest layout shift score",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "poc_browser_last_value{metric=\"CLS\"}",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 9,
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Browser page views",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "poc_browser_observation_sum{metric=\"PAGE_VIEW\"}",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Browser JavaScript errors",
+      "type": "timeseries",
+      "description": "Count only; error text is not exported.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "poc_browser_observation_sum{metric=\"JS_ERROR\"}",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "id": 11,
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Browser observation age",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time()-poc_browser_last_observation_timestamp_seconds",
+          "legendFormat": "{{service_name}} {{http_route}} {{status}} {{state}} {{pool_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "id": 12,
+      "gridPos": {
+        "x": 12,
+        "y": 40,
         "w": 12,
         "h": 8
       }

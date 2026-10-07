@@ -90,6 +90,8 @@ GitHub Actions runs backend tests/package, frontend build, Compose validation an
 
 ## Run complete local stack
 
+For native Windows execution without Docker, see [the Windows runbook](docs/NATIVE_WINDOWS_RUNBOOK.md). It includes CMD startup, tool paths, all dashboard links, log commands, and telemetry checks.
+
 ```bash
 docker compose up --build
 ```
@@ -172,3 +174,6 @@ Added cached SQL-backed payment/outbox/notification gauges with freshness/health
 ## Service dashboards and deployment checklist
 
 13 dashboards / 152 panels now include seven dedicated Java service views, an explicit frontend coverage view and a consolidated platform overview. Regenerate using `python3 scripts/dashboards/generate.py`. See [docs/DASHBOARDS_AND_DEPLOYMENT.md](docs/DASHBOARDS_AND_DEPLOYMENT.md) for queries, review findings and the Cloud Run sequence. The separate manual-dashboard-review workflow evaluates queries and renders dashboards; it is never part of ordinary push/build CI.
+# Independent Cloud Run deployment
+
+Use the eight manual `Deploy <service>` workflows on `main`. See [service-by-service deployment](docs/SERVICE_BY_SERVICE_DEPLOYMENT.md) for WIF, secrets, registry, prerequisites and deployment order. CI still tests/validates on push; deployment requires **Actions → Deploy <service> → Run workflow**.

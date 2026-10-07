@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Real DB gauges and Prometheus -> Alertmanager -> inbox outage/recovery evidence."""
 import json
+import os
 import subprocess
 import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from otel_acceptance import request,eventually,login,payment,notification
+from otel_acceptance import request,eventually,login,payment,notification,compose
 
 results=[]
 def query(expr):
@@ -14,8 +15,11 @@ def query(expr):
     assert data['status']=='success';return data['data']['result']
 def value(expr):
     rows=query(expr);assert rows,'No series: '+expr;return float(rows[0]['value'][1])
-def compose(*args):subprocess.run(['bash','scripts/otel-compose.sh',*args],check=True,timeout=120)
 def db(sql):
+    if os.environ.get('POC_NATIVE')=='true':
+        exe=Path(os.environ.get('PG_HOME','C:/Program Files/PostgreSQL/17'))/'bin/psql.exe'
+        raw=subprocess.check_output([str(exe),'-h','127.0.0.1','-p','55432','-U','payments','-d','payments','-tA','-c',sql],env={**os.environ,'PGPASSWORD':'payments'},text=True,timeout=20)
+        return float(raw.strip())
     raw=subprocess.check_output(['bash','scripts/otel-compose.sh','exec','-T','postgres','psql','-U','payments','-d','payments','-tA','-c',sql],text=True,timeout=20)
     return float(raw.strip())
 def check_snapshot():

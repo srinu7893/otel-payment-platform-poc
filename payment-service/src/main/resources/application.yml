@@ -5,9 +5,9 @@ spring:
   application:
     name: payment-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/payments
-    username: payments
-    password: payments
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/payments}
+    username: ${SPRING_DATASOURCE_USERNAME:payments}
+    password: ${SPRING_DATASOURCE_PASSWORD:payments}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -21,10 +21,10 @@ spring:
     schemas: payment
     default-schema: payment
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: payments
-    password: payments
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:payments}
+    password: ${SPRING_RABBITMQ_PASSWORD:payments}
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
@@ -49,9 +49,9 @@ clients:
     connect-timeout: 2s
     read-timeout: 5s
   gateway:
-    base-url: http://localhost:8081
+    base-url: ${CLIENTS_GATEWAY_BASE_URL:http://localhost:8081}
   customer:
-    base-url: http://localhost:8084
+    base-url: ${CLIENTS_CUSTOMER_BASE_URL:http://localhost:8084}
 
 risk:
   max-transaction-amount: ${RISK_MAX_TRANSACTION_AMOUNT:100000.00}

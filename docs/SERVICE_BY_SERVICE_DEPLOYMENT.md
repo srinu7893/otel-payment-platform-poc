@@ -1,0 +1,70 @@
+# Manual Cloud Run deployment per service
+
+Each of the eight `deploy-*.yml` workflows has only `workflow_dispatch`. A push runs the existing CI, never these deployments. In GitHub open **Actions → Deploy <service> → Run workflow → main**. Only the selected application's Dockerfile is built, its image is pushed, and its dedicated service receives a new revision. Backend Maven builds use `-pl <service> -am`: the parent/shared `cloud-runtime` dependency is packaged when needed; other application services are not built. Frontend builds do not run Maven.
+
+All application images go to `us-central1-docker.pkg.dev/project-c9bd3d0e-266f-47bf-852/otel-payment-platform`. Every run uses a commit/run-specific tag and deploys its resolved immutable digest. Backend images use the `cloud` target of their service Dockerfile, including the checksum-verified Java agent. The `local` target remains the default for Compose. Frontend's `cloud` target listens on Cloud Run's injected `PORT` and proxies `/api` to the configured API Gateway HTTPS origin; the local target retains Compose networking.
+
+## Configure GitHub and GCP once
+
+Create the GitHub environment `gcp-poc`, with these secrets:
+
+| Secret | Value |
+|---|---|
+| `WIF_PROVIDER` | Full workload identity provider resource name, bound to this repository/main/environment |
+| `GCP_SERVICE_ACCOUNT` | Deployment service account email, authenticated through WIF; no JSON key |
+
+Environment variables:
+
+| Variable | Value |
+|---|---|
+| `CLOUD_RUN_CONFIG_JSON` | Complete JSON based on `deploy/cloud-run/service-config.example.json`, with real network/subnet, all canonical service URLs, distinct runtime accounts and pinned numeric Secret Manager versions |
+| `COLLECTOR_IMAGE` | Existing Collector image digest in the same registry, e.g. `us-central1-docker.pkg.dev/project-c9bd3d0e-266f-47bf-852/otel-payment-platform/collector@sha256:...` |
+| `GRAFANA_URL` | Optional Grafana UI URL for frontend links |
+
+Backend workflows reuse the configured Collector digest; they never build another service or the Collector. Publish that shared image once with the existing image-publishing tooling or a separate approved Collector release. Frontend does not require a Collector digest.
+
+Enable Artifact Registry, Cloud Run, IAM credentials, Secret Manager and telemetry APIs, and provision the repository in `us-central1`. The deployment identity needs Artifact Registry writer, Cloud Run deployment permissions, `iam.serviceAccounts.actAs` on the runtime accounts, and token creation for the selected runtime health-check identities. Bind the WIF subject with `roles/iam.workloadIdentityUser`. Runtime accounts need access to their required secrets and telemetry writer roles.
+
+Provision PostgreSQL and TLS RabbitMQ reachable through the configured VPC/subnet. JDBC URL/user/password and JWT signing key are supplied through Secret Manager, never workflow text. All JWT-using services must use the same signing-key secret/version. The five database consumers are Auth, Customer, Bank, Payment and Notification. API Gateway and Gateway adapter have no datasource dependency. Payment and Notification need broker secrets; Payment's background relay and Notification's consumers use instance-based CPU and a minimum instance of one.
+
+The deployer intentionally does not guess IAM or create infrastructure. Bootstrap all eight service slots once using vetted placeholder images and the dedicated names below to obtain stable canonical URLs. Set caller IAM and runtime self-invoker permissions. Internal services must reject anonymous requests; only frontend and API Gateway are public edges. This bootstrap step does not deploy the application. The first successful application revision must pass startup/readiness before receiving traffic. The frontend proxy expects an API Gateway accessible to the configured public edge.
+
+IAM caller graph: Payment → Customer/Gateway adapter; Gateway adapter → Bank; API Gateway → all six backend services for support health. Provision those bindings before the first release. The application already supports Cloud Run IAM tokens through `X-Serverless-Authorization`; customer JWTs stay in `Authorization`.
+
+## Deployment order
+
+Wait for existing CI to succeed on the exact main commit, then manually run:
+
+| Order | Workflow | Cloud Run service |
+|---|---|---|
+| 1 | `deploy-auth.yml` | `auth-service` |
+| 2 | `deploy-customer.yml` | `customer-service` |
+| 3 | `deploy-bank.yml` | `mock-bank-service` |
+| 4 | `deploy-gateway.yml` | `gateway-service` |
+| 5 | `deploy-payment.yml` | `payment-service` |
+| 6 | `deploy-notification.yml` | `notification-service` |
+| 7 | `deploy-api-gateway.yml` | `api-gateway` |
+| 8 | `deploy-frontend.yml` | `payment-frontend` |
+
+For later changes, run only the affected service workflow. Changes to `cloud-runtime` require separately deploying its consumers (Payment, Gateway adapter and API Gateway). Coordinate schema compatibility and shared JWT changes across services; traffic rollback does not undo migrations or committed business work.
+
+Each workflow checks CI, validates config, authenticates via WIF, builds/pushes one application, renders one manifest, preserves current traffic, checks a tagged candidate, promotes it and checks the canonical readiness endpoint. On failure after promotion, it restores that service's saved traffic allocation. Review `service-release-<service>-<run-id>` artifacts for the manifest, previous traffic and result. No other application's image, revision or traffic is modified. Health-token impersonation requires the runtime account's self-invoker permission. Existing Cloud Run services and canonical URLs must match the config.
+
+`manual-cloud-run.yml` is now a validation-only legacy full-stack check; it cannot deploy all services. Existing `ci.yml` remains unchanged. The manual image-publishing workflow remains available for explicit full-stack image preparation and shared Collector releases, independently of deployment.
+
+## Optional Cloud Build files
+
+`cloudbuild-frontend.yaml`, `cloudbuild-auth.yaml`, `cloudbuild-customer.yaml`, `cloudbuild-payment.yaml`, `cloudbuild-gateway.yaml`, `cloudbuild-bank.yaml`, `cloudbuild-notification.yaml` and `cloudbuild-api-gateway.yaml` are build/publish alternatives, not triggers and not deployment jobs. Submit manually from the repository root, for example:
+
+```sh
+gcloud builds submit . --project=project-c9bd3d0e-266f-47bf-852 \
+  --config=cloudbuild-auth.yaml --substitutions=_REVISION=$(git rev-parse HEAD)
+```
+
+The Cloud Build identity needs repository writer permission. No Cloud Build push trigger is created. GitHub workflows build with Docker on their hosted runner and do not require Cloud Build permissions.
+
+Spring services use `${PORT:8080}`. Database settings use `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`. Existing JWT consumers use `JWT_SECRET`; service URLs and RabbitMQ settings accept environment overrides. Compose explicitly sets the previous local ports. Cloud Run injects reserved `PORT`; it is omitted from manifest env values. Startup/liveness probes and the deployment's authenticated readiness check cover application startup. Business acceptance and cloud telemetry verification should follow the initial deployment.
+
+Local validation covers deployment contracts, selection/rollback behavior, YAML and backend/frontend builds. Docker/Cloud Run execution must be verified by hosted CI and manually dispatched deployments on an authenticated environment; Docker is unavailable on this workstation.
+
+References: [WIF through GitHub Actions](https://github.com/google-github-actions/auth#workload-identity-federation-through-a-service-account), [Cloud Run container startup order](https://docs.cloud.google.com/run/docs/configuring/services/containers), [Cloud Run health checks](https://docs.cloud.google.com/run/docs/configuring/healthchecks).

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Isolated local PoC notification receiver. No outbound messaging or production auth."""
 import hashlib
+from contextlib import contextmanager
 import html
 import json
 import os
@@ -16,8 +17,14 @@ class Inbox:
         self.lock=threading.Lock()
         with self.connect() as db:
             db.execute('create table if not exists incidents (id text primary key, fingerprint text, name text, service text, owner text, severity text, summary text, status text, started text, ended text, received real, acknowledged real)')
+    @contextmanager
     def connect(self):
-        return sqlite3.connect(self.path, timeout=5)
+        db=sqlite3.connect(self.path, timeout=5)
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
     def ingest(self, payload):
         alerts=payload.get('alerts')
         if not isinstance(alerts,list) or not 1<=len(alerts)<=100:
@@ -83,4 +90,4 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__=='__main__':
     path=Path(os.environ.get('INBOX_DB','/data/inbox.sqlite'));path.parent.mkdir(parents=True,exist_ok=True)
-    server=ThreadingHTTPServer(('0.0.0.0',8090),Handler);server.inbox=Inbox(path);server.serve_forever()
+    server=ThreadingHTTPServer((os.environ.get('INBOX_HOST','0.0.0.0'),int(os.environ.get('INBOX_PORT','8090'))),Handler);server.inbox=Inbox(path);server.serve_forever()

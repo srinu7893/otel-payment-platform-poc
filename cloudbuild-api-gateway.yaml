@@ -1,0 +1,13 @@
+steps:
+- name: maven:3.9.9-eclipse-temurin-21
+  entrypoint: mvn
+  args: ['-B', '-pl', 'api-gateway', '-am', 'package', '-DskipTests']
+- name: gcr.io/cloud-builders/curl
+  entrypoint: bash
+  args: ['-c', 'bash scripts/setup-otel-agent.sh && cp observability/agent/opentelemetry-javaagent.jar api-gateway/target/opentelemetry-javaagent.jar']
+- name: gcr.io/cloud-builders/docker
+  args: ['build', '--target', 'cloud', '--build-arg', 'JAR_FILE=target/api-gateway-0.1.0-SNAPSHOT.jar', '--label', 'org.opencontainers.image.revision=${_REVISION}', '-f', 'api-gateway/Dockerfile', '-t', 'us-central1-docker.pkg.dev/project-c9bd3d0e-266f-47bf-852/otel-payment-platform/api-gateway:${_REVISION}', 'api-gateway']
+images:
+- 'us-central1-docker.pkg.dev/project-c9bd3d0e-266f-47bf-852/otel-payment-platform/api-gateway:${_REVISION}'
+substitutions:
+  _REVISION: manual

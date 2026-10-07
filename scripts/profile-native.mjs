@@ -1,0 +1,13 @@
+import {readFile,mkdir} from 'node:fs/promises';
+import {spawnSync} from 'node:child_process';
+import path from 'node:path';
+const service=process.argv[2]||'payment-service';
+const state=JSON.parse(await readFile('artifacts/native-runtime/processes.json','utf8'));const item=state[service];
+if(!item||path.basename(item.exe).toLowerCase()!=='java.exe')throw Error('Select a tracked Java service');
+await mkdir('artifacts/profiles',{recursive:true});
+const jcmd=path.join(path.dirname(item.exe),'jcmd.exe');
+const identity=spawnSync(jcmd,[String(item.pid),'VM.command_line'],{windowsHide:true,encoding:'utf8'});
+if(identity.status!==0||!identity.stdout.includes(`${service}-0.1.0-SNAPSHOT.jar`))throw Error('Tracked JVM identity mismatch');
+const file=path.resolve('artifacts/profiles',`${service}-${Date.now()}.jfr`);
+const result=spawnSync(jcmd,[String(item.pid),'JFR.start','name=poc-profile','settings=profile','duration=30s',`filename=${file}`],{windowsHide:true,encoding:'utf8'});
+if(result.status!==0)throw Error(result.stderr);console.log(result.stdout);console.log(`Recording file after 30 seconds: ${file}`);
