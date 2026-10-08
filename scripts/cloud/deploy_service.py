@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Deploy one prebuilt application digest, preserving traffic until readiness passes."""
 import argparse
-import copy
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
 from urllib.parse import urlparse
-from run_release import SERVICES, CALLS, DATABASE, JWT, SECRET_RE, render, gcloud, allocation, health
+from run_release import SERVICES, CALLS, DATABASE, JWT, SECRET_RE, render, gcloud, allocation, health, preserved_traffic, validate_manifest_traffic
 
 PROJECT = 'project-c9bd3d0e-266f-47bf-852'
 REGISTRY = f'us-central1-docker.pkg.dev/{PROJECT}/otel-payment-platform'
@@ -99,12 +98,12 @@ def deploy(config, service, image, collector, revision, out):
         required = {config['serviceAccounts'][service]}
         if any('serviceAccount:' + account not in members for account in required):
             raise ValueError('Provision selected service caller/self-invoker permissions first')
-    traffic = allocation(previous)
+    targets = preserved_traffic(previous)
+    traffic = allocation({'status': {'traffic': targets}})
     out.mkdir(parents=True, exist_ok=True)
     (out/'previous-traffic.json').write_text(json.dumps(traffic, indent=2))
-    manifest['spec']['traffic'] = copy.deepcopy(previous['status'].get('traffic', []))
-    for entry in manifest['spec']['traffic']:
-        entry.pop('url', None)
+    manifest['spec']['traffic'] = targets
+    validate_manifest_traffic(manifest, traffic)
     file = out/(service+'.json')
     file.write_text(json.dumps(manifest, indent=2))
     candidate = manifest['spec']['template']['metadata']['name']

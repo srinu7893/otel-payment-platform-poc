@@ -137,6 +137,54 @@ def allocation(service):
     if sum(traffic.values()) != 100: raise ValueError('Existing service must have 100% resolved traffic')
     return traffic
 
+def normalize_traffic(entries):
+    """Convert API status targets to exclusive, spec-safe traffic targets."""
+    targets = []
+    for entry in entries:
+        revision = entry.get('revisionName') or entry.get('revision_name')
+        latest = entry.get('latestRevision', entry.get('latest_revision', False))
+        target = {key: entry[key] for key in ['percent', 'tag'] if key in entry}
+        if revision:
+            target['revisionName'] = revision
+        elif latest is True:
+            target['latestRevision'] = True
+        else:
+            raise ValueError('Traffic target requires a revisionName or latestRevision=true')
+        targets.append(target)
+    return targets
+
+def validate_manifest_traffic(manifest, preserved=None):
+    """Reject ambiguous targets and production traffic to a new candidate."""
+    entries = manifest.get('spec', {}).get('traffic', [])
+    for index, target in enumerate(entries):
+        revision = target.get('revisionName') or target.get('revision_name')
+        latest = target.get('latestRevision') is True or target.get('latest_revision') is True
+        if revision and latest:
+            raise ValueError(f'Invalid spec.traffic[{index}]: revisionName and latestRevision=true are mutually exclusive')
+        if revision and ('latestRevision' in target or 'latest_revision' in target):
+            raise ValueError(f'Invalid spec.traffic[{index}]: remove latestRevision from explicit revision target')
+        if not revision and not latest:
+            raise ValueError(f'Invalid spec.traffic[{index}]: missing revision target')
+    if preserved is not None:
+        candidate = manifest['spec']['template']['metadata']['name']
+        if any(t.get('latestRevision') is True or t.get('latest_revision') is True for t in entries):
+            raise ValueError('Candidate replacement requires explicit preserved revisions; latestRevision would route to the candidate')
+        current = allocation({'status': {'traffic': entries}})
+        if current != preserved or candidate in current:
+            raise ValueError('Candidate replacement must preserve production allocation and give the candidate no production traffic')
+
+def preserved_traffic(service):
+    """Pin any unresolved latest target to the previously ready revision."""
+    targets = normalize_traffic(service['status'].get('traffic', []))
+    for target in targets:
+        if target.pop('latestRevision', False):
+            revision = service['status'].get('latestReadyRevisionName') or service['status'].get('latest_ready_revision_name')
+            if not revision:
+                raise ValueError('Cannot preserve latestRevision traffic: live latestReadyRevisionName is missing')
+            target['revisionName'] = revision
+    allocation({'status': {'traffic': targets}})
+    return targets
+
 def health(config, url, service):
     # Generate a fresh token with the canonical audience, including for tagged revision URLs.
     token = subprocess.check_output(['gcloud', 'auth', 'print-identity-token',
@@ -174,7 +222,8 @@ def release(config, files, output):
         for caller, targets in CALLS.items():
             if service in targets and 'serviceAccount:' + config['serviceAccounts'][caller] not in members and not public:
                 raise ValueError('Missing configured caller invoker permission: ' + caller + ' -> ' + service)
-    previous = {service: allocation(before[service]) for service in SERVICES}
+    targets = {service: preserved_traffic(before[service]) for service in SERVICES}
+    previous = {service: allocation({'status': {'traffic': targets[service]}}) for service in SERVICES}
     output.parent.mkdir(parents=True, exist_ok=True)
     (output.parent / 'pre-release.json').write_text(json.dumps(previous, indent=2))
     promoted, candidates = [], {}
@@ -183,9 +232,8 @@ def release(config, files, output):
         for service in SERVICES:
             manifest = json.loads(files[service].read_text())
             # Preserve traffic exactly, including tagged entries, while creating the candidate revision.
-            manifest['spec']['traffic'] = before[service]['status'].get('traffic', [])
-            # status fields must not be sent in a spec traffic target.
-            for entry in manifest['spec']['traffic']: entry.pop('url', None)
+            manifest['spec']['traffic'] = targets[service]
+            validate_manifest_traffic(manifest, previous[service])
             files[service].write_text(json.dumps(manifest, indent=2))
             gcloud(config, 'run', 'services', 'replace', str(files[service]))
             name = config['prefix'] + '-' + service

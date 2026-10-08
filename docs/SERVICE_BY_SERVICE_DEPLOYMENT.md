@@ -95,6 +95,26 @@ Each workflow checks CI, validates config, authenticates via WIF, builds/pushes 
 
 `manual-cloud-run.yml` is now a validation-only legacy full-stack check; it cannot deploy all services. Existing `ci.yml` remains unchanged. The manual image-publishing workflow remains available for explicit full-stack image preparation and shared Collector releases, independently of deployment.
 
+## Preserved production traffic during candidate creation
+
+Both deployment scripts normalize live traffic before writing the replacement manifest. Explicit `revisionName` targets take precedence over `latestRevision` (including `latest_revision`); the latest flag is removed completely. Status-only URLs are omitted and tags/percentages remain. A latest-only target is pinned to the live `latestReadyRevisionName`; missing resolution fails locally. This ensures creating a candidate does not redirect production traffic to that candidate.
+
+Before replacement, a local guard rejects conflicting targets, latest-based targets, changes to the saved production split, or any production allocation to the candidate revision. Candidate health is checked through its temporary tag before exact-revision promotion. Rollback uses the saved explicit revision allocation.
+
+`deploy/cloud-run/customer-traffic.example.json` shows the exact transformation for illustrative revision `customer-service-00012-abc` (not a queried live revision). Before:
+
+```json
+{"traffic":[{"revisionName":"customer-service-00012-abc","latestRevision":true,"percent":100}]}
+```
+
+After, in `service.spec`:
+
+```json
+{"traffic":[{"percent":100,"revisionName":"customer-service-00012-abc"}]}
+```
+
+The deployment artifact's `customer-service.json` contains the actual rendered traffic and `previous-traffic.json` records the exact rollback split. No traffic setting is needed in the customer-only configuration example: traffic is read from the selected live service.
+
 ## Optional Cloud Build files
 
 `cloudbuild-frontend.yaml`, `cloudbuild-auth.yaml`, `cloudbuild-customer.yaml`, `cloudbuild-payment.yaml`, `cloudbuild-gateway.yaml`, `cloudbuild-bank.yaml`, `cloudbuild-notification.yaml` and `cloudbuild-api-gateway.yaml` are build/publish alternatives, not triggers and not deployment jobs. Submit manually from the repository root, for example:

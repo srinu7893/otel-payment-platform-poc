@@ -44,7 +44,7 @@ class ReleaseRollbackTest(unittest.TestCase):
         from run_release import release,CALLS
         config=json.loads((ROOT/'deploy/cloud-run/config.full-stack.example.json').read_text())
         image='us-central1-docker.pkg.dev/replace-project-id/otel-payment-poc/payment@sha256:'+'a'*64
-        states={service:{'status':{'url':config['urls'][service],'traffic':[{'revisionName':'old-a','percent':70},{'revisionName':'old-b','percent':30}]}} for service in SERVICES}
+        states={service:{'status':{'url':config['urls'][service],'traffic':[{'revisionName':'old-a','latestRevision':True,'percent':70},{'revisionName':'old-b','percent':30}]}} for service in SERVICES}
         calls=[]
         def fake_gcloud(conf,*args):
             calls.append(args)
@@ -52,7 +52,10 @@ class ReleaseRollbackTest(unittest.TestCase):
                 members=['serviceAccount:'+value for value in config['serviceAccounts'].values()]
                 if args[3].endswith(('frontend','api-gateway')):members.append('allUsers')
                 return {'bindings':[{'role':'roles/run.invoker','members':members}]}
-            if args[2]=='replace':return {}
+            if args[2]=='replace':
+                traffic=json.loads(Path(args[3]).read_text())['spec']['traffic']
+                self.assertEqual(traffic,[{'revisionName':'old-a','percent':70},{'revisionName':'old-b','percent':30}])
+                return {}
             service=args[3].removeprefix(config['prefix']+'-')
             if args[2]=='describe':return copy.deepcopy(states[service])
             option=args[4]

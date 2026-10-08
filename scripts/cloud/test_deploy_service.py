@@ -35,14 +35,17 @@ class IndependentDeploymentTest(unittest.TestCase):
         config=json.loads((Path(__file__).resolve().parents[2]/'deploy/cloud-run/config.example.json').read_text())
         for failure in [False, True]:
             with self.subTest(candidate_failure=failure):
-                state={'status':{'url':config['urls']['customer-service'],'traffic':[{'revisionName':'old-customer','percent':100}]}}
+                state={'status':{'url':config['urls']['customer-service'],'traffic':[{'revisionName':'old-customer','latestRevision':True,'percent':100}]}}
                 calls=[]
                 def fake(conf,*args):
                     calls.append(args)
                     if args[2]=='get-iam-policy':
                         return {'bindings':[{'role':'roles/run.invoker','members':['serviceAccount:'+config['serviceAccounts']['customer-service']]}]}
                     if args[2]=='describe':return copy.deepcopy(state)
-                    if args[2]=='replace':return {}
+                    if args[2]=='replace':
+                        manifest=json.loads(Path(args[3]).read_text())
+                        self.assertEqual(manifest['spec']['traffic'],[{'revisionName':'old-customer','percent':100}])
+                        return {}
                     option=args[4]
                     if option.startswith('--update-tags='):
                         tag,revision=option.split('=',2)[1:]
@@ -60,7 +63,7 @@ class IndependentDeploymentTest(unittest.TestCase):
                     else:
                         deploy(config,'customer-service',self.image,self.collector,'gh-1',Path(directory))
                         self.assertEqual(json.loads((Path(directory)/'result.json').read_text())['status'],'PASS')
-                self.assertEqual(state['status']['traffic'],[{'revisionName':'old-customer' if failure else 'customer-service-gh-1','percent':100}])
+                self.assertEqual(state['status']['traffic'],[{'revisionName':'old-customer','latestRevision':True,'percent':100}] if failure else [{'revisionName':'customer-service-gh-1','percent':100}])
                 self.assertTrue(all(a[3]=='customer-service' for a in calls if a[2]!='replace'))
 
     def test_every_service_accepts_only_its_own_configuration(self):
@@ -154,7 +157,7 @@ class IndependentDeploymentTest(unittest.TestCase):
     def test_failure_after_promotion_rolls_back_only_selected_service(self):
         # No future caller account is available during this release.
         self.config['serviceAccounts']={'auth-service':self.config['serviceAccounts']['auth-service']}
-        calls=[];state={'status':{'url':self.config['urls']['auth-service'],'traffic':[{'revisionName':'auth-old','percent':100}]}}
+        calls=[];state={'status':{'url':self.config['urls']['auth-service'],'traffic':[{'revisionName':'auth-old','latest_revision':True,'percent':100}]}}
         def fake(config,*args):
             calls.append(args)
             if args[2]=='get-iam-policy':

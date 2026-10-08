@@ -1,0 +1,20 @@
+{
+  "description": "Illustrative resolved live status; customer-service-00012-abc is an example revision, not a queried live revision.",
+  "before": {
+    "traffic": [
+      {
+        "revisionName": "customer-service-00012-abc",
+        "latestRevision": true,
+        "percent": 100
+      }
+    ]
+  },
+  "after": {
+    "traffic": [
+      {
+        "percent": 100,
+        "revisionName": "customer-service-00012-abc"
+      }
+    ]
+  }
+}
