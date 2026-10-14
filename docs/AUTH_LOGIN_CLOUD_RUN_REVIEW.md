@@ -1,4 +1,4 @@
-# Auth login and private Cloud Run verification — 14 October 2026
+# Auth login and private Cloud Run verification â€” 14 October 2026
 
 All changes are local/uncommitted. No deployment, gcloud command, resource creation, IAM/secret change or database migration was executed. Cloud Run IAM/Collector/probe configuration stays unchanged. Business login/payment logic stays unchanged.
 
@@ -121,3 +121,11 @@ References: [Cloud Run two authentication headers](https://docs.cloud.google.com
 - `frontend/src/styles.css`
 - `scripts/cloud/test_auth_probe_contract.py`
 - `docs/AUTH_LOGIN_CLOUD_RUN_REVIEW.md` (this report)
+
+## Gateway startup follow-up - 14 October 2026
+
+The subsequent Gateway candidate `api-gateway-gh-38554320481-1` failed before HTTP startup. The supplied Cloud Run stack trace and a full local startup test both confirm `jsonToGRPCFilterFactory -> grpcSslConfigurer -> NoClassDefFoundError: io/grpc/netty/NettyChannelBuilder`. The ADC library's transitive gRPC API classes activated Gateway's optional JSON-to-gRPC feature without its Netty transport. This application routes HTTP and does not use that feature. `spring.cloud.gateway.server.webflux.filter.json-to-grpc.enabled=false` disables it while retaining ADC identity authentication, all routes, JWT enforcement and the Collector. A real Gateway startup regression test with IAM enabled now checks liveness/readiness200 and that the unused filter is absent.
+
+The 18 Gateway/shared tests pass locally with this fix. Frontend deployment run38554543068 passed candidate and production health and promoted its exact revision. Read-only diagnostic workflow38555032114 can read revision conditions, but log access was denied because github-deployer lacks log-view permissions; no IAM grant was added. The user supplied the failed container stack instead. The diagnostic workflow is manual/main/WIF only and never modifies Cloud Run resources.
+
+Reference: [Gateway JSON-to-gRPC configuration](https://docs.spring.io/spring-cloud-gateway/reference/configprops.html).

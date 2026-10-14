@@ -8,6 +8,10 @@ spring:
     gateway:
       server:
         webflux:
+          # Google ADC brings grpc-api onto the classpath; this HTTP gateway does not use gRPC routing.
+          filter:
+            json-to-grpc:
+              enabled: false
           routes:
             - id: auth-service
               uri: ${SERVICES_AUTH_URL:http://localhost:8079}
