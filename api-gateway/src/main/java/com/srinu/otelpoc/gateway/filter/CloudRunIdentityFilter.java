@@ -42,8 +42,10 @@ public class CloudRunIdentityFilter implements GlobalFilter, Ordered {
             // Handle only token acquisition here; downstream failures must not be relabeled as IAM failures.
             .map(token -> java.util.Optional.of(token))
             .onErrorResume(error -> {
-                log.warn("event=WORKLOAD_TOKEN_FAILED backend={} audience={} correlationId={} traceId={} errorType={}",
-                    destination == null ? "unresolved" : destination.getHost(), audience, correlationId, traceId(clean), error.getClass().getSimpleName());
+                Throwable cause = error.getCause();
+                log.warn("event=WORKLOAD_TOKEN_FAILED backend={} audience={} correlationId={} traceId={} errorType={} errorMessage={} causeType={} causeMessage={}",
+                    destination == null ? "unresolved" : destination.getHost(), audience, correlationId, traceId(clean), error.getClass().getName(), safeMessage(error),
+                    cause == null ? "none" : cause.getClass().getName(), safeMessage(cause));
                 return tokenFailure(clean, correlationId).thenReturn(java.util.Optional.<String>empty());
             })
             .flatMap(token -> {
@@ -61,6 +63,17 @@ public class CloudRunIdentityFilter implements GlobalFilter, Ordered {
                     "event=PRIVATE_BACKEND_COMPLETED backend={} status={} correlationId={} traceId={}",
                     destination.getHost(), outbound.getResponse().getStatusCode(), correlationId, traceId(clean)));
             });
+    }
+    static String safeMessage(Throwable error) {
+        if (error == null || error.getMessage() == null) return "unavailable";
+        // Only our fixed diagnostic messages are safe; library errors can contain token response bodies.
+        String message = error.getMessage();
+        if (java.util.Set.of("Refusing workload credentials for an unconfigured service origin",
+                "Interrupted while acquiring workload identity", "Metadata server returned an invalid ID token",
+                "Metadata token audience or lifetime is invalid", "Metadata server returned malformed token claims",
+                "Metadata identity response exceeded size limit").contains(message)
+                || message.matches("Metadata identity request failed with HTTP [0-9]{3}")) return message;
+        return "[redacted external exception message]";
     }
     private String traceId(ServerWebExchange exchange) {
         String active = MDC.get("trace_id");

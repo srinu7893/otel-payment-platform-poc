@@ -1,0 +1,13 @@
+# Gateway identity token acquisition review
+
+The login failure was reproduced in the real Gateway routing pipeline. Spring Gateway resolves the configured HTTPS backend as `https://auth-service-fddyka6g2a-uc.a.run.app:443/api/v1/auth/login`. The workload credential allowlist rejected every explicit port, throwing `IOException: Refusing workload credentials for an unconfigured service origin` before ADC token acquisition. Standard HTTPS port 443 is now accepted; other ports, user information, HTTP, and unlisted origins remain rejected. The audience remains the canonical origin without a port or path.
+
+Google ADC is loaded lazily. Credentials implementing `IdTokenProvider` use `IdTokenCredentials` with the exact audience and refresh before use. Other credential types use the fixed Cloud Run metadata identity endpoint with URL-encoded audience, `format=full`, GET, `Metadata-Flavor: Google`, a two-second connect timeout, a three-second read timeout, redirects disabled, and bounded response size. Provider failures are not silently replaced by fallback requests. Tokens are cached only until 60 seconds before expiry and rejected for wrong audience or insufficient lifetime.
+
+Login forwards the Google token in Authorization and X-Serverless-Authorization. Business requests retain the customer JWT in Authorization and use X-Serverless-Authorization for workload identity. Acquisition failures return the existing structured 503 and never call the backend. Browser responses do not expose workload tokens.
+
+Failure diagnostics include exception and direct-cause classes, backend, audience, correlation and trace IDs. Only fixed internal error messages are logged; arbitrary library messages are redacted because they can contain credential responses. No exception object or stack trace is supplied to the logger.
+
+Regression tests cover actual route normalization, successful HTTP forwarding to a mock backend, unchanged body/content type/correlation and W3C headers, fail-closed responses, ADC provider and non-provider paths, metadata encoding/header/timeouts/redirect rejection, cache renewal, and credential-message redaction. The backend rewrite used by the HTTP integration test exists only in test configuration after workload authentication.
+
+The runtime dependency remains Google Auth Library 1.50.0 with compile scope, inherited through cloud-runtime. Verify the executable JAR contains GoogleCredentials, IdTokenCredentials, IdTokenProvider, ComputeEngineCredentials, and ServiceAccountCredentials in BOOT-INF/lib. JSON-to-gRPC remains disabled; grpc-netty is not added. No business logic, IAM policy, deployment trigger, or traffic safety control changes are required.

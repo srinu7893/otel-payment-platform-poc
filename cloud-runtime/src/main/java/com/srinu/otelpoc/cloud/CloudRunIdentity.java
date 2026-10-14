@@ -43,7 +43,9 @@ public final class CloudRunIdentity {
     }
     public synchronized String bearerFor(URI destination) throws IOException {
         String origin = destination.getScheme() + "://" + destination.getHost();
-        if (destination.getUserInfo() != null || destination.getPort() != -1 || !audiences.contains(origin)) {
+        // Gateway normalizes an HTTPS route to :443; the ID-token audience stays the canonical origin.
+        if (destination.getUserInfo() != null || (destination.getPort() != -1 && destination.getPort() != 443)
+                || !"https".equals(destination.getScheme()) || !audiences.contains(origin)) {
             throw new IOException("Refusing workload credentials for an unconfigured service origin");
         }
         long now = clock.instant().getEpochSecond();
@@ -70,16 +72,45 @@ public final class CloudRunIdentity {
         return "Bearer " + cached.token();
     }
     private static TokenFetcher adcFetcher() {
+        return adcFetcher(metadataFetcher());
+    }
+    static TokenFetcher adcFetcher(TokenFetcher fallback) {
         return new TokenFetcher() {
             private GoogleCredentials credentials;
             @Override public String fetch(String audience) throws IOException {
                 if (credentials == null) credentials = GoogleCredentials.getApplicationDefault();
                 if (!(credentials instanceof IdTokenProvider provider)) {
-                    throw new IOException("Runtime ADC does not support Google ID tokens");
+                    try { return fallback.fetch(audience); }
+                    catch (InterruptedException error) { Thread.currentThread().interrupt(); throw new IOException("Interrupted while acquiring workload identity", error); }
                 }
                 return IdTokenCredentials.newBuilder().setIdTokenProvider(provider)
                     .setTargetAudience(audience).setOptions(java.util.List.of()).build().refreshAccessToken().getTokenValue();
             }
+        };
+    }
+    static TokenFetcher metadataFetcher() {
+        return metadataFetcher(url -> (java.net.HttpURLConnection) url.openConnection());
+    }
+    @FunctionalInterface interface MetadataConnection { java.net.HttpURLConnection open(java.net.URL url) throws IOException; }
+    static TokenFetcher metadataFetcher(MetadataConnection factory) {
+        return audience -> {
+            var url = URI.create("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience="
+                + java.net.URLEncoder.encode(audience, java.nio.charset.StandardCharsets.UTF_8) + "&format=full").toURL();
+            var connection = factory.open(url);
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Metadata-Flavor", "Google");
+            connection.setConnectTimeout(2000);
+            connection.setReadTimeout(3000);
+            connection.setInstanceFollowRedirects(false);
+            try {
+                int status = connection.getResponseCode();
+                if (status != 200) throw new IOException("Metadata identity request failed with HTTP " + status);
+                try (var input = connection.getInputStream()) {
+                    byte[] bytes = input.readNBytes(65537);
+                    if (bytes.length > 65536) throw new IOException("Metadata identity response exceeded size limit");
+                    return new String(bytes, java.nio.charset.StandardCharsets.UTF_8).trim();
+                }
+            } finally { connection.disconnect(); }
         };
     }
 }
