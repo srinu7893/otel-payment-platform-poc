@@ -1,3 +1,4 @@
+import { formatApiError } from './errors.js';
 import { useEffect, useState } from 'react';
 import ObservabilityPanel from './ObservabilityPanel';
 import {
@@ -35,7 +36,7 @@ export default function OperationsPanel({ token, roles }) {
       setTransfers(transferPage?.content || []);
       setNotifications(notificationPage?.content || []);
     } catch (e) {
-      setError(`${e.message}${e.correlationId ? ` (correlation ${e.correlationId})` : ''}`);
+      setError(formatApiError(e));
     } finally {
       setLoading(false);
     }
@@ -56,7 +57,7 @@ export default function OperationsPanel({ token, roles }) {
         : await getTransfer(token, searchId.trim());
       setSearchResult(result);
     } catch (e) {
-      setError(`${e.message}${e.correlationId ? ` (correlation ${e.correlationId})` : ''}`);
+      setError(formatApiError(e));
     }
   }
 

@@ -42,7 +42,7 @@ public class RequestContextFilter implements GlobalFilter, Ordered {
                     headers.remove(CUSTOMER_HEADER);
                     headers.remove(ROLES_HEADER);
                     headers.set(CORRELATION_HEADER, finalCorrelationId);
-                    if (authentication instanceof JwtAuthenticationToken jwtAuth) {
+                    if (authentication instanceof JwtAuthenticationToken jwtAuth && jwtAuth.isAuthenticated()) {
                         headers.set(USER_HEADER, jwtAuth.getName());
                         String customerId = jwtAuth.getToken().getClaimAsString("customer_id");
                         if (customerId != null) headers.set(CUSTOMER_HEADER, customerId);

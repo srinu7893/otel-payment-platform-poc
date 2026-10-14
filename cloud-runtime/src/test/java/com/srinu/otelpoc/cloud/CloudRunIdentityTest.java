@@ -10,6 +10,20 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.*;
 class CloudRunIdentityTest {
+    @Test void productionFetcherUsesAdcIdTokenProviderForExactCanonicalAudience() throws Exception {
+        String token=Base64.getUrlEncoder().withoutPadding().encodeToString("{\"alg\":\"RS256\"}".getBytes(StandardCharsets.UTF_8))+"."
+            +Base64.getUrlEncoder().withoutPadding().encodeToString(("{\"aud\":\""+AUD+"\",\"exp\":"+(Instant.now().getEpochSecond()+3600)+"}").getBytes(StandardCharsets.UTF_8))+".c2ln";
+        com.google.auth.oauth2.ComputeEngineCredentials adc=org.mockito.Mockito.mock(com.google.auth.oauth2.ComputeEngineCredentials.class);
+        org.mockito.Mockito.when(adc.idTokenWithAudience(org.mockito.ArgumentMatchers.eq(AUD),org.mockito.ArgumentMatchers.anyList()))
+            .thenReturn(com.google.auth.oauth2.IdToken.create(token));
+        try(var defaults=org.mockito.Mockito.mockStatic(com.google.auth.oauth2.GoogleCredentials.class)) {
+            defaults.when(com.google.auth.oauth2.GoogleCredentials::getApplicationDefault).thenReturn(adc);
+            var identity=new CloudRunIdentity(Set.of(AUD));
+            assertThat(identity.bearerFor(URI.create(AUD+"/api/v1/auth/login"))).isEqualTo("Bearer "+token);
+            defaults.verify(com.google.auth.oauth2.GoogleCredentials::getApplicationDefault);
+            org.mockito.Mockito.verify(adc).idTokenWithAudience(org.mockito.ArgumentMatchers.eq(AUD),org.mockito.ArgumentMatchers.anyList());
+        }
+    }
     private static final String AUD = "https://payment.example.run.app";
     private static final Clock NOW = Clock.fixed(Instant.ofEpochSecond(1000), ZoneOffset.UTC);
     private String token(String aud, long expiry) {

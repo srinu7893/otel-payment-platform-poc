@@ -1,3 +1,4 @@
+import { formatApiError } from './errors.js';
 import { useEffect, useMemo, useState } from 'react';
 import {
   createPayment,
@@ -37,7 +38,7 @@ export default function App() {
       setSession(result);
       setTab((result.roles || []).some(r => r === 'SUPPORT' || r === 'ADMIN') ? 'operations' : 'overview');
     } catch (e) {
-      setError(`${e.message}${e.correlationId ? ` (correlation ${e.correlationId})` : ''}`);
+      setError(formatApiError(e));
     } finally {
       setLoading(false);
     }
@@ -58,7 +59,7 @@ export default function App() {
       setTransfers(transferPage?.content || []);
       setNotifications(notificationPage?.content || []);
     } catch (e) {
-      setError(`${e.message}${e.correlationId ? ` (correlation ${e.correlationId})` : ''}`);
+      setError(formatApiError(e));
     }
   }
 
@@ -84,7 +85,7 @@ export default function App() {
       formElement.reset();
       await refreshAll();
     } catch (e) {
-      setError(formatError(e));
+      setError(formatApiError(e));
     } finally {
       setLoading(false);
     }
@@ -109,7 +110,7 @@ export default function App() {
       formElement.reset();
       await refreshAll();
     } catch (e) {
-      setError(formatError(e));
+      setError(formatApiError(e));
     } finally {
       setLoading(false);
     }
@@ -124,7 +125,7 @@ export default function App() {
       setSuccess(`Refund ${String(result.refundId).slice(0, 8)} is ${result.status}`);
       await refreshAll();
     } catch (e) {
-      setError(formatError(e));
+      setError(formatApiError(e));
     } finally {
       setLoading(false);
     }
@@ -214,9 +215,6 @@ function HistoryTable({ title, rows, type, onRefund, loading }) {
   return <div className="card"><h2>{title}</h2><div className="tableWrap"><table><thead><tr><th>ID</th><th>Destination</th><th>Amount</th><th>Status</th>{type === 'payment' && <th>Action</th>}</tr></thead><tbody>{rows.map(row => <tr key={row.paymentId || row.transferId}><td>{short(row.paymentId || row.transferId)}</td><td>{type === 'payment' ? row.merchant : row.receiverAccount}</td><td>{row.amount} {type === 'transfer' ? row.currency : ''}</td><td><span className="badge">{row.status}</span></td>{type === 'payment' && <td>{row.status === 'COMPLETED' && onRefund ? <button className="secondary compact" disabled={loading} onClick={() => onRefund(row.paymentId)}>Refund</button> : '—'}</td>}</tr>)}{rows.length === 0 && <tr><td colSpan={type === 'payment' ? '5' : '4'}>No records yet.</td></tr>}</tbody></table></div></div>;
 }
 
-function formatError(e) {
-  return `${e.code ? `${e.code}: ` : ''}${e.message}${e.correlationId ? ` (correlation ${e.correlationId})` : ''}`;
-}
 
 function short(value) {
   return value ? String(value).slice(0, 8) : '—';

@@ -2,14 +2,11 @@ package com.srinu.otelpoc.cloud;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.IdTokenProvider;
+import com.google.auth.oauth2.IdTokenCredentials;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
-import java.time.Duration;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,7 +25,7 @@ public final class CloudRunIdentity {
     private record Cached(String token, long expires) {}
 
     public CloudRunIdentity(Set<String> audiences) {
-        this(audiences, metadataFetcher(), Clock.systemUTC());
+        this(audiences, adcFetcher(), Clock.systemUTC());
     }
     public CloudRunIdentity(Set<String> audiences, TokenFetcher fetcher, Clock clock) {
         this.audiences = audiences.stream().map(value -> {
@@ -72,19 +69,17 @@ public final class CloudRunIdentity {
         }
         return "Bearer " + cached.token();
     }
-    private static TokenFetcher metadataFetcher() {
-        HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2))
-            .followRedirects(HttpClient.Redirect.NEVER).build();
-        return audience -> {
-            URI url = URI.create("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?format=full&audience="
-                + URLEncoder.encode(audience, StandardCharsets.UTF_8));
-            HttpRequest request = HttpRequest.newBuilder(url).timeout(Duration.ofSeconds(3))
-                .header("Metadata-Flavor", "Google").GET().build();
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200 || !response.headers().firstValue("Metadata-Flavor").orElse("").equals("Google")) {
-                throw new IOException("Cloud Run metadata identity request failed");
+    private static TokenFetcher adcFetcher() {
+        return new TokenFetcher() {
+            private GoogleCredentials credentials;
+            @Override public String fetch(String audience) throws IOException {
+                if (credentials == null) credentials = GoogleCredentials.getApplicationDefault();
+                if (!(credentials instanceof IdTokenProvider provider)) {
+                    throw new IOException("Runtime ADC does not support Google ID tokens");
+                }
+                return IdTokenCredentials.newBuilder().setIdTokenProvider(provider)
+                    .setTargetAudience(audience).setOptions(java.util.List.of()).build().refreshAccessToken().getTokenValue();
             }
-            return response.body().strip();
         };
     }
 }

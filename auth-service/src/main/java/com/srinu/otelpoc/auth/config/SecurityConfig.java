@@ -4,6 +4,8 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -41,16 +43,29 @@ public class SecurityConfig {
     }
 
     @Bean
+    @Order(1)
+    SecurityFilterChain healthSecurityFilterChain(HttpSecurity http) throws Exception {
+        return http.securityMatcher("/actuator/health", "/actuator/health/**")
+            .csrf(csrf -> csrf.disable())
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll()).build();
+    }
+
+    @Bean
+    @Order(2)
     SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityErrorHandler securityErrors) throws Exception {
+        DefaultBearerTokenResolver bearerTokens = new DefaultBearerTokenResolver();
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/login", "/actuator/health", "/actuator/info").permitAll()
+                .requestMatchers("/api/v1/auth/login").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint(securityErrors)
                 .accessDeniedHandler(securityErrors))
             .oauth2ResourceServer(oauth -> oauth
+                // Login is public at the application layer; Cloud Run validates its Google ID token.
+                .bearerTokenResolver(request -> request.getServletPath().equals("/api/v1/auth/login")
+                    ? null : bearerTokens.resolve(request))
                 .authenticationEntryPoint(securityErrors)
                 .accessDeniedHandler(securityErrors)
                 .jwt(jwt -> {}));

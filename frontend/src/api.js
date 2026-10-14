@@ -1,4 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+import { normalizeApiError } from './errors.js';
 
 async function request(path, options = {}) {
   const correlationId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -19,13 +20,11 @@ async function request(path, options = {}) {
       : await response.text();
 
   if (!response.ok) {
-    const message = typeof body === 'object' && body?.message
-      ? body.message
-      : body || `HTTP ${response.status}`;
-    const error = new Error(message);
+    const normalized = normalizeApiError({ response: { data: body, headers: response.headers } });
+    const error = new Error(normalized.message);
     error.status = response.status;
-    error.code = typeof body === 'object' ? body?.code : undefined;
-    error.correlationId = response.headers.get('X-Correlation-Id') || body?.correlationId || correlationId;
+    error.code = normalized.code;
+    error.correlationId = normalized.correlationId || correlationId;
     throw error;
   }
   return body;
