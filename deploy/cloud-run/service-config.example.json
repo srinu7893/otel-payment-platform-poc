@@ -36,5 +36,6 @@
     "password": "otel-rabbit-password"
   },
   "jwtSecret": "otel-jwt",
-  "secretVersion": "1"
+  "secretVersion": "1",
+  "rabbitVirtualHost": "replace-cloudamqp-vhost"
 }

@@ -29,10 +29,7 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
         GH_REPO: ${{ github.repository }}
-      run: |
-        set -euo pipefail
-        run_id=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs" --method GET -f head_sha="$COMMIT_SHA" -f status=success --jq '.workflow_runs[0].id // empty')
-        test -n "$run_id" || { echo 'Run the existing CI successfully on this main commit first.'; exit 1; }
+      run: bash scripts/cloud/workflow_service.sh ci
     - uses: actions/setup-java@v5
       if: env.SERVICE != 'frontend'
       with:
@@ -40,12 +37,7 @@ jobs:
         java-version: '21'
         cache: maven
     - name: Validate required deployment configuration
-      run: |
-        set -euo pipefail
-        test -n "$CLOUD_CONFIG" || { echo 'Set gcp-poc CLOUD_RUN_CONFIG_JSON.'; exit 1; }
-        printf '%s' "$CLOUD_CONFIG" > "$RUNNER_TEMP/service-config.json"
-        python3 scripts/cloud/deploy_service.py validate --service "$SERVICE" --config "$RUNNER_TEMP/service-config.json" \
-          --image "$REGISTRY/gateway-service@sha256:$(printf '0%.0s' {1..64})" --collector "$COLLECTOR_IMAGE"
+      run: bash scripts/cloud/workflow_service.sh validate
     - name: Authenticate with Workload Identity Federation
       uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
       with:
@@ -53,21 +45,9 @@ jobs:
         service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
     - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
     - name: Build and push selected service only
-      run: |
-        set -euo pipefail
-        gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
-        image="$REGISTRY/gateway-service:$COMMIT_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-        bash scripts/cloud/build_service.sh "$SERVICE" "$image" "$COMMIT_SHA"
-        docker push "$image"
-        digest=$(gcloud artifacts docker images describe "$image" --project=project-c9bd3d0e-266f-47bf-852 --format='value(image_summary.digest)')
-        [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo 'Invalid registry digest'; exit 1; }
-        printf '%s' "$REGISTRY/gateway-service@$digest" > "$RUNNER_TEMP/service-image.txt"
+      run: bash scripts/cloud/workflow_service.sh publish
     - name: Deploy only selected Cloud Run service
-      run: |
-        set -euo pipefail
-        python3 scripts/cloud/deploy_service.py deploy --service "$SERVICE" --config "$RUNNER_TEMP/service-config.json" \
-          --image "$(cat "$RUNNER_TEMP/service-image.txt")" --collector "$COLLECTOR_IMAGE" \
-          --revision "gh-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+      run: bash scripts/cloud/workflow_service.sh deploy
     - name: Upload selected service deployment evidence
       if: always()
       uses: actions/upload-artifact@v4

@@ -1,133 +1,142 @@
-# Manual Cloud Run deployment per service
+# Manual service-by-service Cloud Run deployment
 
-Each of the eight `deploy-*.yml` workflows has only `workflow_dispatch`. A push runs the existing CI, never these deployments. In GitHub open **Actions → Deploy <service> → Run workflow → main**. Only the selected application's Dockerfile is built, its image is pushed, and its dedicated service receives a new revision. Backend Maven builds use `-pl <service> -am`: the parent/shared `cloud-runtime` dependency is packaged when needed; other application services are not built. Frontend builds do not run Maven.
+The eight `deploy-*.yml` workflows run only through `workflow_dispatch`, only on `main`, after CI passes for that exact commit. A push runs CI, never deployment. All use the `gcp-poc` environment and Workload Identity Federation. Shared `workflow_service.sh` steps check CI, validate configuration, build/push the selected image, resolve its immutable digest, and invoke `deploy_service.py`. No Customer-specific deployment logic remains. Backend builds use `mvn -pl <service> -am`; shared library dependencies are built, other application services are not. Frontend builds only its own Dockerfile. CI remains unchanged.
 
-All application images go to `us-central1-docker.pkg.dev/project-c9bd3d0e-266f-47bf-852/otel-payment-platform`. Every run uses a commit/run-specific tag and deploys its resolved immutable digest. Backend images use the `cloud` target of their service Dockerfile, including the checksum-verified Java agent. The `local` target remains the default for Compose. Frontend's `cloud` target listens on Cloud Run's injected `PORT` and proxies `/api` to the configured API Gateway HTTPS origin; the local target retains Compose networking.
+Project: `project-c9bd3d0e-266f-47bf-852`; region: `us-central1`; repository: `otel-payment-platform`. Deployment identity: `github-deployer@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com`. PoC runtime identity: `otel-payment-runtime@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com`. Dedicated runtime accounts are also supported.
 
-## Configure GitHub and GCP once
+## GitHub configuration
 
-Create the GitHub environment `gcp-poc`, with these secrets:
+Environment secrets: `WIF_PROVIDER` (the dedicated OTel provider) and `GCP_SERVICE_ACCOUNT` (github-deployer email). No JSON service-account key is needed. Environment variables: `CLOUD_RUN_CONFIG_JSON`, `COLLECTOR_IMAGE` (existing immutable Collector digest for Java), optional `GRAFANA_URL` for frontend links.
 
-| Secret | Value |
-|---|---|
-| `WIF_PROVIDER` | Full workload identity provider resource name, bound to this repository/main/environment |
-| `GCP_SERVICE_ACCOUNT` | Deployment service account email, authenticated through WIF; no JSON key |
-
-Environment variables:
-
-| Variable | Value |
-|---|---|
-| `CLOUD_RUN_CONFIG_JSON` | Partial JSON based on `deploy/cloud-run/config.example.json`; only the selected service URL/account and its required secrets are mandatory |
-| `COLLECTOR_IMAGE` | Existing Collector image digest in the same registry, e.g. `us-central1-docker.pkg.dev/project-c9bd3d0e-266f-47bf-852/otel-payment-platform/collector@sha256:...` |
-| `GRAFANA_URL` | Optional Grafana UI URL for frontend links |
-
-Backend workflows reuse the configured Collector digest; they never build another service or the Collector. Publish that shared image once with the existing image-publishing tooling or a separate approved Collector release. Frontend does not require a Collector digest.
-
-Enable Artifact Registry, Cloud Run, IAM credentials, Secret Manager and telemetry APIs, and provision the repository in `us-central1`. The deployment identity needs Artifact Registry writer, Cloud Run deployment permissions, `iam.serviceAccounts.actAs` on the runtime accounts, and token creation for the selected runtime health-check identities. Bind the WIF subject with `roles/iam.workloadIdentityUser`. Runtime accounts need access to their required secrets and telemetry writer roles.
-
-Provision the database for each database consumer. Neon can be reached over public TLS without a VPC. Configure TLS RabbitMQ only for Payment and Notification; provide network/subnetwork together only when private networking is needed. JDBC URL/user/password and JWT signing key are supplied through Secret Manager, never workflow text. All JWT-using services must use the same signing-key secret/version. The five database consumers are Auth, Customer, Bank, Payment and Notification. API Gateway and Gateway adapter have no datasource dependency. Payment and Notification need broker secrets; Payment's background relay and Notification's consumers use instance-based CPU and a minimum instance of one.
-
-The deployer intentionally does not guess IAM or create infrastructure. Bootstrap only the selected service slot to obtain its stable canonical URL. Add other slots, URLs and accounts as they become available. A shared runtime service account is supported, including the existing Auth and Customer runtime identity. Set runtime self-invoker permissions and caller IAM as each caller is introduced. Internal services must reject anonymous requests; only frontend and API Gateway are public edges. This bootstrap step does not deploy the application. The first successful application revision must pass startup/readiness before receiving traffic. The frontend proxy expects an API Gateway accessible to the configured public edge.
-
-IAM caller graph: Payment → Customer/Gateway adapter; Gateway adapter → Bank; API Gateway → all six backend services for support health. Provision each binding before enabling that caller. Selected-service deployment checks only its self-invoker binding; missing future callers do not block it. The application already supports Cloud Run IAM tokens through `X-Serverless-Authorization`; customer JWTs stay in `Authorization`.
-
-## Customer-only configuration
-
-Set `gcp-poc` environment variable `CLOUD_RUN_CONFIG_JSON` to:
+Stable `CLOUD_RUN_CONFIG_JSON` for every service (no URLs or per-service account map required):
 
 ```json
 {
   "project": "project-c9bd3d0e-266f-47bf-852",
   "region": "us-central1",
   "repository": "otel-payment-platform",
-  "urls": {
-    "customer-service": "https://customer-service-52916499838.us-central1.run.app"
-  },
-  "serviceAccounts": {
-    "customer-service": "otel-payment-runtime@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com"
-  },
+  "defaultServiceAccount": "otel-payment-runtime@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com",
   "databaseSecrets": {
     "url": "neon-jdbc-url",
     "username": "neon-username",
     "password": "neon-password"
   },
+  "rabbitHost": "shrimp.rmq.cloudamqp.com",
+  "rabbitPort": 5671,
+  "rabbitVirtualHost": "dctbblya",
+  "rabbitSecrets": {
+    "username": "rabbit-username",
+    "password": "rabbit-password"
+  },
+  "jwtSecret": "jwt-secret",
   "secretVersion": "1"
 }
 ```
 
-This deploys Customer using only `neon-jdbc-url`, `neon-username` and `neon-password`, pinned to version `1`. Confirm that version exists and that the runtime account can access all three secrets. The JDBC secret should contain your Neon TLS JDBC connection URL. No JWT, RabbitMQ, VPC, other service URLs or other runtime accounts are required. Backend deployments still require `COLLECTOR_IMAGE` as an immutable digest.
+Account precedence is `serviceAccounts[selected-service]` when explicitly supplied, otherwise `defaultServiceAccount`; missing both fails validation. Optional per-service overrides must be valid identities in the configured project. The live service's `spec.template.spec.serviceAccountName` must match the expected account before any candidate replacement. This guards identity drift rather than silently changing a bootstrapped runtime identity.
 
-The actual customer workflow is `.github/workflows/deploy-customer.yml`, displayed as **Deploy customer-service** in Actions; there is no `deploy-customer-service.yml` duplicate. It remains manual-only and uses WIF.
+`urls` remains optional for backward compatibility and supplied dependency origins. Deployment describes the selected service in the configured project/region and uses live `status.url` for canonical health, token audience, evidence and summary. Valid optional display URL differences produce warnings, and both configured/discovered values appear in evidence. Available outbound dependencies are discovered automatically. Missing dependencies do not block selected deployment; unavailable dependencies retain validated supplied origins. No URLs or account entries need to be added when future services are bootstrapped. Redeploy a caller to discover newly available backends.
 
-| Selected service | Required application secrets/configuration |
+Only selected fields are validated: Bank ignores Rabbit/JWT; Gateway ignores datasource/Rabbit/JWT. Workers require `rabbitPort` as integer 5671 and always receive TLS=true, plus host/vhost/secret names. JWT and database references are injected only into their actual consumers. Numeric `secretVersion` applies to required secret references; unrelated fields are ignored. Confirm all secret names/version1 in the stable example actually exist; the configuration contains references, never password values. CloudAMQP host/vhost above are the supplied non-secret values.
+
+`config.full-stack.example.json` and `config.bootstrap.example.json` use this same stable structure. The retired complete-prefix release validator retains an archival test fixture in `scripts/cloud/fixtures/full-stack-legacy.json`; do not use its old full-stack CLI to deploy the dedicated services. All eight active workflows use the shared selected-service path.
+
+Final process: bootstrap a service once, configure its required secrets, apply public/private IAM, then manually run that service's GitHub workflow. It discovers URLs, runtime identity, current traffic/latest-ready revision, ingress/authentication, ports, scaling/billing and existing secret references. `CLOUD_RUN_CONFIG_JSON` stays unchanged between selected service deployments. Missing slots fail with the documented bootstrap diagnostic; runtime mismatch fails before replacement.
+
+## Service contracts
+
+| Service | Cloud Run name | Access | Secrets | Local fallback port | Minimum |
+|---|---|---|---|---|---|
+| Auth | auth-service | Private | Database + JWT | 8079 | 0 |
+| Customer | customer-service | Private | Database | 8084 | 0 |
+| Bank | mock-bank-service | Private | Database | 8082 | 0 |
+| Gateway adapter | gateway-service | Private | None | 8081 | 0 |
+| Payment | payment-service | Private | Database + JWT + Rabbit | 8080 | 1 |
+| Notification | notification-service | Private | Database + JWT + Rabbit | 8083 | 1 |
+| API Gateway | api-gateway | Public | JWT | 8088 | 0 |
+| Frontend | payment-frontend | Public | None | Local Nginx 80 | 0 |
+
+All Cloud Run application containers use port 8080; Cloud Run injects `PORT`, never an explicit reserved env entry. Spring `${PORT:<local-port>}` preserves native fallback ports; Compose retains explicit overrides. Database environment names are `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, supplied only to the five database consumers through pinned Secret Manager references. Neon JDBC must enable TLS. These services own separate Flyway schemas; validate migration permission and shared connection limits before deployment. JWT consumers must use the same sufficiently strong signing secret/version.
+
+RabbitMQ is required only for Payment and Notification. `rabbitHost` must be a hostname; username/password come from `rabbitSecrets` in Secret Manager. `rabbitVirtualHost` is required and should match the assigned CloudAMQP vhost. `rabbitPort` must be the integer 5671. Manifests inject `SPRING_RABBITMQ_HOST`, TLS port `SPRING_RABBITMQ_PORT=5671`, secret-backed `SPRING_RABBITMQ_USERNAME`/`PASSWORD`, `SPRING_RABBITMQ_VIRTUAL_HOST`, and `SPRING_RABBITMQ_SSL_ENABLED=true`. Never place broker passwords in GitHub variables.
+
+All services initially have revision maximum instances 1. Payment's schedulers and Notification's listener require always allocated CPU and minimum instances 1: they cannot scale to zero and incur idle cost. Other Java services retain always allocated CPU for asynchronous Collector/agent export, but minimum 0; they can scale to zero, yet bill while an instance is alive. Frontend uses request-based CPU and minimum 0. Converting Java services to request-based CPU needs a separately tested exporter-flush strategy. Revision maxScale=1 does not guarantee one total process during overlapping old/new revisions. Verify outbox idempotency and Rabbit consumer behavior through rollout; minimum instances on an unpromoted worker candidate can still run background work. No application logic was changed to suppress workers during candidate checks.
+
+## IAM and authenticated verification
+
+Internal services must enforce Invoker IAM and have no `allUsers`/`allAuthenticatedUsers` Invoker grants. Ingress stays `all`; alternate ingress is rejected because external tagged health checks would need a different topology. Private probes generate an ID token using the selected runtime identity, canonical service origin as audience, and the tagged candidate as destination. Customer JWT remains in `Authorization`; workload identity uses `X-Serverless-Authorization`. Deployment preflight checks `iam.serviceAccounts.actAs` and private token creation before replacement, with explicit role diagnostics.
+
+Public edges must either grant `allUsers` Invoker or already disable the Invoker IAM check. The deployment preserves the existing public mode; private deployments always enforce IAM. Public readiness requests are anonymous and require no runtime impersonation. API Gateway's application JWT validation remains enabled. Its workload identity filter obtains metadata-server tokens only for deployment-configured audiences and strips caller-supplied workload headers. Missing dependencies are not usable routes: if none are available, online deployments allow only the selected canonical origin, so IAM initialization succeeds without authorizing unknown backends. Redeploy each caller after new dependencies become available. Offline initial bootstrap manifests may omit workload IAM until origins are discovered; this is bootstrap-only, not the final GitHub deployment.
+
+Required grants, scoped as narrowly as practical:
+
+| Identity | Required roles |
 |---|---|
-| Auth | Database + JWT |
-| Customer, Bank | Database |
-| Gateway adapter | None |
-| Payment, Notification | Database + JWT + Rabbit host/user/password |
-| API Gateway | JWT |
-| Frontend | None |
+| WIF repository subject | `roles/iam.workloadIdentityUser` on github-deployer, constrained to repository/main/gcp-poc |
+| github-deployer | `roles/run.admin` for this PoC, `roles/artifactregistry.writer` on the repository |
+| github-deployer on runtime account | `roles/iam.serviceAccountUser`; `roles/iam.serviceAccountTokenCreator` for private health |
+| github-deployer and runtime on each internal service | `roles/run.invoker` |
+| Runtime on used Secret Manager secrets | `roles/secretmanager.secretAccessor` on each required secret |
+| Java runtime project observability | `roles/cloudtrace.agent`, `roles/logging.logWriter`, `roles/monitoring.metricWriter` |
 
-Each secret-consuming deployment requires a numeric `secretVersion`; `latest` and `replace-` placeholders in consumed values are rejected. Optional Grafana export adds its token secret and pinned version requirement. Unrelated configuration is ignored. Shared accounts are permitted.
+Caller graph: Payment -> Customer/Gateway; Gateway -> Bank; API Gateway -> all six backends. With the shared PoC account, its service-level Invoker grants satisfy these calls. Separate accounts need caller-specific grants. Sharing a runtime identity also shares all its effective secret/invocation permissions; it is not production service isolation. No runtime Editor, Owner or Cloud Run Admin role is required. Existing bootstrap service policy is checked; IAM is never automatically broadened by deployment.
 
-Dependency URLs are optional during configuration validation. Supplied dependency URLs are validated and rendered into routing/IAM audience settings. Configure all actual dependencies before testing business requests: Payment needs Customer/Gateway, Gateway needs Bank, API Gateway needs its routed backends, and Frontend needs API Gateway. Frontend's Nginx proxy requires its API Gateway URL to start successfully, so a frontend-only configuration can validate but cannot pass deployment health verification without that URL. Validation is not a claim that an incomplete application graph is operational.
+## Traffic and evidence
 
-The legacy full-stack validator still uses `deploy/cloud-run/config.full-stack.example.json` and its complete configuration contract. Do not pass the customer-only example to that legacy tool.
+Both deployment paths normalize API field styles `revisionName`/`revision_name` and `latestRevision`/`latest_revision`. An explicit revision removes the latest flag completely. Latest-only live targets are resolved to the previous `latestReadyRevisionName`; unresolved targets fail locally. Percentages/tags survive and status URLs are removed. Non-boolean latest flags, non-string revisions, invalid percentages and conflicting field styles are rejected.
 
-## Deployment order
+Before replacement, a local guard verifies the exact prior explicit production split, with zero production traffic for the candidate. Candidate tagging, private/public health, exact revision promotion and traffic convergence follow. Failure after promotion restores that service's saved split. Tag cleanup follows. A client timeout after a successful promotion is covered by rollback tracking set before the API call.
 
-Wait for existing CI to succeed on the exact main commit, then manually run:
-
-| Order | Workflow | Cloud Run service |
-|---|---|---|
-| 1 | `deploy-auth.yml` | `auth-service` |
-| 2 | `deploy-customer.yml` | `customer-service` |
-| 3 | `deploy-bank.yml` | `mock-bank-service` |
-| 4 | `deploy-gateway.yml` | `gateway-service` |
-| 5 | `deploy-payment.yml` | `payment-service` |
-| 6 | `deploy-notification.yml` | `notification-service` |
-| 7 | `deploy-api-gateway.yml` | `api-gateway` |
-| 8 | `deploy-frontend.yml` | `payment-frontend` |
-
-For later changes, run only the affected service workflow. Changes to `cloud-runtime` require separately deploying its consumers (Payment, Gateway adapter and API Gateway). Coordinate schema compatibility and shared JWT changes across services; traffic rollback does not undo migrations or committed business work.
-
-Each workflow checks CI, validates config, authenticates via WIF, builds/pushes one application, renders one manifest, preserves current traffic, checks a tagged candidate, promotes it and checks the canonical readiness endpoint. On failure after promotion, it restores that service's saved traffic allocation. Review `service-release-<service>-<run-id>` artifacts for the manifest, previous traffic and result. No other application's image, revision or traffic is modified. Health-token impersonation requires the runtime account's self-invoker permission. Existing Cloud Run services and canonical URLs must match the config.
-
-`manual-cloud-run.yml` is now a validation-only legacy full-stack check; it cannot deploy all services. Existing `ci.yml` remains unchanged. The manual image-publishing workflow remains available for explicit full-stack image preparation and shared Collector releases, independently of deployment.
-
-## Preserved production traffic during candidate creation
-
-Both deployment scripts normalize live traffic before writing the replacement manifest. Explicit `revisionName` targets take precedence over `latestRevision` (including `latest_revision`); the latest flag is removed completely. Status-only URLs are omitted and tags/percentages remain. A latest-only target is pinned to the live `latestReadyRevisionName`; missing resolution fails locally. This ensures creating a candidate does not redirect production traffic to that candidate.
-
-Before replacement, a local guard rejects conflicting targets, latest-based targets, changes to the saved production split, or any production allocation to the candidate revision. Candidate health is checked through its temporary tag before exact-revision promotion. Rollback uses the saved explicit revision allocation.
-
-`deploy/cloud-run/customer-traffic.example.json` shows the exact transformation for illustrative revision `customer-service-00012-abc` (not a queried live revision). Before:
+Before/after for illustrative customer revision (not a queried live revision):
 
 ```json
 {"traffic":[{"revisionName":"customer-service-00012-abc","latestRevision":true,"percent":100}]}
 ```
 
-After, in `service.spec`:
-
 ```json
 {"traffic":[{"percent":100,"revisionName":"customer-service-00012-abc"}]}
 ```
 
-The deployment artifact's `customer-service.json` contains the actual rendered traffic and `previous-traffic.json` records the exact rollback split. No traffic setting is needed in the customer-only configuration example: traffic is read from the selected live service.
+The example is also in `customer-traffic.example.json`. Uploaded `service-release-<service>-<run-id>` evidence includes `discovery.json` (configured/discovered URLs, warnings, actual runtime identity, live traffic/latest-ready revision, ingress/IAM bindings, ports/resources, scaling/billing and secret references), selected manifest, `previous-traffic.json`, and `result.json` on success. Readiness success proves startup/routing, not business completion or signal delivery. Rollback does not undo migrations, messages or payments already committed. Secret references are visible in artifacts, never plaintext secret values.
 
-## Optional Cloud Build files
+## Bootstrap checklist and read-only audit
 
-`cloudbuild-frontend.yaml`, `cloudbuild-auth.yaml`, `cloudbuild-customer.yaml`, `cloudbuild-payment.yaml`, `cloudbuild-gateway.yaml`, `cloudbuild-bank.yaml`, `cloudbuild-notification.yaml` and `cloudbuild-api-gateway.yaml` are build/publish alternatives, not triggers and not deployment jobs. Submit manually from the repository root, for example:
+1. Confirm required APIs, existing repository, WIF provider restrictions and environment variables. Publish the checksum-verified shared Collector image separately and supply its digest.
+2. Create/confirm Neon secrets and schema permissions. For Payment/Notification, confirm CloudAMQP TLS/vhost and broker secrets. Confirm JWT secret and numeric versions.
+3. Confirm the IAM grants above; keep internal services private. Do not create missing resources through a deployment workflow.
+4. Choose an existing immutable application image for each service's initial bootstrap. Generate its manifest/commands using `bootstrap_service.py commands`; this writes local files and prints commands only.
+5. Review and manually execute only the intended missing service's commands. Do not replace the proven Customer service unnecessarily. See `CLOUD_RUN_BOOTSTRAP_COMMANDS.md` for all seven remaining service command sequences.
+6. Audit the selected slot before its first manual GitHub deployment:
 
 ```sh
-gcloud builds submit . --project=project-c9bd3d0e-266f-47bf-852 \
-  --config=cloudbuild-auth.yaml --substitutions=_REVISION=$(git rev-parse HEAD)
+python3 scripts/cloud/bootstrap_service.py check --service mock-bank-service \
+  --config deploy/cloud-run/config.bootstrap.json --collector "$COLLECTOR_IMAGE" \
+  --check-deployer-permissions
 ```
 
-The Cloud Build identity needs repository writer permission. No Cloud Build push trigger is created. GitHub workflows build with Docker on their hosted runner and do not require Cloud Build permissions.
+The audit describes only the selected service plus available dependency URLs, checks runtime identity, canonical origin, access policy and Invoker principals, app/Collector port/probes, resource limits, scaling/CPU mode, secret references/versions and exporter configuration. Running with `--check-deployer-permissions` must use github-deployer credentials, not an administrator's identity. It does not test actual secret payloads, broker connectivity, database migrations, project role least privilege, or successful exports; those need live acceptance. Audit JSON is saved locally. It does not modify GCP.
 
-Spring services use `${PORT:8080}`. Database settings use `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`. Existing JWT consumers use `JWT_SECRET`; service URLs and RabbitMQ settings accept environment overrides. Compose explicitly sets the previous local ports. Cloud Run injects reserved `PORT`; it is omitted from manifest env values. Startup/liveness probes and the deployment's authenticated readiness check cover application startup. Business acceptance and cloud telemetry verification should follow the initial deployment.
+## Recommended deployment order
 
-Local validation covers deployment contracts, selection/rollback behavior, YAML and backend/frontend builds. Docker/Cloud Run execution must be verified by hosted CI and manually dispatched deployments on an authenticated environment; Docker is unavailable on this workstation.
+Manually open Actions -> Deploy <service> -> Run workflow -> main, after exact-commit CI passes:
 
-References: [WIF through GitHub Actions](https://github.com/google-github-actions/auth#workload-identity-federation-through-a-service-account), [Cloud Run container startup order](https://docs.cloud.google.com/run/docs/configuring/services/containers), [Cloud Run health checks](https://docs.cloud.google.com/run/docs/configuring/healthchecks).
+1. Auth (`deploy-auth.yml`)
+2. Customer (`deploy-customer.yml`, already proven)
+3. Bank (`deploy-bank.yml`)
+4. Gateway (`deploy-gateway.yml`)
+5. Payment (`deploy-payment.yml`)
+6. Notification (`deploy-notification.yml`)
+7. API Gateway (`deploy-api-gateway.yml`)
+8. Frontend (`deploy-frontend.yml`)
+
+For later changes, deploy only affected services. Changes to `cloud-runtime` require separately deploying its consumers. Discover dependencies before testing routes. Frontend's gateway URL is runtime Nginx configuration, not required at build time; if missing during bootstrap its proxy points to a closed loopback port and returns an upstream error, while `/health` works. Final GitHub deployment discovers API Gateway and wires HTTPS/SNI, with customer `Authorization` preserved. Frontend has no JDBC, Rabbit, JWT signing or Collector secrets.
+
+## Collector and validation limits
+
+Java Dockerfiles have explicit service JAR paths, cloud targets with the checksum-verified Java agent, and unchanged local targets. `COLLECTOR_IMAGE` must be an immutable digest from the configured registry. Agent OTLP exports to `http://127.0.0.1:4318`. Collector config receives OTLP, applies memory/batch/privacy processors and sends traces/logs through `googlecloud` to Cloud Trace/Logging and metrics through `googlemanagedprometheus`. Health extension listens on 13133; Collector startup probe is finite and app startup depends on it. Invalid Collector configuration fails bounded startup rather than silently disabling exporters. Health readiness does not prove the exporter can reach Google APIs. With no successful export, inspect Collector logs and the writer roles/APIs. Optional Grafana fan-out needs its own pinned token secret. All final Java deployments retain enabled traces/logs/metrics.
+
+Each `cloudbuild-*.yaml` is a manually submitted build/publish alternative and builds only its selected Dockerfile/module. No trigger or deployment is created. Example: `gcloud builds submit . --project=project-c9bd3d0e-266f-47bf-852 --config=cloudbuild-bank.yaml --substitutions=_REVISION=$(git rev-parse HEAD)`. Frontend Cloud Build defaults do not set optional project/Grafana UI link build arguments; use GitHub build for those links. Cloud Build images must still be resolved to digests before bootstrap/deployment.
+
+Source/config validation, deployment unit tests, workflow lint, YAML/JSON parsing, relevant Maven identity/security tests and frontend production build are local evidence. Docker execution is unavailable on this workstation. All remaining cloud/bootstrap commands are generated for manual execution; this review creates no GCP resources and triggers no deployments.
+
+References: [Cloud Run public access](https://docs.cloud.google.com/run/docs/authenticating/public), [service-account impersonation](https://docs.cloud.google.com/docs/authentication/use-service-account-impersonation), [IAM permission preflight](https://docs.cloud.google.com/iam/docs/reference/rest/v1/projects.serviceAccounts/testIamPermissions), [Collector on Cloud Run](https://docs.cloud.google.com/stackdriver/docs/instrumentation/opentelemetry-collector-cloud-run).

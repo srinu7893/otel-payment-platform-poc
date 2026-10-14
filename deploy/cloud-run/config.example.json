@@ -2,16 +2,19 @@
   "project": "project-c9bd3d0e-266f-47bf-852",
   "region": "us-central1",
   "repository": "otel-payment-platform",
-  "urls": {
-    "customer-service": "https://customer-service-52916499838.us-central1.run.app"
-  },
-  "serviceAccounts": {
-    "customer-service": "otel-payment-runtime@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com"
-  },
+  "defaultServiceAccount": "otel-payment-runtime@project-c9bd3d0e-266f-47bf-852.iam.gserviceaccount.com",
   "databaseSecrets": {
     "url": "neon-jdbc-url",
     "username": "neon-username",
     "password": "neon-password"
   },
+  "rabbitHost": "shrimp.rmq.cloudamqp.com",
+  "rabbitPort": 5671,
+  "rabbitVirtualHost": "dctbblya",
+  "rabbitSecrets": {
+    "username": "rabbit-username",
+    "password": "rabbit-password"
+  },
+  "jwtSecret": "jwt-secret",
   "secretVersion": "1"
 }

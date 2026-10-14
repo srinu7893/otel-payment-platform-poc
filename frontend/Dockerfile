@@ -12,7 +12,7 @@ FROM nginx:1.27-alpine AS cloud
 ENV NGINX_ENVSUBST_FILTER="^(PORT|API_GATEWAY_URL|API_GATEWAY_HOST)$"
 COPY cloud-run.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
-ENV PORT=8080
+ENV PORT=8080 API_GATEWAY_URL=http://127.0.0.1:9 API_GATEWAY_HOST=127.0.0.1
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD wget -q -O /dev/null http://127.0.0.1:${PORT}/health || exit 1
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Render/validate or release existing Cloud Run services; no implicit infrastructure creation."""
 import argparse
+import copy
 import json
 import os
 from pathlib import Path
@@ -17,8 +18,21 @@ CALLS = {'payment-service': ['gateway-service', 'customer-service'], 'gateway-se
          'api-gateway': SERVICES[:6]}
 JWT = {'auth-service', 'payment-service', 'notification-service', 'api-gateway'}
 SECRET_RE = r'[A-Za-z0-9_-]+'
+PUBLIC = {'frontend', 'api-gateway'}
+WORKERS = {'payment-service', 'notification-service'}
 
 def validate(config, allow_example=False):
+    if config.get('defaultServiceAccount') and not allow_example:
+        # The retired manual validator can still check the stable shared-account format.
+        from deploy_service import validate_selected, runtime_account
+        normalized = copy.deepcopy(config)
+        normalized.setdefault('urls', {})
+        normalized.setdefault('serviceAccounts', {})
+        normalized.setdefault('prefix', 'otel-poc')
+        for service in SERVICES:
+            validate_selected(normalized, service)
+            normalized['serviceAccounts'][service] = runtime_account(normalized, service)
+        return normalized
     raw = json.dumps(config)
     if not allow_example and 'replace-' in raw:
         raise ValueError('Example placeholders must be replaced before deployment')
@@ -66,12 +80,16 @@ def render(config, service, image, collector, revision):
         env.update({'SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE': '5', 'SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE': '1'})
     if service in JWT: secrets.append(secret(config, 'JWT_SECRET', config['jwtSecret']))
     if service in {'payment-service', 'notification-service'}:
-        env.update({'SPRING_RABBITMQ_HOST': config['rabbitHost'], 'SPRING_RABBITMQ_PORT': '5671', 'SPRING_RABBITMQ_SSL_ENABLED': 'true'})
+        env.update({'SPRING_RABBITMQ_HOST': config['rabbitHost'], 'SPRING_RABBITMQ_PORT': str(config.get('rabbitPort', 5671)), 'SPRING_RABBITMQ_SSL_ENABLED': 'true',
+                    'SPRING_RABBITMQ_VIRTUAL_HOST': config.get('rabbitVirtualHost', '/')})
         for name, key in [('SPRING_RABBITMQ_USERNAME', 'username'), ('SPRING_RABBITMQ_PASSWORD', 'password')]:
             secrets.append(secret(config, name, config['rabbitSecrets'][key]))
     targets = [target for target in CALLS.get(service, []) if target in config['urls']]
-    if targets:
-        env.update({'CLOUD_RUN_IAM_ENABLED': 'true', 'CLOUD_RUN_AUDIENCES': ','.join(config['urls'][target] for target in targets)})
+    audiences = [config['urls'][target] for target in targets]
+    if not audiences and service in config['urls']:
+        audiences = [config['urls'][service]]
+    if service in CALLS and audiences:
+        env.update({'CLOUD_RUN_IAM_ENABLED': 'true', 'CLOUD_RUN_AUDIENCES': ','.join(audiences)})
     if service == 'payment-service':
         for key, target in [('CLIENTS_GATEWAY_BASE_URL', 'gateway-service'), ('CLIENTS_CUSTOMER_BASE_URL', 'customer-service')]:
             if target in config['urls']: env[key] = config['urls'][target]
@@ -97,7 +115,8 @@ def render(config, service, image, collector, revision):
                    'env': [{'name': key, 'value': value} for key, value in env.items()] + secrets,
                    'startupProbe': {'httpGet': {'path': probe, 'port': 8080}, 'periodSeconds': 5, 'timeoutSeconds': 3, 'failureThreshold': 36},
                    'livenessProbe': {'httpGet': {'path': probe, 'port': 8080}, 'periodSeconds': 30, 'timeoutSeconds': 3}}]
-    annotations = {'autoscaling.knative.dev/maxScale': '1', 'run.googleapis.com/cpu-throttling': 'false',
+    annotations = {'autoscaling.knative.dev/maxScale': '1', 'autoscaling.knative.dev/minScale': '0',
+                   'run.googleapis.com/cpu-throttling': 'true' if service == 'frontend' else 'false',
                    'run.googleapis.com/startup-cpu-boost': 'true', 'run.googleapis.com/execution-environment': 'gen2'}
     if config.get('network') and config.get('subnetwork'):
         annotations.update({'run.googleapis.com/network-interfaces': json.dumps([{'network': config['network'], 'subnetwork': config['subnetwork']}]),
@@ -118,14 +137,19 @@ def render(config, service, image, collector, revision):
             secret(config, 'GRAFANA_OTLP_TOKEN', config['grafana']['tokenSecret'])])
     prefix = config.get('prefix', 'otel-poc')
     return {'apiVersion': 'serving.knative.dev/v1', 'kind': 'Service', 'metadata': {'name': prefix + '-' + service,
-              'annotations': {'run.googleapis.com/ingress': 'all'}},
+              'annotations': {'run.googleapis.com/ingress': config.get('ingress', 'all'),
+                              'run.googleapis.com/invoker-iam-disabled': 'false'}},
             'spec': {'template': {'metadata': {'name': prefix + '-' + service + '-' + revision,
                                 'annotations': annotations}, 'spec': {'serviceAccountName': config['serviceAccounts'][service],
                                 'containerConcurrency': 20, 'timeoutSeconds': 60, 'containers': containers}}}}
 
 def gcloud(config, *args):
-    output = subprocess.check_output(['gcloud', '--quiet', '--project=' + config['project'], '--format=json',
-                                     *args, '--region=' + config['region']], text=True)
+    try:
+        output = subprocess.check_output(['gcloud', '--quiet', '--project=' + config['project'], '--format=json',
+                                         *args, '--region=' + config['region']], text=True, stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as error:
+        if error.stderr: print(error.stderr.strip())
+        raise
     return json.loads(output or 'null')
 
 def allocation(service):
@@ -141,6 +165,15 @@ def normalize_traffic(entries):
     """Convert API status targets to exclusive, spec-safe traffic targets."""
     targets = []
     for entry in entries:
+        if not isinstance(entry, dict): raise ValueError('Traffic target must be an object')
+        for key in ['revisionName', 'revision_name']:
+            if key in entry and not isinstance(entry[key], str): raise ValueError('Traffic revisionName must be a string')
+        for key in ['latestRevision', 'latest_revision']:
+            if key in entry and not isinstance(entry[key], bool): raise ValueError('Traffic latestRevision must be boolean')
+        if 'percent' in entry and (type(entry['percent']) is not int or not 0 <= entry['percent'] <= 100):
+            raise ValueError('Traffic percent must be an integer between 0 and 100')
+        if entry.get('revisionName') and entry.get('revision_name') and entry['revisionName'] != entry['revision_name']:
+            raise ValueError('Conflicting revisionName field styles')
         revision = entry.get('revisionName') or entry.get('revision_name')
         latest = entry.get('latestRevision', entry.get('latest_revision', False))
         target = {key: entry[key] for key in ['percent', 'tag'] if key in entry}
@@ -156,6 +189,7 @@ def normalize_traffic(entries):
 def validate_manifest_traffic(manifest, preserved=None):
     """Reject ambiguous targets and production traffic to a new candidate."""
     entries = manifest.get('spec', {}).get('traffic', [])
+    normalize_traffic(entries)
     for index, target in enumerate(entries):
         revision = target.get('revisionName') or target.get('revision_name')
         latest = target.get('latestRevision') is True or target.get('latest_revision') is True
@@ -185,13 +219,19 @@ def preserved_traffic(service):
     allocation({'status': {'traffic': targets}})
     return targets
 
-def health(config, url, service):
+def identity_token(config, service):
     # Generate a fresh token with the canonical audience, including for tagged revision URLs.
-    token = subprocess.check_output(['gcloud', 'auth', 'print-identity-token',
-        '--impersonate-service-account=' + config['serviceAccounts'][service],
-        '--audiences=' + config['urls'][service], '--include-email'], text=True).strip()
+    try:
+        return subprocess.check_output(['gcloud', 'auth', 'print-identity-token',
+            '--impersonate-service-account=' + config['serviceAccounts'][service],
+            '--audiences=' + config['urls'][service], '--include-email'], text=True).strip()
+    except subprocess.CalledProcessError as error:
+        raise ValueError('Private health checks require roles/iam.serviceAccountTokenCreator on ' + config['serviceAccounts'][service] + ' for the deployment identity') from error
+
+def health(config, url, service):
+    headers = {} if service in PUBLIC else {'X-Serverless-Authorization': 'Bearer ' + identity_token(config, service)}
     path = '/health' if service == 'frontend' else '/actuator/health/readiness'
-    request = urllib.request.Request(url + path, headers={'X-Serverless-Authorization': 'Bearer ' + token})
+    request = urllib.request.Request(url + path, headers=headers)
     for attempt in range(12):
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
@@ -202,19 +242,25 @@ def health(config, url, service):
     raise RuntimeError('Readiness failed for ' + service)
 
 def release(config, files, output):
+    config = copy.deepcopy(config)
     # All eight services must exist; creation/IAM/storage are provisioned separately, never guessed here.
     before = {service: gcloud(config, 'run', 'services', 'describe', config['prefix'] + '-' + service) for service in SERVICES}
+    warnings = []
     for service in SERVICES:
-        if before[service]['status']['url'] != config['urls'][service]: raise ValueError('Configured URL differs from live canonical URL: ' + service)
+        actual = before[service]['status']['url']
+        if actual != config['urls'][service]: warnings.append(service + ': using discovered canonical URL ' + actual)
+        config['urls'][service] = actual
     # Private IAM boundaries are checked before any candidate changes.
     for service in SERVICES:
         policy = gcloud(config, 'run', 'services', 'get-iam-policy', config['prefix'] + '-' + service)
         members = {member for binding in policy.get('bindings', []) if binding.get('role') == 'roles/run.invoker'
                    for member in binding.get('members', [])}
         public = service in {'frontend', 'api-gateway'}
+        disabled = str(before[service].get('metadata', {}).get('annotations', {}).get('run.googleapis.com/invoker-iam-disabled', 'false')).lower() == 'true'
+        if disabled and not public: raise ValueError('Internal service must enforce invoker IAM: ' + service)
         if not public and ({'allUsers', 'allAuthenticatedUsers'} & members):
             raise ValueError('Backend service must not have public invoker access: ' + service)
-        if public and 'allUsers' not in members:
+        if public and not disabled and 'allUsers' not in members:
             raise ValueError('Public edge invoker policy is missing: ' + service)
         # Release checks impersonate the service runtime identity; it must invoke its own service.
         if 'serviceAccount:' + config['serviceAccounts'][service] not in members and not public:
@@ -231,6 +277,13 @@ def release(config, files, output):
     try:
         for service in SERVICES:
             manifest = json.loads(files[service].read_text())
+            # Rerender outbound audiences from discovered URLs, retaining the saved immutable images.
+            old_template = manifest['spec']['template']
+            containers = old_template['spec']['containers']
+            suffix = old_template['metadata']['name'].removeprefix(config['prefix'] + '-' + service + '-')
+            manifest = render(config, service, containers[0]['image'], containers[-1]['image'], suffix)
+            if service in PUBLIC and str(before[service].get('metadata', {}).get('annotations', {}).get('run.googleapis.com/invoker-iam-disabled', 'false')).lower() == 'true':
+                manifest['metadata']['annotations']['run.googleapis.com/invoker-iam-disabled'] = 'true'
             # Preserve traffic exactly, including tagged entries, while creating the candidate revision.
             manifest['spec']['traffic'] = targets[service]
             validate_manifest_traffic(manifest, previous[service])
@@ -249,7 +302,7 @@ def release(config, files, output):
             current = gcloud(config, 'run', 'services', 'describe', name)
             if allocation(current) != {revision: 100}: raise RuntimeError('Traffic did not converge: ' + service)
             health(config, config['urls'][service], service)
-        output.write_text(json.dumps({'status': 'PASS', 'revisions': candidates, 'urls': config['urls'],
+        output.write_text(json.dumps({'status': 'PASS', 'revisions': candidates, 'urls': config['urls'], 'warnings':warnings,
                                      'scope': 'readiness and traffic; business/telemetry cloud acceptance is separate'}, indent=2))
     except Exception:
         for service in reversed(promoted):

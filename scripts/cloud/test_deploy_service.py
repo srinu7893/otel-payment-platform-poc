@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from deploy_service import PROJECT, REGISTRY, service_name, selected_manifest, deploy, validate_selected
+from deploy_service import PROJECT, REGISTRY, service_name, selected_manifest, deploy, validate_selected, DEPLOYER
 from run_release import SERVICES
 
 class IndependentDeploymentTest(unittest.TestCase):
@@ -13,6 +13,8 @@ class IndependentDeploymentTest(unittest.TestCase):
         self.config['network']='poc-network';self.config['subnetwork']='poc-subnet';self.config['rabbitHost']='broker.internal'
         self.config['urls']={s:'https://'+s+'.run.app' for s in SERVICES}
         self.collector=REGISTRY+'/collector@sha256:'+'b'*64
+        self.config['rabbitVirtualHost']='payments';self.config['rabbitPort']=5671
+        mocked=patch('deploy_service.verify_runtime_permissions');mocked.start();self.addCleanup(mocked.stop)
         self.image=REGISTRY+'/auth-service@sha256:'+'a'*64
 
     def partial(self, service):
@@ -29,18 +31,19 @@ class IndependentDeploymentTest(unittest.TestCase):
         self.assertEqual(refs, {name: {'name': secret, 'key':'1'} for name,secret in [
             ('SPRING_DATASOURCE_URL','neon-jdbc-url'),('SPRING_DATASOURCE_USERNAME','neon-username'),('SPRING_DATASOURCE_PASSWORD','neon-password')]})
         self.assertNotIn('run.googleapis.com/network-interfaces',manifest['spec']['template']['metadata']['annotations'])
-        self.assertEqual(set(config['urls']),{'customer-service'})
+        self.assertNotIn('urls',config)
 
     def test_customer_only_rollout_and_candidate_failure(self):
         config=json.loads((Path(__file__).resolve().parents[2]/'deploy/cloud-run/config.example.json').read_text())
+        config['urls']={'customer-service':'https://customer-service.run.app'}
         for failure in [False, True]:
             with self.subTest(candidate_failure=failure):
-                state={'status':{'url':config['urls']['customer-service'],'traffic':[{'revisionName':'old-customer','latestRevision':True,'percent':100}]}}
+                state={'spec':{'template':{'spec':{'serviceAccountName':config['defaultServiceAccount']}}},'status':{'url':config['urls']['customer-service'],'traffic':[{'revisionName':'old-customer','latestRevision':True,'percent':100}]}}
                 calls=[]
                 def fake(conf,*args):
                     calls.append(args)
                     if args[2]=='get-iam-policy':
-                        return {'bindings':[{'role':'roles/run.invoker','members':['serviceAccount:'+config['serviceAccounts']['customer-service']]}]}
+                        return {'bindings':[{'role':'roles/run.invoker','members':['serviceAccount:'+config['defaultServiceAccount'],'serviceAccount:'+DEPLOYER]}]}
                     if args[2]=='describe':return copy.deepcopy(state)
                     if args[2]=='replace':
                         manifest=json.loads(Path(args[3]).read_text())
@@ -75,12 +78,12 @@ class IndependentDeploymentTest(unittest.TestCase):
                 if service in JWT:config['jwtSecret']=self.config['jwtSecret']
                 if service in DATABASE or service in JWT:config['secretVersion']='1'
                 if service in {'payment-service','notification-service'}:
-                    config.update(rabbitHost='broker.internal',rabbitSecrets=self.config['rabbitSecrets'])
+                    config.update(rabbitHost='broker.internal',rabbitVirtualHost='payments',rabbitPort=5671,rabbitSecrets=self.config['rabbitSecrets'])
                 selected_manifest(config,service,self.image,self.collector,'gh-1')
 
     def test_missing_selected_fields_and_placeholder_secrets_are_rejected(self):
         config=json.loads((Path(__file__).resolve().parents[2]/'deploy/cloud-run/config.example.json').read_text())
-        for key in ['project','region','repository','urls','serviceAccounts','databaseSecrets','secretVersion']:
+        for key in ['project','region','repository','defaultServiceAccount','databaseSecrets','secretVersion']:
             with self.subTest(key=key):
                 broken=copy.deepcopy(config);broken.pop(key)
                 with self.assertRaises(ValueError):validate_selected(broken,'customer-service')
@@ -113,7 +116,7 @@ class IndependentDeploymentTest(unittest.TestCase):
                 config['jwtSecret']='jwt-key'
             if service in {'payment-service','notification-service'}:
                 with self.assertRaises(ValueError):validate_selected(config,service)
-                config.update(rabbitHost='broker.internal',rabbitSecrets=self.config['rabbitSecrets'])
+                config.update(rabbitHost='broker.internal',rabbitVirtualHost='payments',rabbitPort=5671,rabbitSecrets=self.config['rabbitSecrets'])
                 for missing in ['rabbitHost','rabbitSecrets']:
                     broken=copy.deepcopy(config);broken.pop(missing)
                     with self.assertRaises(ValueError):validate_selected(broken,service)
@@ -122,8 +125,8 @@ class IndependentDeploymentTest(unittest.TestCase):
     def test_unrelated_configuration_does_not_block_customer(self):
         config=json.loads((Path(__file__).resolve().parents[2]/'deploy/cloud-run/config.example.json').read_text())
         config.update(jwtSecret='replace-jwt',rabbitHost='replace-broker')
-        config['urls']['payment-service']='replace-url'
-        config['serviceAccounts']['auth-service']=config['serviceAccounts']['customer-service']
+        config['urls']={'payment-service':'replace-url'}
+        config['serviceAccounts']={'auth-service':config['defaultServiceAccount']}
         selected_manifest(config,'customer-service',self.image,self.collector,'gh-1')
 
     def test_optional_dependencies_and_private_network_are_validated(self):
@@ -157,11 +160,11 @@ class IndependentDeploymentTest(unittest.TestCase):
     def test_failure_after_promotion_rolls_back_only_selected_service(self):
         # No future caller account is available during this release.
         self.config['serviceAccounts']={'auth-service':self.config['serviceAccounts']['auth-service']}
-        calls=[];state={'status':{'url':self.config['urls']['auth-service'],'traffic':[{'revisionName':'auth-old','latest_revision':True,'percent':100}]}}
+        calls=[];state={'spec':{'template':{'spec':{'serviceAccountName':self.config['serviceAccounts']['auth-service']}}},'status':{'url':self.config['urls']['auth-service'],'traffic':[{'revisionName':'auth-old','latest_revision':True,'percent':100}]}}
         def fake(config,*args):
             calls.append(args)
             if args[2]=='get-iam-policy':
-                return {'bindings':[{'role':'roles/run.invoker','members':['serviceAccount:'+a for a in self.config['serviceAccounts'].values()]}]}
+                return {'bindings':[{'role':'roles/run.invoker','members':['serviceAccount:'+a for a in self.config['serviceAccounts'].values()]+['serviceAccount:'+DEPLOYER]}]}
             if args[2]=='describe':return copy.deepcopy(state)
             if args[2]=='update-traffic':
                 option=args[4]
@@ -180,7 +183,7 @@ class IndependentDeploymentTest(unittest.TestCase):
 
     def test_private_service_public_policy_blocks_before_replacement(self):
         def fake(config,*args):
-            if args[2]=='describe':return {'status':{'url':config['urls']['auth-service']}}
+            if args[2]=='describe':return {'spec':{'template':{'spec':{'serviceAccountName':config['serviceAccounts']['auth-service']}}},'status':{'url':config['urls']['auth-service']}}
             return {'bindings':[{'role':'roles/run.invoker','members':['allUsers']}]}
         with tempfile.TemporaryDirectory() as directory,patch('deploy_service.gcloud',side_effect=fake) as cloud:
             with self.assertRaises(ValueError):deploy(self.config,'auth-service',self.image,self.collector,'gh-1',Path(directory))
