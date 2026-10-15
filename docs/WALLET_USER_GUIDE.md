@@ -57,6 +57,8 @@ Amounts use at most two decimal places. Wallet deposits and money requests are l
 
 ## Verification
 
+For interactive backend testing, import the collection and cloud/local environment from [postman](../postman/README.md). The ordered requests create two fresh sandbox users, capture tokens and transaction IDs automatically, and test the customer journey plus support operations and rejected requests. Read its retry instructions before changing money-movement requests.
+
 Backend journey (intentionally adds INR 10 in demo funds and performs small test transactions):
 
 ```cmd
