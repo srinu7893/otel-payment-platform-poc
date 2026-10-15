@@ -29,6 +29,10 @@ spring:
               uri: ${SERVICES_PAYMENT_URL:http://localhost:8080}
               predicates:
                 - Path=/api/v1/transfers/**
+            - id: wallet-service
+              uri: ${SERVICES_PAYMENT_URL:http://localhost:8080}
+              predicates:
+                - Path=/api/v1/wallet/**,/api/v1/money-requests/**
             - id: notification-service
               uri: ${SERVICES_NOTIFICATION_URL:http://localhost:8083}
               predicates:

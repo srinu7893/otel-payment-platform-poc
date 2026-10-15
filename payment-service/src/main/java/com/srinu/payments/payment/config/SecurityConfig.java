@@ -42,7 +42,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                .requestMatchers("/api/v1/payments/**", "/api/v1/transfers/**").hasAnyRole("CUSTOMER", "SUPPORT", "ADMIN")
+                .requestMatchers("/api/v1/payments/**", "/api/v1/transfers/**", "/api/v1/wallet/**", "/api/v1/money-requests/**").hasAnyRole("CUSTOMER", "SUPPORT", "ADMIN")
                 .anyRequest().authenticated())
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint(securityErrors)

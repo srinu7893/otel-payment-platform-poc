@@ -113,3 +113,11 @@ export function listNotifications(token, { paymentId, transferId, page = 0, size
 export function getOperationsHealth(token) {
   return request('/v1/ops/health', { headers: authHeaders(token) });
 }
+
+export const getWallet = token => request('/v1/wallet', { headers: authHeaders(token) });
+export const lookupRecipient = (token, account) => request(`/v1/wallet/recipients/${encodeURIComponent(account)}`, { headers: authHeaders(token) });
+export const getActivity = (token, page = 0) => request(`/v1/wallet/activity?page=${page}&size=20`, { headers: authHeaders(token) });
+export const depositMoney = (token, payload) => request('/v1/wallet/deposits', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(payload) });
+export const listMoneyRequests = (token, page = 0) => request(`/v1/money-requests?page=${page}&size=20`, { headers: authHeaders(token) });
+export const requestMoney = (token, payload) => request('/v1/money-requests', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(payload) });
+export const respondToRequest = (token, id, action) => request(`/v1/money-requests/${encodeURIComponent(id)}/${action}`, { method: 'POST', headers: authHeaders(token) });

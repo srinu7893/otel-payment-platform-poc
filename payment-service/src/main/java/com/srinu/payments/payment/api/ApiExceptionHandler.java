@@ -79,6 +79,19 @@ public class ApiExceptionHandler {
             .body(error("INVALID_STATE", ex.getMessage(), request, Map.of()));
     }
 
+    @ExceptionHandler(org.springframework.web.client.RestClientResponseException.class)
+    ResponseEntity<ApiError> downstream(org.springframework.web.client.RestClientResponseException ex, HttpServletRequest request) {
+        int status=ex.getStatusCode().value();
+        if(status==404) return ResponseEntity.status(404).body(error("ACCOUNT_NOT_FOUND", "Account not found. Check the account number.", request, Map.of()));
+        if(status==400 || status==409) return ResponseEntity.status(status).body(error("WALLET_REQUEST_REJECTED", "The account operation was rejected. Check the amount, account status, and request details.", request, Map.of()));
+        return ResponseEntity.status(503).body(error("BACKEND_UNAVAILABLE", "A required service is unavailable. Please refresh before retrying.", request, Map.of()));
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    ResponseEntity<ApiError> forbidden(org.springframework.security.access.AccessDeniedException ex, HttpServletRequest request) {
+        return ResponseEntity.status(403).body(error("FORBIDDEN", "This action is not permitted for your account", request, Map.of()));
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiError> unexpected(Exception ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

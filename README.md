@@ -177,3 +177,6 @@ Added cached SQL-backed payment/outbox/notification gauges with freshness/health
 # Independent Cloud Run deployment
 
 Use the eight manual `Deploy <service>` workflows on `main`. See [service-by-service deployment](docs/SERVICE_BY_SERVICE_DEPLOYMENT.md) for WIF, secrets, registry, prerequisites and deployment order. CI still tests/validates on push; deployment requires **Actions → Deploy <service> → Run workflow**.
+# Wallet customer guide
+
+For balance, demo deposits, merchant payments, transfers, refunds, money requests, and history, see [the wallet guide](docs/WALLET_USER_GUIDE.md). It includes demo account numbers, step-by-step journeys, status/retry guidance, and repeatable API/browser tests.

@@ -110,7 +110,7 @@ public class PaymentApplicationService {
 
     @Transactional(readOnly = true)
     public Page<PaymentResponse> list(String customerId, boolean privileged, PaymentStatus status, int page, int size) {
-        var pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
+        var pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100), org.springframework.data.domain.Sort.by("createdAt").descending());
         Page<Payment> result;
         if (privileged) {
             result = status == null ? repo.findAll(pageable) : repo.findAllByStatus(status, pageable);

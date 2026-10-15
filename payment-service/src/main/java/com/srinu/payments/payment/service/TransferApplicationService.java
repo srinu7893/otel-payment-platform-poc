@@ -113,7 +113,7 @@ public class TransferApplicationService {
 
     @Transactional(readOnly = true)
     public Page<TransferResponse> list(String customerId, boolean privileged, int page, int size) {
-        var pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
+        var pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100), org.springframework.data.domain.Sort.by("createdAt").descending());
         var result = privileged ? transfers.findAll(pageable) : transfers.findAllByCustomerId(customerId, pageable);
         return result.map(t -> toResponse(t, "Transfer retrieved"));
     }

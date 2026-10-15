@@ -7,6 +7,6 @@ public record TransferRequest(
     @NotBlank String idempotencyKey,
     @NotBlank String senderAccount,
     @NotBlank String receiverAccount,
-    @NotNull @DecimalMin("0.01") BigDecimal amount,
-    @NotBlank @Pattern(regexp = "[A-Z]{3}") String currency
+    @NotNull @DecimalMin("0.01") @Digits(integer=10,fraction=2) BigDecimal amount,
+    @NotBlank @Pattern(regexp = "INR", message = "Only INR transfers are supported") String currency
 ) {}

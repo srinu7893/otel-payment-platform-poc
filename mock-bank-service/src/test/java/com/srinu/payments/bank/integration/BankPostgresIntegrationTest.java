@@ -22,6 +22,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class BankPostgresIntegrationTest {
+    @Autowired private com.srinu.payments.bank.service.WalletService wallet;
+    @Test @Transactional void depositsAreIdempotentAndAppearInTheBankLedger() {
+        var before=wallet.balance("ACC1001").balance();
+        var id=UUID.randomUUID();var amount=new BigDecimal("50.00");
+        wallet.deposit("ACC1001",id,amount);wallet.deposit("ACC1001",id,amount);accounts.flush();
+        assertThat(wallet.balance("ACC1001").balance()).isEqualByComparingTo(before.add(amount));
+        assertThat(wallet.activity("ACC1001",0,100)).anySatisfy(a->{assertThat(a.id()).isEqualTo(id);assertThat(a.direction()).isEqualTo("CREDIT");});
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->wallet.deposit("ACC1001",id,new BigDecimal("60.00"))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(wallet.recipient("ACC2001").customerName()).isNotBlank();
+    }
+    @Test @Transactional void incomingAndOutgoingTransfersAppearOnBothAccountStatements() {
+        var response=transferService.transfer(new TransferRequest(UUID.randomUUID(),"ACC1001","ACC2001",new BigDecimal("1.00"),"INR"));
+        accounts.flush();
+        assertThat(wallet.activity("ACC1001",0,100)).anySatisfy(a->{assertThat(a.id()).isEqualTo(response.transactionId());assertThat(a.direction()).isEqualTo("DEBIT");});
+        assertThat(wallet.activity("ACC2001",0,100)).anySatisfy(a->{assertThat(a.id()).isEqualTo(response.transactionId());assertThat(a.direction()).isEqualTo("CREDIT");});
+    }
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry properties) {
