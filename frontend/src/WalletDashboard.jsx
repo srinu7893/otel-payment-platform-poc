@@ -55,13 +55,22 @@ export default function WalletDashboard({ session }) {
   }
   useEffect(() => { refresh(page); }, [token, page]);
 
-  async function perform(action, message) {
+  function openTab(id) {
+    setTab(id); setPage(0); setConfirmation(null); setNotice(''); setError('');
+  }
+  async function perform(action, message, completedKey) {
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await action();
       const status = result?.status;
       setNotice(status ? `${message}: ${status}. ${pending(status) ? 'The outcome is still being checked. Refresh history; do not submit a new transaction.' : ''}` : message);
-      setConfirmation(null); keys.current.clear();
+      setConfirmation(null);
+      // A different successful operation must not erase an uncertain payment's retry key.
+      if (completedKey && !pending(status)) {
+        for (const [signature, key] of keys.current) {
+          if (key === completedKey) keys.current.delete(signature);
+        }
+      }
       await refresh();
       return true;
     } catch (e) { setError(formatApiError(e)); return false; }
@@ -86,6 +95,7 @@ export default function WalletDashboard({ session }) {
         const payload = kind === 'payment'
           ? { accountNumber: profile.accountNumber, merchant: String(form.get('merchant')).trim(), amount: Number(amount) }
           : { amount: Number(amount) };
+        if (kind === 'payment' && !payload.merchant) throw new Error('Enter a merchant name.');
         setConfirmation({ kind, payload, name: kind === 'payment' ? payload.merchant : 'Your demo wallet', account: profile?.accountNumber });
       }
     } catch (e) { setError(formatApiError(e)); }
@@ -95,7 +105,7 @@ export default function WalletDashboard({ session }) {
     const { kind, payload } = confirmation;
     const body = { ...payload, idempotencyKey: idempotency(kind, payload) };
     const actions = { payment: api.createPayment, transfer: api.createTransfer, deposit: api.depositMoney, request: api.requestMoney };
-    perform(() => actions[kind](token, body), { payment: 'Payment submitted', transfer: 'Transfer submitted', deposit: 'Demo deposit', request: 'Money request sent' }[kind]);
+    perform(() => actions[kind](token, body), { payment: 'Payment submitted', transfer: 'Transfer submitted', deposit: 'Demo deposit', request: 'Money request sent' }[kind], body.idempotencyKey);
   }
   async function showDetail(type, id) {
     setBusy(true); setError('');
@@ -114,12 +124,12 @@ export default function WalletDashboard({ session }) {
   return <section className="stack wallet">
     <div className="demoBanner">Demo payment sandbox · INR test funds only · No real bank account or card is charged.</div>
     <div className="row"><div><h2>Hello, {profile?.name || session.customerId}</h2><p>Account {profile?.accountNumber || 'loading…'} · {profile?.email}</p></div><button className="secondary" disabled={refreshing || busy} onClick={() => refresh()}>{refreshing ? 'Refreshing…' : 'Refresh account'}</button></div>
-    <nav className="tabs" aria-label="Payment features">{tabs.map(([id, label]) => <button key={id} className={tab === id ? 'active' : 'secondary'} onClick={() => { setTab(id); setConfirmation(null); setNotice(''); }}>{label}</button>)}</nav>
+    <nav className="tabs" aria-label="Payment features">{tabs.map(([id, label]) => <button key={id} className={tab === id ? 'active' : 'secondary'} onClick={() => openTab(id)}>{label}</button>)}</nav>
     {error && <p role="alert" className="error">{error}</p>}
     {notice && <p role="status" className={/FAILED|DECLINED/.test(notice) ? 'error' : 'success'}>{notice}</p>}
     {confirmation && <section className="card confirmation" aria-label="Review transaction"><h2>Review {confirmation.kind}</h2><p>{money(confirmation.payload.amount)} {confirmation.kind === 'request' ? 'requested from' : 'to'} <b>{confirmation.name}</b></p><p>Account: {confirmation.account}</p>{confirmation.payload.note && <p>Note: {confirmation.payload.note}</p>}<p>{confirmation.kind === 'request' ? 'This sends a request only. The payer must approve it.' : confirmation.kind === 'deposit' ? 'This adds simulated funds to your demo account.' : 'Confirm the recipient and amount before continuing.'}</p><div className="headerActions"><button disabled={busy} onClick={confirm}>{busy ? 'Processing…' : 'Confirm transaction'}</button><button className="secondary" disabled={busy} onClick={() => setConfirmation(null)}>Go back</button></div></section>}
     {tab === 'overview' && <>
-      <section className="dashboardGrid"><article className="card metric"><span>Available balance</span><strong data-testid="balance">{wallet ? money(wallet.balance) : 'Unavailable'}</strong><small>{wallet?.active ? 'Account active' : 'Refresh to check account status'}</small></article><article className="card metric"><span>Your account number</span><strong>{profile?.accountNumber || '—'}</strong><small>Share this to receive a transfer</small></article><article className="card metric"><span>Money requests</span><strong>{requests.filter(r => r.status === 'OPEN' && r.payerAccount === profile?.accountNumber).length}</strong><small>Awaiting your response on this page</small></article><article className="card metric"><span>Get started</span><button onClick={() => setTab('deposit')}>Add demo funds</button><button className="secondary" onClick={() => setTab('transfer')}>Send money</button></article></section>
+      <section className="dashboardGrid"><article className="card metric"><span>Available balance</span><strong data-testid="balance">{wallet ? money(wallet.balance) : 'Unavailable'}</strong><small>{wallet?.active ? 'Account active' : 'Refresh to check account status'}</small></article><article className="card metric"><span>Your account number</span><strong>{profile?.accountNumber || '—'}</strong><small>Share this to receive a transfer</small></article><article className="card metric"><span>Money requests</span><strong>{requests.filter(r => r.status === 'OPEN' && r.payerAccount === profile?.accountNumber).length}</strong><small>Awaiting your response on this page</small></article><article className="card metric"><span>Get started</span><button onClick={() => openTab('deposit')}>Add demo funds</button><button className="secondary" onClick={() => openTab('transfer')}>Send money</button></article></section>
       <Activity rows={activity} />
       <section className="card"><h2>Try a complete payment journey</h2><ol><li>Add INR 500 in <b>Add demo money</b>.</li><li>Send INR 25 to <b>ACC2001</b>, the receiver account.</li><li>Open History for the result and transaction details.</li><li>Sign out and sign in as <b>receiver / receiver123</b> to see the credit.</li></ol></section>
     </>}
@@ -145,7 +155,7 @@ export default function WalletDashboard({ session }) {
     </>}
     {tab === 'notifications' && <section className="card"><h2>Notifications</h2><p>Events arrive asynchronously after payments, transfers and refunds.</p><div className="tableWrap"><table><thead><tr><th>Event</th><th>Channel</th><th>Status</th></tr></thead><tbody>{notifications.map(n => <tr key={n.id}><td>{n.eventType}</td><td>{n.channel}</td><td>{n.status}</td></tr>)}{!notifications.length && <tr><td colSpan="3">No events on this page. Refresh after a transaction.</td></tr>}</tbody></table></div><Paging page={page} setPage={setPage} busy={busy || refreshing} hasNext={notifications.length === 20} /></section>}
     {tab === 'help' && <section className="card help"><h2>How to use your demo account</h2><dl><dt>Register and open an account</dt><dd>Sign out → New user? Create account → enter your name, email and a unique username/password. A new mock-bank account number is created with zero opening balance. You are signed in when setup completes. If setup is interrupted, retry the same registration details.</dd><dt>Check balance</dt><dd>My account shows the bank balance. Refresh account after a transaction.</dd><dt>Deposit</dt><dd>Add demo money → enter amount → Review deposit → Confirm transaction.</dd><dt>Pay a merchant</dt><dd>Pay merchant → enter a merchant name and amount → review and confirm. A completed payment debits your balance.</dd><dt>Send to an account</dt><dd>Send money → enter an existing account number → enter amount → check the returned recipient name → confirm. Unknown or inactive accounts cannot receive funds. Share your own account number to receive funds.</dd><dt>Receive money / request money</dt><dd>Request money → enter payer account and amount → review and confirm. Sign in as that payer to pay or decline. Requests themselves do not move funds.</dd><dt>History and refunds</dt><dd>History → Details shows the full payment or transfer. Completed merchant payments can be refunded once. Transfers cannot be reversed in this demo.</dd><dt>Pending outcome</dt><dd>If status is PROCESSING or RECONCILIATION_REQUIRED, refresh history. Do not create another transaction: the existing one may have moved funds and is being reconciled.</dd><dt>Demo users</dt><dd>demo / demo123 owns ACC1001. receiver / receiver123 owns ACC2001. Use two browser windows or sign out between accounts. Registration also supports new sandbox users. No real external bank or UPI account is created.</dd></dl></section>}
-    {detail && <div className="modalBackdrop"><section className="card detail" role="dialog" aria-modal="true" aria-label="Transaction details"><h2>Transaction details</h2><dl>{Object.entries(detail.record).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{String(value ?? '—')}</dd></div>)}</dl>{detail.refund && <p>Refund: {detail.refund.status} · {detail.refund.refundId}</p>}{detail.type === 'payment' && detail.record.status === 'COMPLETED' && !detail.refund && <button disabled={busy} onClick={async () => { if (!window.confirm('Refund this merchant payment to your account?')) return; const id = detail.record.paymentId; if (await perform(() => api.createRefund(token, id, idempotency('refund', { id })), 'Refund submitted')) setDetail(null); }}>Refund payment</button>}<button className="secondary" disabled={busy} onClick={() => setDetail(null)}>Close details</button></section></div>}
+    {detail && <div className="modalBackdrop"><section className="card detail" role="dialog" aria-modal="true" aria-label="Transaction details"><h2>Transaction details</h2><dl>{Object.entries(detail.record).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{String(value ?? '—')}</dd></div>)}</dl>{detail.refund && <p>Refund: {detail.refund.status} · {detail.refund.refundId}</p>}{detail.type === 'payment' && detail.record.status === 'COMPLETED' && !detail.refund && <button disabled={busy} onClick={async () => { if (!window.confirm('Refund this merchant payment to your account?')) return; const id = detail.record.paymentId; const key = idempotency('refund', { id }); if (await perform(() => api.createRefund(token, id, key), 'Refund submitted', key)) setDetail(null); }}>Refund payment</button>}<button className="secondary" disabled={busy} onClick={() => setDetail(null)}>Close details</button></section></div>}
   </section>;
 }
 

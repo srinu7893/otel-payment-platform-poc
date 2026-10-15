@@ -51,6 +51,10 @@ export default function OperationsPanel({ token, roles }) {
     if (!searchId.trim()) return;
     setError('');
     setSearchResult(null);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(searchId.trim())) {
+      setError('Enter a valid payment or transfer UUID.');
+      return;
+    }
     try {
       const result = searchType === 'payment'
         ? await getPayment(token, searchId.trim())

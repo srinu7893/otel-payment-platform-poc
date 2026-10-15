@@ -18,6 +18,13 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiError> invalidParameter(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex,
+                                               HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Request parameter has an invalid format", request,
+            Map.of(ex.getName(), "invalid format")));
+    }
+
     @ExceptionHandler(org.springframework.web.client.ResourceAccessException.class)
     ResponseEntity<ApiError> dependencyUnavailable(org.springframework.web.client.ResourceAccessException ex,HttpServletRequest request){
         Throwable cause=ex.getCause();

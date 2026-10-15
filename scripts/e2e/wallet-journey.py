@@ -67,6 +67,10 @@ try:
     own=call('/wallet',token=demo);other=call('/wallet',token=receiver)
     assert own['accountNumber']!=other['accountNumber'];record('Both customers can see their own balances')
     call('/wallet',expected=(401,));record('Anonymous wallet access denied')
+    for path in ('/payments/not-a-uuid', '/transfers/not-a-uuid', '/payments?status=UNKNOWN'):
+        invalid=call(path,token=demo,expected=(400,))
+        assert invalid['code']=='VALIDATION_ERROR'
+    record('Malformed transaction IDs and filters return validation errors')
     before=balance(demo);receiver_before=balance(receiver)
     assert call('/wallet?accountNumber='+other['accountNumber'],token=demo)['accountNumber']==own['accountNumber'];record('Wallet balance cannot be redirected to another account')
     if args.new_users:

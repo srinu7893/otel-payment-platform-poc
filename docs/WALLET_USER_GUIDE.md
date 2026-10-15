@@ -51,7 +51,7 @@ Cloud Run dependencies can start on demand. Customer reads allow up to 25 second
 | PAID | The money request's transfer completed. |
 | CANCELLED / DECLINED on a request | The request cannot be paid and did not move funds. |
 
-The form retains its idempotency key on an HTTP failure. Retrying unchanged details in the same session reuses that key. A page reload or new session does not retain that pending form key: check history before submitting again. Request-payment retries always use a server-derived transfer key. Deposits are atomic with their bank ledger record and repeated keys do not credit twice.
+The form retains its idempotency key on an HTTP failure or pending transaction outcome. Retrying unchanged details in the same session reuses that key, even after another successful operation such as a deposit. Only a confirmed final result clears that operation's key. A page reload or new session does not retain that pending form key: check history before submitting again. Request-payment retries always use a server-derived transfer key. Deposits are atomic with their bank ledger record and repeated keys do not credit twice.
 
 Amounts use at most two decimal places. Wallet deposits and money requests are limited to INR 100,000 per operation. Merchant/transfer risk policies and available funds can impose lower limits. The sandbox supports INR and full merchant refunds only. Transfer reversal, real external deposits, multi-currency settlement, KYC, production identity verification, and production fraud controls are outside this implementation.
 
@@ -73,5 +73,14 @@ node scripts\e2e\wallet-browser.cjs https://payment-frontend-52916499838.us-cent
 ```
 
 Browser evidence: `artifacts/wallet-browser.json` and `artifacts/screenshots/wallet-*.png`. This registers a new user, adds INR 0.50 to that user and INR 2 to the demo user and performs small payments/transfers/requests.
+
+Selenium acceptance suite using Microsoft Edge (Python and Edge must be installed; the driver is downloaded on first run):
+
+```cmd
+python -m pip install --target artifacts/selenium-deps selenium==4.51.0
+python scripts\e2e\wallet-selenium.py --url https://payment-frontend-52916499838.us-central1.run.app/ --out artifacts/selenium-wallet-results.json
+```
+
+This creates two fresh sandbox users, adds INR 10 plus small pagination deposits, and tests registration/login, balance, merchant payments/refunds, transfers, request approval/decline/cancel, history, notifications, mobile help and support/admin lookup. It also deliberately discards successful payment responses to verify that manual retries cannot debit twice, including after an unrelated deposit. Changing features must reset pagination, whitespace-only merchants must be rejected, and malformed support IDs must show validation errors. Registration can resume using the same details if provisioning returns REGISTRATION_PENDING. Reports exclude passwords and tokens; screenshots are saved under `artifacts/selenium-screenshots`. These checks exercise mock funds only and do not verify real banking rails or authenticated Cloud Console dashboard contents.
 
 Deploy changed services manually after passing exact-commit CI: **mock-bank-service → customer-service → auth-service → gateway-service → payment-service → api-gateway → frontend**. Bank migration V4, payment migration V7 and Auth migration V2 are additive. Auth now discovers customer-service and mock-bank-service canonical URLs and uses workload identity on those private calls. Existing notification service and private IAM boundaries stay in place. Each workflow still builds only its selected service, uses WIF and immutable digests, checks the tagged candidate, verifies traffic promotion, and retains rollback controls.

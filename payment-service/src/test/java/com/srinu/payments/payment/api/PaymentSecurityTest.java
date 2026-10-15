@@ -29,6 +29,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = "security.jwt.secret=01234567890123456789012345678901")
 class PaymentSecurityTest {
 
+    @Test
+    void malformedPaymentIdReturnsValidationErrorInsteadOf500() throws Exception {
+        mvc.perform(get("/api/v1/payments/not-a-uuid")
+                .with(jwt().jwt(token -> token.claim("customer_id", "demo-customer"))
+                    .authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+            .andExpect(jsonPath("$.fieldErrors.id").value("invalid format"));
+    }
+
     @Autowired
     private MockMvc mvc;
 
