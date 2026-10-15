@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 SERVICES = ['mock-bank-service', 'customer-service', 'auth-service', 'gateway-service',
             'notification-service', 'payment-service', 'api-gateway', 'frontend']
 DATABASE = {'auth-service', 'customer-service', 'mock-bank-service', 'payment-service', 'notification-service'}
-CALLS = {'payment-service': ['gateway-service', 'customer-service'], 'gateway-service': ['mock-bank-service'],
+CALLS = {'auth-service': ['customer-service', 'mock-bank-service'], 'payment-service': ['gateway-service', 'customer-service'], 'gateway-service': ['mock-bank-service'],
          'api-gateway': SERVICES[:6]}
 JWT = {'auth-service', 'payment-service', 'notification-service', 'api-gateway'}
 SECRET_RE = r'[A-Za-z0-9_-]+'
@@ -90,6 +90,9 @@ def render(config, service, image, collector, revision):
         audiences = [config['urls'][service]]
     if service in CALLS and audiences:
         env.update({'CLOUD_RUN_IAM_ENABLED': 'true', 'CLOUD_RUN_AUDIENCES': ','.join(audiences)})
+    if service == 'auth-service':
+        for key, target in [('CLIENTS_CUSTOMER_BASE_URL', 'customer-service'), ('CLIENTS_BANK_BASE_URL', 'mock-bank-service')]:
+            if target in config['urls']: env[key] = config['urls'][target]
     if service == 'payment-service':
         for key, target in [('CLIENTS_GATEWAY_BASE_URL', 'gateway-service'), ('CLIENTS_CUSTOMER_BASE_URL', 'customer-service')]:
             if target in config['urls']: env[key] = config['urls'][target]

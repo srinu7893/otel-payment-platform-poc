@@ -41,6 +41,10 @@ export function login(username, password) {
   });
 }
 
+export function register(payload) {
+  return request('/v1/auth/register', { method: 'POST', body: JSON.stringify(payload) });
+}
+
 export function getCustomer(token, customerId) {
   return request(`/v1/customers/${customerId}`, { headers: authHeaders(token) });
 }

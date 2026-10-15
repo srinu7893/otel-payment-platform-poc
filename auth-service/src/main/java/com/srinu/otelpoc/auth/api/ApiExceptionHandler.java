@@ -15,6 +15,18 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(com.srinu.otelpoc.auth.service.RegistrationService.RegistrationConflict.class)
+    ResponseEntity<ApiError> registrationConflict(Exception ex,HttpServletRequest request){
+        return ResponseEntity.status(409).body(error("REGISTRATION_CONFLICT","Username or email is already registered, or registration details differ. Sign in or choose different details.",request,Map.of()));
+    }
+    @ExceptionHandler(com.srinu.otelpoc.auth.service.RegistrationService.ProvisioningUnavailable.class)
+    ResponseEntity<ApiError> provisioningUnavailable(Exception ex,HttpServletRequest request){
+        return ResponseEntity.status(503).body(error("REGISTRATION_PENDING","Account setup is not complete. Retry registration with the same username, password, name and email.",request,Map.of()));
+    }
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<ApiError> badRequest(IllegalArgumentException ex,HttpServletRequest request){
+        return ResponseEntity.badRequest().body(error("INVALID_REQUEST",ex.getMessage(),request,Map.of()));
+    }
 
     @ExceptionHandler(AuthenticationService.InvalidCredentialsException.class)
     ResponseEntity<ApiError> invalidCredentials(AuthenticationService.InvalidCredentialsException ex,

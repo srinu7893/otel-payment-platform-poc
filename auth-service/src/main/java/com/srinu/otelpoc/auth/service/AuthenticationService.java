@@ -28,6 +28,7 @@ public class AuthenticationService {
 
     @Transactional
     public LoginResult login(String username, String password) {
+        username=username.trim().toLowerCase(java.util.Locale.ROOT);
         AppUser user = users.findById(username).orElse(null);
         if (user == null || !user.isEnabled() || user.isLocked() || !passwordEncoder.matches(password, user.getPasswordHash())) {
             log.warn("event=LOGIN_FAILED username={}", username);

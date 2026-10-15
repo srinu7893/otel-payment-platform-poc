@@ -20,5 +20,7 @@ public class AuthController {
         return ResponseEntity.ok(authenticationService.login(request.username(), request.password()));
     }
 
-    public record LoginRequest(@NotBlank String username, @NotBlank String password) {}
+    public record LoginRequest(@NotBlank String username, @NotBlank String password) {
+        @Override public String toString(){return "LoginRequest[redacted]";}
+    }
 }

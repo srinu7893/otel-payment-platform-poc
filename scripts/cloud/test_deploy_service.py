@@ -178,7 +178,8 @@ class IndependentDeploymentTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory,patch('deploy_service.gcloud',side_effect=fake),patch('deploy_service.health',side_effect=[None,RuntimeError('readiness failure')]):
             with self.assertRaises(RuntimeError):deploy(self.config,'auth-service',self.image,self.collector,'gh-1',Path(directory))
         self.assertEqual(state['status']['traffic'],[{'revisionName':'auth-old','percent':100}])
-        self.assertTrue(all(a[3]=='auth-service' for a in calls if a[2]!='replace'))
+        self.assertTrue(all(a[3]=='auth-service' for a in calls if a[2] in {'get-iam-policy','update-traffic'}))
+        self.assertTrue(any(a[2]=='describe' and a[3]=='customer-service' for a in calls))
         self.assertEqual(sum(a[2]=='replace' for a in calls),1)
 
     def test_private_service_public_policy_blocks_before_replacement(self):

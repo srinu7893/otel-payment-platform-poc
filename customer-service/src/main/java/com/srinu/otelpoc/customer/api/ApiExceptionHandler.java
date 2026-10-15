@@ -15,6 +15,10 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler({org.springframework.web.server.ResponseStatusException.class,org.springframework.dao.DataIntegrityViolationException.class})
+    ResponseEntity<ApiError> provisioningConflict(Exception ex,HttpServletRequest request){
+        return ResponseEntity.status(409).body(error("CUSTOMER_CONFLICT","Customer or email already exists with different details",request,Map.of()));
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiError> validation(MethodArgumentNotValidException ex, HttpServletRequest request) {

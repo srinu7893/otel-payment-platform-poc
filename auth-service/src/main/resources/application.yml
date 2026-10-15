@@ -44,3 +44,9 @@ logging:
   structured:
     format:
       console: logstash
+
+clients:
+  customer:
+    base-url: ${CLIENTS_CUSTOMER_BASE_URL:http://localhost:8084}
+  bank:
+    base-url: ${CLIENTS_BANK_BASE_URL:http://localhost:8082}

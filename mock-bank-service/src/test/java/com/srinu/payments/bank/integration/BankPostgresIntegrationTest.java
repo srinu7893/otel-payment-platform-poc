@@ -22,6 +22,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class BankPostgresIntegrationTest {
+    @Test @Transactional void onboardingRetryDoesNotResetBalance(){
+        String account="ACC"+UUID.randomUUID().toString().replace("-","").substring(0,24).toUpperCase(java.util.Locale.ROOT);
+        var controller=new com.srinu.payments.bank.api.OnboardingController(accounts);
+        var request=new com.srinu.payments.bank.api.OnboardingController.Request("New customer");
+        controller.provision(account,request);assertThat(wallet.balance(account).balance()).isZero();
+        wallet.deposit(account,UUID.randomUUID(),new BigDecimal("10.00"));controller.provision(account,request);accounts.flush();
+        assertThat(wallet.balance(account).balance()).isEqualByComparingTo("10.00");
+    }
     @Autowired private com.srinu.payments.bank.service.WalletService wallet;
     @Test @Transactional void depositsAreIdempotentAndAppearInTheBankLedger() {
         var before=wallet.balance("ACC1001").balance();

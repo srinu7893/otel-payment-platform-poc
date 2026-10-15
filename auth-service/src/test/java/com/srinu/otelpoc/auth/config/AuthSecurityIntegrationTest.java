@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 class AuthSecurityIntegrationTest {
     @Configuration
     @EnableAutoConfiguration(exclude={DataSourceAutoConfiguration.class,HibernateJpaAutoConfiguration.class,FlywayAutoConfiguration.class})
-    @Import({SecurityConfig.class,SecurityErrorHandler.class,AuthController.class,HealthDiagnostics.class,CorrelationIdFilter.class,ProtectedController.class})
+    @Import({SecurityConfig.class,SecurityErrorHandler.class,AuthController.class,com.srinu.otelpoc.auth.api.RegistrationController.class,HealthDiagnostics.class,CorrelationIdFilter.class,ProtectedController.class})
     static class TestApplication {
         @Bean AtomicBoolean databaseUp() { return new AtomicBoolean(true); }
         @Bean HealthIndicator dbHealthIndicator(AtomicBoolean databaseUp) {
@@ -50,6 +50,7 @@ class AuthSecurityIntegrationTest {
     @Autowired AtomicBoolean databaseUp;
     @Autowired org.springframework.context.ApplicationContext context;
     @MockitoBean AuthenticationService authenticationService;
+    @MockitoBean com.srinu.otelpoc.auth.service.RegistrationService registration;
     @AfterEach void reset() {
         databaseUp.set(true);
         org.springframework.boot.availability.AvailabilityChangeEvent.publish(context, org.springframework.boot.availability.ReadinessState.ACCEPTING_TRAFFIC);
@@ -82,8 +83,10 @@ class AuthSecurityIntegrationTest {
         var headers=new HttpHeaders();headers.setBearerAuth(jwt);
         assertThat(http.exchange("/api/v1/auth/protected-test",HttpMethod.GET,new HttpEntity<>(headers),String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
-    @Test void registrationIsNotInventedOrMadePublic() {
-        assertThat(http.postForEntity("/api/v1/auth/register",new HttpEntity<>("{}"),String.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    @Test void registrationIsPublicAndIgnoresGoogleWorkloadBearer() {
+        var headers=new HttpHeaders();headers.setContentType(MediaType.APPLICATION_JSON);headers.setBearerAuth("google-id-token");
+        String body="{\"username\":\"newuser\",\"password\":\"test-password-123\",\"name\":\"New User\",\"email\":\"new@example.com\"}";
+        assertThat(http.exchange("/api/v1/auth/register",HttpMethod.POST,new HttpEntity<>(body,headers),String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
     @Test void databaseFailureAffectsReadinessButNotLiveness() {
         databaseUp.set(false);

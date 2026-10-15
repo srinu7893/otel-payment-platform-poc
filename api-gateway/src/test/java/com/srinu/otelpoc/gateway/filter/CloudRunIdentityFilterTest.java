@@ -20,16 +20,17 @@ import static org.mockito.Mockito.*;
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR;
 
 class CloudRunIdentityFilterTest {
-    @Test void loginUsesCanonicalAudienceAndGoogleAuthorizationWhilePreservingBodyAndTrace() {
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"/api/v1/auth/login","/api/v1/auth/register"})
+    void publicAuthUsesCanonicalAudienceAndGoogleAuthorizationWhilePreservingBodyAndTrace(String path) {
         String audience="https://auth-service-fddyka6g2a-uc.a.run.app";
         AtomicReference<String> requestedAudience=new AtomicReference<>();
         String token="header."+Base64.getUrlEncoder().withoutPadding().encodeToString(("{\"aud\":\""+audience+"\",\"exp\":5000}").getBytes(StandardCharsets.UTF_8))+".sig";
         var identity=new CloudRunIdentity(Set.of(audience), value->{requestedAudience.set(value);return token;},Clock.fixed(Instant.ofEpochSecond(1000),ZoneOffset.UTC));
         ObjectProvider<CloudRunIdentity> provider=mock(ObjectProvider.class);when(provider.getIfAvailable()).thenReturn(identity);
-        var exchange=MockServerWebExchange.from(MockServerHttpRequest.post("/api/v1/auth/login")
+        var exchange=MockServerWebExchange.from(MockServerHttpRequest.post(path)
             .header("X-Correlation-Id","login-corr").header("traceparent","00-cdb7d9d2d2fd09f5471664c22133068d-0123456789abcdef-01")
             .header("tracestate","vendor=opaque").header("baggage","demo=value").body("{\"username\":\"demo\",\"password\":\"demo123\"}"));
-        exchange.getAttributes().put(GATEWAY_REQUEST_URL_ATTR,URI.create(audience+"/api/v1/auth/login"));
+        exchange.getAttributes().put(GATEWAY_REQUEST_URL_ATTR,URI.create(audience+path));
         AtomicReference<ServerWebExchange> outbound=new AtomicReference<>();
         new CloudRunIdentityFilter(provider).filter(exchange,next->{outbound.set(next);return Mono.empty();}).block();
         assertThat(requestedAudience.get()).isEqualTo(audience);

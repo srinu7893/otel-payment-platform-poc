@@ -11,7 +11,7 @@ export default defineConfig({
         rewrite: () => '/rum'
       },
       '/api': {
-        target: 'http://localhost:8088',
+        target: process.env.API_GATEWAY_URL || 'http://localhost:8088',
         changeOrigin: true,
         rewrite: path => path.replace(/^\/api/, '/api')
       }

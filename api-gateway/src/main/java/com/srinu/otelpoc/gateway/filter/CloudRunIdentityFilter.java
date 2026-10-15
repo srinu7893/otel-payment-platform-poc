@@ -52,7 +52,7 @@ public class CloudRunIdentityFilter implements GlobalFilter, Ordered {
                 if (token.isEmpty()) return Mono.empty();
                 log.info("event=WORKLOAD_TOKEN_READY backend={} audience={} correlationId={} traceId={}",
                     destination.getHost(), audience, correlationId, traceId(clean));
-                boolean login = clean.getRequest().getPath().value().equals("/api/v1/auth/login");
+                boolean login = java.util.Set.of("/api/v1/auth/login", "/api/v1/auth/register").contains(clean.getRequest().getPath().value());
                 var outbound = clean.mutate().request(request -> request.headers(headers -> {
                     headers.set("X-Correlation-Id", correlationId);
                     headers.set(CloudRunIdentity.HEADER, token.get());

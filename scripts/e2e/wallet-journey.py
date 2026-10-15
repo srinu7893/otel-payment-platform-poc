@@ -16,6 +16,7 @@ from pathlib import Path
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--url',required=True,help='Frontend origin or API gateway origin')
 parser.add_argument('--out',default='artifacts/wallet-journey.json')
+parser.add_argument('--new-users',action='store_true',help='Register two fresh users and run the journey with their assigned bank accounts')
 args=parser.parse_args()
 base=args.url.rstrip('/')+'/api/v1'
 checks=[]
@@ -43,11 +44,32 @@ def settled(kind,result,token):
     raise AssertionError('Transaction did not settle: '+result['status'])
 
 try:
-    demo=login('demo','demo123');receiver=login('receiver','receiver123')
+    if args.new_users:
+        suffix=uuid.uuid4().hex[:12]
+        first={'username':'sender_'+suffix,'password':'Sandbox-'+uuid.uuid4().hex,'name':'Acceptance Sender','email':'sender_'+suffix+'@example.com'}
+        first.update(roles=['ADMIN'],accountNumber='ACC1001')
+        second={'username':'receiver_'+suffix,'password':'Sandbox-'+uuid.uuid4().hex,'name':'Acceptance Receiver','email':'receiver_'+suffix+'@example.com'}
+        registration=call('/auth/register',first)
+        receiver_registration=call('/auth/register',second)
+        assert registration['accountNumber']!=receiver_registration['accountNumber']
+        assert set(registration['session']['roles'])=={'CUSTOMER'}
+        demo=registration['session']['accessToken'];receiver=receiver_registration['session']['accessToken']
+        assert balance(demo)==0 and balance(receiver)==0;record('New users receive distinct zero-balance bank accounts')
+        assert call('/auth/register',first)['accountNumber']==registration['accountNumber'];record('Registration retry reuses the same bank account')
+        call('/auth/register',{**first,'password':'Wrong-password-123'},expected=(409,));record('Existing username cannot be taken over with a different password')
+        call('/auth/register',{**first,'username':'duplicate_'+suffix},expected=(409,));record('Duplicate email rejected')
+        call('/auth/login',{'username':first['username'],'password':'Wrong-password-123'},expected=(401,));record('Incorrect credentials rejected')
+        demo=login(first['username'],first['password']);receiver=login(second['username'],second['password']);record('New users can sign in with their credentials')
+    else:
+        demo=login('demo','demo123');receiver=login('receiver','receiver123')
     own=call('/wallet',token=demo);other=call('/wallet',token=receiver)
     assert own['accountNumber']!=other['accountNumber'];record('Both customers can see their own balances')
     call('/wallet',expected=(401,));record('Anonymous wallet access denied')
     before=balance(demo);receiver_before=balance(receiver)
+    assert call('/wallet?accountNumber='+other['accountNumber'],token=demo)['accountNumber']==own['accountNumber'];record('Wallet balance cannot be redirected to another account')
+    if args.new_users:
+        failed=settled('payments',call('/payments',{'idempotencyKey':key(),'accountNumber':own['accountNumber'],'merchant':'Insufficient funds check','amount':0.01},demo),demo)
+        assert failed['status'] in ('FAILED','DECLINED') and balance(demo)==before;record('Insufficient funds fail without changing balance')
     body={'idempotencyKey':key(),'amount':10}
     first=call('/wallet/deposits',body,demo);second=call('/wallet/deposits',body,demo)
     assert first['id']==second['id'] and balance(demo)==before+Decimal('10');record('Deposit retry credits only once')
@@ -73,6 +95,8 @@ try:
     replay=call('/transfers',transfer_body,demo);assert replay['transferId']==transfer['transferId']
     assert balance(demo)==before+Decimal('8') and balance(receiver)==receiver_before+Decimal('2');record('Transfer and replay debit/credit both accounts once')
     call('/transfers',{'idempotencyKey':key(),'senderAccount':other['accountNumber'],'receiverAccount':own['accountNumber'],'amount':1,'currency':'INR'},demo,expected=(403,));record('Sender account spoofing rejected')
+    call('/transfers',{'idempotencyKey':key(),'senderAccount':own['accountNumber'],'receiverAccount':own['accountNumber'],'amount':1,'currency':'INR'},demo,expected=(400,));record('Self transfer rejected')
+    call('/transfers',{'idempotencyKey':key(),'senderAccount':own['accountNumber'],'receiverAccount':other['accountNumber'],'amount':1,'currency':'USD'},demo,expected=(400,));record('Unsupported currency rejected')
     request=call('/money-requests',{'idempotencyKey':key(),'payerAccount':other['accountNumber'],'amount':1,'note':'Acceptance request'},demo)
     assert request['status']=='OPEN' and balance(demo)==before+Decimal('8');record('Money request does not move money')
     incoming=call('/money-requests',token=receiver)['content'];assert any(r['id']==request['id'] for r in incoming)

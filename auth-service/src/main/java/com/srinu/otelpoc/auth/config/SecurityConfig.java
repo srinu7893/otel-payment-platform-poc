@@ -57,14 +57,14 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/login").permitAll()
+                .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint(securityErrors)
                 .accessDeniedHandler(securityErrors))
             .oauth2ResourceServer(oauth -> oauth
                 // Login is public at the application layer; Cloud Run validates its Google ID token.
-                .bearerTokenResolver(request -> request.getServletPath().equals("/api/v1/auth/login")
+                .bearerTokenResolver(request -> (request.getServletPath().equals("/api/v1/auth/login") || request.getServletPath().equals("/api/v1/auth/register"))
                     ? null : bearerTokens.resolve(request))
                 .authenticationEntryPoint(securityErrors)
                 .accessDeniedHandler(securityErrors)
