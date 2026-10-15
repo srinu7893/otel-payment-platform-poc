@@ -40,6 +40,8 @@ Use **Send money** and enter another **existing active mock-bank account number*
 
 ## Understand statuses and retries
 
+Cloud Run dependencies can start on demand. Customer reads allow up to 25 seconds, the internal wallet bank call up to 25 seconds, and the payment-to-wallet gateway call up to 45 seconds. Connection failures and read timeouts return a safe BACKEND_UNAVAILABLE (503), rather than a generic internal error. The browser retries transient GET failures at most twice; payments, deposits, transfers and request actions are never automatically retried. Existing money-movement timeout/reconciliation behavior is preserved.
+
 | Status | Meaning |
 | --- | --- |
 | COMPLETED | The bank confirmed the movement. |

@@ -19,6 +19,18 @@ import static org.mockito.Mockito.*;
 @Import({SecurityConfig.class,SecurityErrorHandler.class})
 @TestPropertySource(properties="security.jwt.secret=01234567890123456789012345678901")
 class WalletSecurityTest {
+    @Test void dependencyTimeoutsReturnSafe503ForAllReportedReads() throws Exception {
+        var timeout=new org.springframework.web.client.ResourceAccessException("Bearer private-token",new java.net.SocketTimeoutException("private internal details"));
+        when(wallet.balance("demo-customer")).thenThrow(timeout);
+        when(wallet.activity("demo-customer",0,20)).thenThrow(timeout);
+        when(requests.list("demo-customer",0,20)).thenThrow(timeout);
+        for(String path:java.util.List.of("/api/v1/wallet","/api/v1/wallet/activity","/api/v1/money-requests")){
+            mvc.perform(get(path).with(customer()).header("X-Correlation-Id","cold-start-test"))
+                .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("BACKEND_UNAVAILABLE"))
+                .andExpect(jsonPath("$.correlationId").value("cold-start-test"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("private"))));
+        }
+    }
     @Autowired MockMvc mvc;
     @MockitoBean WalletService wallet;
     @MockitoBean MoneyRequestService requests;

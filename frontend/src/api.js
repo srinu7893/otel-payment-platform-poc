@@ -1,9 +1,9 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE = import.meta.env?.VITE_API_BASE_URL || '/api';
 import { normalizeApiError } from './errors.js';
 
 async function request(path, options = {}) {
   const correlationId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetchWithReadRetry(`${API_BASE}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -28,6 +28,20 @@ async function request(path, options = {}) {
     throw error;
   }
   return body;
+}
+
+async function fetchWithReadRetry(url, options) {
+  const read = (options.method || 'GET').toUpperCase() === 'GET';
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (!read || attempt >= 2 || ![429, 502, 503, 504].includes(response.status)) return response;
+      await response.body?.cancel();
+    } catch (error) {
+      if (!read || attempt >= 2) throw error;
+    }
+    await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+  }
 }
 
 function authHeaders(token) {

@@ -18,6 +18,14 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(org.springframework.web.client.ResourceAccessException.class)
+    ResponseEntity<ApiError> dependencyUnavailable(org.springframework.web.client.ResourceAccessException ex,HttpServletRequest request){
+        Throwable cause=ex.getCause();
+        org.slf4j.LoggerFactory.getLogger(ApiExceptionHandler.class).warn(
+            "event=DEPENDENCY_UNAVAILABLE path={} correlationId={} errorType={} causeType={}",
+            request.getRequestURI(),MDC.get("correlationId"),ex.getClass().getName(),cause==null?"none":cause.getClass().getName());
+        return ResponseEntity.status(503).body(error("BACKEND_UNAVAILABLE","A required service is starting or temporarily unavailable. Please refresh shortly.",request,Map.of()));
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiError> validation(MethodArgumentNotValidException ex, HttpServletRequest request) {
@@ -94,6 +102,9 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiError> unexpected(Exception ex, HttpServletRequest request) {
+        org.slf4j.LoggerFactory.getLogger(ApiExceptionHandler.class).error(
+            "event=UNEXPECTED_API_FAILURE path={} correlationId={} errorType={} causeType={}",
+            request.getRequestURI(),MDC.get("correlationId"),ex.getClass().getName(),ex.getCause()==null?"none":ex.getCause().getClass().getName());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
             .body(error("INTERNAL_ERROR", "Unexpected processing error", request, Map.of()));
     }

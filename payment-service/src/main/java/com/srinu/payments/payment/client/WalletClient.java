@@ -11,7 +11,12 @@ import org.springframework.core.ParameterizedTypeReference;
 
 @Component public class WalletClient {
     private final RestClient client;
-    public WalletClient(RestClient.Builder builder,@Value("${clients.gateway.base-url}") String url){client=builder.baseUrl(url).build();}
+    public WalletClient(RestClient.Builder builder,@Value("${clients.gateway.base-url}") String url,
+        @Value("${clients.wallet.read-timeout:45s}") java.time.Duration timeout){
+        var factory=new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(3));factory.setReadTimeout(timeout);
+        client=builder.clone().baseUrl(url).requestFactory(factory).build();
+    }
     public record Balance(String accountNumber,String customerName,BigDecimal balance,String currency,boolean active) {}
     public record Recipient(String accountNumber,String customerName,boolean active) {}
     public record Deposit(UUID id,String accountNumber,BigDecimal amount,String status) {}

@@ -12,8 +12,12 @@ public class CustomerClient {
     private static final String CORRELATION_HEADER = "X-Correlation-Id";
     private final RestClient client;
 
-    public CustomerClient(RestClient.Builder builder, @Value("${clients.customer.base-url}") String baseUrl) {
-        this.client = builder.baseUrl(baseUrl).build();
+    public CustomerClient(RestClient.Builder builder, @Value("${clients.customer.base-url}") String baseUrl,
+                          @Value("${clients.customer.read-timeout:25s}") java.time.Duration readTimeout) {
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(3));
+        factory.setReadTimeout(readTimeout);
+        this.client = builder.clone().baseUrl(baseUrl).requestFactory(factory).build();
     }
 
     public CustomerView get(String customerId) {

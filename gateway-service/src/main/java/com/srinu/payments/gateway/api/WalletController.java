@@ -9,7 +9,12 @@ import org.slf4j.MDC;
 @RestController @RequestMapping("/api/v1/wallet")
 public class WalletController {
     private final RestClient bank;
-    public WalletController(RestClient.Builder builder,@Value("${clients.bank.base-url}") String url){bank=builder.baseUrl(url).build();}
+    public WalletController(RestClient.Builder builder,@Value("${clients.bank.base-url}") String url,
+        @Value("${clients.wallet.bank-read-timeout:25s}") java.time.Duration timeout){
+        var factory=new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(3));factory.setReadTimeout(timeout);
+        bank=builder.clone().baseUrl(url).requestFactory(factory).build();
+    }
     @GetMapping("/{account}") public Object balance(@PathVariable String account){return get("/api/v1/bank/wallet/{account}",account);}
     @GetMapping("/recipients/{account}") public Object recipient(@PathVariable String account){return get("/api/v1/bank/wallet/recipients/{account}",account);}
     @GetMapping("/{account}/activity") public Object activity(@PathVariable String account,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size){
