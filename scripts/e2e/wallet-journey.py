@@ -21,10 +21,10 @@ args=parser.parse_args()
 base=args.url.rstrip('/')+'/api/v1'
 checks=[]
 
-def call(path,data=None,token=None,expected=(200,201)):
+def call(path,data=None,token=None,expected=(200,201),method=None):
     correlation='wallet-e2e-'+str(uuid.uuid4())
     req=Request(base+path,data=json.dumps(data).encode() if data is not None else None,
-        headers={'Content-Type':'application/json','X-Correlation-Id':correlation,**({'Authorization':'Bearer '+token} if token else {})})
+        headers={'Content-Type':'application/json','X-Correlation-Id':correlation,**({'Authorization':'Bearer '+token} if token else {})},method=method)
     try:
         with urlopen(req,timeout=90) as response:status=response.status;raw=response.read()
     except HTTPError as error:status=error.code;raw=error.read()
@@ -54,6 +54,8 @@ try:
         assert registration['accountNumber']!=receiver_registration['accountNumber']
         assert set(registration['session']['roles'])=={'CUSTOMER'}
         demo=registration['session']['accessToken'];receiver=receiver_registration['session']['accessToken']
+        call('/customers/'+receiver_registration['session']['customerId'],token=demo,expected=(403,));record('Other customer profile access denied')
+        call('/customers/'+registration['session']['customerId'],{'name':'Unchanged','email':first['email'],'accountNumber':receiver_registration['accountNumber']},demo,expected=(403,),method='PUT');record('Customer cannot relink their profile to another bank account')
         assert balance(demo)==0 and balance(receiver)==0;record('New users receive distinct zero-balance bank accounts')
         assert call('/auth/register',first)['accountNumber']==registration['accountNumber'];record('Registration retry reuses the same bank account')
         call('/auth/register',{**first,'password':'Wrong-password-123'},expected=(409,));record('Existing username cannot be taken over with a different password')
