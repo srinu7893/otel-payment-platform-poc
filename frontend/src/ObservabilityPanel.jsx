@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { cloudEvidenceLinks, recentDiagnostics, subscribeDiagnostics } from './diagnostics.js';
 
 const CLOUD_PROJECT = import.meta.env.VITE_GOOGLE_CLOUD_PROJECT || '';
 const CLOUD_NATIVE = Boolean(CLOUD_PROJECT) && !import.meta.env.VITE_GRAFANA_URL;
@@ -14,6 +15,8 @@ function explore(uid, query) {
 export default function ObservabilityPanel() {
   const [value, setValue] = useState('');
   const [kind, setKind] = useState('correlation');
+  const [recent, setRecent] = useState(recentDiagnostics);
+  useEffect(() => subscribeDiagnostics(setRecent), []);
   const input = value.trim();
   const valid = kind === 'trace' ? /^[a-fA-F0-9]{32}$/.test(input) : input.length > 0 && input.length <= 100;
   const logQuery = `{service_name=~".+"} ${kind === 'trace' ? '| trace_id=' : '|='}${JSON.stringify(input)}`;
@@ -24,6 +27,7 @@ export default function ObservabilityPanel() {
       <a href={cloudUrl('logs/query', `logName="projects/${CLOUD_PROJECT}/logs/payment-poc-otel"`)} target="_blank" rel="noreferrer">Application logs</a>
       {' · '}<a href={cloudUrl('traces')} target="_blank" rel="noreferrer">Distributed traces</a>
       {' · '}<a href={cloudUrl('monitoring/metrics-explorer')} target="_blank" rel="noreferrer">Cloud metrics</a>
+      {' · '}<a href={cloudUrl('monitoring/dashboards')} target="_blank" rel="noreferrer">Service and API dashboards</a>
     </p> : <p><a href={`${GRAFANA}/d/payment-poc`} target="_blank" rel="noreferrer">Operations dashboard</a>
       {' · '}<a href={explore('tempo', { queryType: 'traceql', query: '{ resource.service.name = "payment-service" }' })} target="_blank" rel="noreferrer">Payment traces and service map</a>
       {' · '}<a href={`${GRAFANA}/d/payment-business`} target="_blank" rel="noreferrer">Business outcomes</a>
@@ -35,8 +39,13 @@ export default function ObservabilityPanel() {
       <label>Lookup<select value={kind} onChange={e => setKind(e.target.value)}><option value="correlation">Correlation ID</option><option value="trace">Trace ID</option></select></label>
       <label className="grow">ID<input value={value} maxLength={100} onChange={e => setValue(e.target.value)} placeholder={kind === 'trace' ? '32 hexadecimal characters' : 'X-Correlation-Id from the response'} /></label>
       {valid && <a href={CLOUD_NATIVE ? cloudUrl('logs/query', `logName="projects/${CLOUD_PROJECT}/logs/payment-poc-otel" AND ${kind === 'trace' ? `trace="projects/${CLOUD_PROJECT}/traces/${input.toLowerCase()}"` : `SEARCH(${JSON.stringify(input)})`}`) : explore('loki', { expr: logQuery, queryType: 'range' })} target="_blank" rel="noreferrer">Find logs</a>}
-      {valid && kind === 'trace' && <a href={CLOUD_NATIVE ? cloudUrl('logs/query', `trace="projects/${CLOUD_PROJECT}/traces/${input.toLowerCase()}"`) : explore('tempo', { queryType: 'traceql', query: input.toLowerCase() })} target="_blank" rel="noreferrer">{CLOUD_NATIVE ? 'Find linked trace' : 'Open trace'}</a>}
+      {valid && kind === 'trace' && <a href={CLOUD_NATIVE ? cloudEvidenceLinks(CLOUD_PROJECT, input, '').trace : explore('tempo', { queryType: 'traceql', query: input.toLowerCase() })} target="_blank" rel="noreferrer">Open trace</a>}
     </div>
+    <details><summary>Recent API request traces</summary><p>Last 10 requests in this browser session. A trace ID is shown only when the gateway reports an active trace; storage is verified separately.</p>
+      <div className="tableWrap"><table><thead><tr><th>Time</th><th>Operation</th><th>HTTP</th><th>Correlation ID</th><th>Trace ID</th><th>Evidence</th></tr></thead><tbody>{recent.map((row, index) => {
+        const links = cloudEvidenceLinks(CLOUD_PROJECT, row.traceId, row.correlationId);
+        return <tr key={`${row.time}-${index}`}><td>{new Date(row.time).toLocaleTimeString()}</td><td>{row.method} {row.operation}</td><td>{row.status}</td><td>{row.correlationId}</td><td>{row.traceId || 'Not reported'}</td><td>{links.logs && <a href={links.logs} target="_blank" rel="noreferrer">Logs</a>}{' '}{links.trace && <a href={links.trace} target="_blank" rel="noreferrer">Trace</a>}</td></tr>;
+      })}</tbody></table></div></details>
     <small>{CLOUD_NATIVE ? 'Set the time window in Cloud Logging, then follow the trace link on an event.' : 'Search covers the last hour. Increase the time range in Grafana for older requests.'}</small>
   </section>;
 }

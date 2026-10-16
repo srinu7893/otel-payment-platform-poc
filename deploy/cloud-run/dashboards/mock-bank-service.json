@@ -1,0 +1,261 @@
+{
+  "displayName": "OTel Payment POC - mock-bank-service",
+  "mosaicLayout": {
+    "columns": 12,
+    "tiles": [
+      {
+        "xPos": 0,
+        "yPos": 0,
+        "width": 12,
+        "height": 2,
+        "widget": {
+          "title": "How to investigate",
+          "text": {
+            "format": "MARKDOWN",
+            "content": "OTel application metrics from Managed Prometheus. Grouped by service job, route template and HTTP method. Health routes are excluded. Request counts are Prometheus estimates, not ledger audit counts. Availability is HTTP technical availability; business declines and pending outcomes need transaction investigation. No traffic produces an undefined ratio, not 100% availability. Histograms require observations. Open a request in Postman Visualize or Support > Observability to follow its Logs and Trace links. A missing series is not zero. Browser RUM is not enabled in the deployed frontend."
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Requests per second",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (job) (rate(http_server_request_duration_seconds_count{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\"}[5m]))"
+                },
+                "plotType": "LINE"
+              }
+            ],
+            "timeshiftDuration": "0s",
+            "yAxis": {
+              "label": "",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "API operation traffic",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (job,http_route,http_request_method) (rate(http_server_request_duration_seconds_count{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\"}[5m]))"
+                },
+                "plotType": "LINE"
+              }
+            ],
+            "timeshiftDuration": "0s",
+            "yAxis": {
+              "label": "",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 6,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "API operation request count - last hour",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (job,http_route,http_request_method) (increase(http_server_request_duration_seconds_count{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\"}[1h]))"
+                },
+                "plotType": "LINE"
+              }
+            ],
+            "timeshiftDuration": "0s",
+            "yAxis": {
+              "label": "",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "yPos": 6,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "API operation 5xx per second",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (job,http_route,http_request_method) (rate(http_server_request_duration_seconds_count{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\",http_response_status_code=~\"5..\"}[5m])) or (0 * sum by (job,http_route,http_request_method) (rate(http_server_request_duration_seconds_count{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\"}[5m])))"
+                },
+                "plotType": "LINE"
+              }
+            ],
+            "timeshiftDuration": "0s",
+            "yAxis": {
+              "label": "",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 10,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Technical availability by API (1 - 5xx ratio)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "1 - ((sum by (job,http_route,http_request_method) (rate(http_server_request_duration_seconds_count{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\",http_response_status_code=~\"5..\"}[5m])) or (0 * sum by (job,http_route,http_request_method) (rate(http_server_request_duration_seconds_count{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\"}[5m])))) / sum by (job,http_route,http_request_method) (rate(http_server_request_duration_seconds_count{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\"}[5m])))"
+                },
+                "plotType": "LINE"
+              }
+            ],
+            "timeshiftDuration": "0s",
+            "yAxis": {
+              "label": "",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "yPos": 10,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "API operation p50 latency (seconds)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "histogram_quantile(0.5,sum by (le,job,http_route,http_request_method) (rate(http_server_request_duration_seconds_bucket{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\"}[5m])))"
+                },
+                "plotType": "LINE"
+              }
+            ],
+            "timeshiftDuration": "0s",
+            "yAxis": {
+              "label": "",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 14,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "API operation p95 latency (seconds)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "histogram_quantile(0.95,sum by (le,job,http_route,http_request_method) (rate(http_server_request_duration_seconds_bucket{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\"}[5m])))"
+                },
+                "plotType": "LINE"
+              }
+            ],
+            "timeshiftDuration": "0s",
+            "yAxis": {
+              "label": "",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "yPos": 14,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "API operation p99 latency (seconds)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "histogram_quantile(0.99,sum by (le,job,http_route,http_request_method) (rate(http_server_request_duration_seconds_bucket{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\"}[5m])))"
+                },
+                "plotType": "LINE"
+              }
+            ],
+            "timeshiftDuration": "0s",
+            "yAxis": {
+              "label": "",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 18,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "JVM memory used (bytes)",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (job) (jvm_memory_used_bytes{job=\"payment-poc/mock-bank-service\",jvm_memory_type=~\".+\"})"
+                },
+                "plotType": "LINE"
+              }
+            ],
+            "timeshiftDuration": "0s",
+            "yAxis": {
+              "label": "",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "yPos": 18,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "HTTP 4xx per second",
+          "xyChart": {
+            "dataSets": [
+              {
+                "timeSeriesQuery": {
+                  "prometheusQuery": "sum by (job,http_route,http_request_method) (rate(http_server_request_duration_seconds_count{job=\"payment-poc/mock-bank-service\",http_route=~\".+\",http_route!~\".*actuator.*\",http_response_status_code=~\"4..\"}[5m]))"
+                },
+                "plotType": "LINE"
+              }
+            ],
+            "timeshiftDuration": "0s",
+            "yAxis": {
+              "label": "",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

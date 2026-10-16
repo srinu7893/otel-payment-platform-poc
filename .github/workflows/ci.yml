@@ -30,6 +30,9 @@ jobs:
     - name: Build frontend
       working-directory: frontend
       run: npm run build
+    - name: Test frontend request diagnostics and retries
+      working-directory: frontend
+      run: npm test
     - name: Test local incident receiver
       run: python3 -m unittest discover -s observability/incident-inbox -p "test_*.py"
     - name: Validate cloud release contracts

@@ -10,6 +10,10 @@
       "script": {
         "type": "text/javascript",
         "exec": [
+          "// Explicit W3C parent lets the gateway confirm the actual accepted trace.",
+          "const requestedTrace=pm.variables.replaceIn('{{$guid}}').replace(/-/g,'');",
+          "pm.variables.set('otel_requested_trace_id',requestedTrace);",
+          "pm.request.headers.upsert({key:'traceparent',value:'00-'+requestedTrace+'-'+pm.variables.replaceIn('{{$guid}}').replace(/-/g,'').slice(0,16)+'-01'});",
           "// Fetch a fresh sandbox JWT for every request; never commit expiring tokens.",
           "const receiver = pm.info.requestName.startsWith('Receiver:');",
           "const prefix = receiver ? 'live_receiver_' : 'live_sender_';",
@@ -34,6 +38,37 @@
           "for(const match of raw.matchAll(/\\{\\{(live_new_[a-z_]+_key)\\}\\}/g)) {",
           "  if(!pm.environment.get(match[1])) pm.environment.set(match[1],pm.variables.replaceIn('{{$guid}}'));",
           "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const project=pm.environment.get('gcp_project_id') || '';",
+          "const reportedTrace=pm.response.headers.get('X-Trace-Id') || '';",
+          "const correlation=pm.response.headers.get('X-Correlation-Id') || '';",
+          "const validTrace=/^[a-f0-9]{32}$/i.test(reportedTrace) && !/^0+$/.test(reportedTrace);",
+          "pm.environment.set('last_trace_id',validTrace ? reportedTrace : '');",
+          "pm.environment.set('last_correlation_id',/^[A-Za-z0-9._-]{1,100}$/.test(correlation) ? correlation : '');",
+          "const validProject=/^[a-z][a-z0-9-]{4,61}[a-z0-9]$/.test(project);",
+          "const query=validTrace ? 'trace=\"projects/'+project+'/traces/'+reportedTrace+'\"' : '';",
+          "const logsUrl=validProject && validTrace ? 'https://console.cloud.google.com/logs/query?project='+encodeURIComponent(project)+'&query='+encodeURIComponent(query) : '';",
+          "const traceUrl=validProject && validTrace ? 'https://console.cloud.google.com/traces/list?project='+encodeURIComponent(project)+'&tid='+reportedTrace : '';",
+          "pm.environment.set('last_logs_url',logsUrl);pm.environment.set('last_trace_url',traceUrl);",
+          "if(String(pm.environment.get('otel_require_trace'))==='true') {",
+          "  pm.test('Gateway reports the accepted OTel trace',()=>pm.expect(reportedTrace).to.eql(pm.variables.get('otel_requested_trace_id')));",
+          "}",
+          "if(pm.request.method==='POST' && /\\/v1\\/payments$/.test(pm.request.url.getPath()) && pm.response.code===201 && validTrace) {",
+          "  const paymentResult=pm.response.json();",
+          "  if(pm.environment.get('otel_payment_id')!==paymentResult.paymentId) {",
+          "    pm.environment.set('otel_payment_id',paymentResult.paymentId);",
+          "    pm.environment.set('otel_payment_trace_id',reportedTrace);",
+          "    pm.environment.set('otel_payment_trace_url',traceUrl);pm.environment.set('otel_payment_logs_url',logsUrl);",
+          "  }",
+          "}",
+          "pm.visualizer.set('<h3>Request telemetry</h3><p>Trace: {{trace}}</p><p>Correlation: {{correlation}}</p>{{#if traceUrl}}<p><a href=\"{{traceUrl}}\" target=\"_blank\">Open distributed trace</a> | <a href=\"{{logsUrl}}\" target=\"_blank\">Open correlated logs</a></p>{{else}}<p>No active trace reported.</p>{{/if}}<p>Links require your Google Cloud viewing permissions. A returned trace ID does not prove backend storage.</p>',{trace:validTrace ? reportedTrace : 'Not reported',correlation,traceUrl,logsUrl});"
         ]
       }
     }

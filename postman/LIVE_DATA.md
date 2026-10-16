@@ -1,5 +1,7 @@
 # Send requests against existing sandbox data
 
+After Send, open **Visualize** for the request's Cloud Trace and correlated-log links. `last_trace_id` and `last_correlation_id` are saved automatically. New cloud assertions verify the active trace header; viewing stored signals still requires Google Cloud read access. See [OTEL_CLOUD_DEMO.md](../docs/OTEL_CLOUD_DEMO.md).
+
 Verified against the deployed app on 2026-10-16: **28 collection requests, 32 assertions, zero failures**. Each request also performs automatic login.
 
 Import **Live-Data.postman_collection.json** and **Live-Data.postman_environment.json**, then select **Payment Platform - Live Data (deployed sandbox)**. Open **01 - Fetch existing data immediately** and click **Send** on any request. You do not need to register, initialize users, or manually copy a token. Each request logs into the appropriate existing demo account automatically.

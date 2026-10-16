@@ -1,87 +1,191 @@
 #!/usr/bin/env python3
-"""Explicitly invoked, isolated fake-payment cloud checks; never run in ordinary CI."""
-import argparse,json,os,subprocess,time,urllib.request,urllib.error,urllib.parse,uuid
+"""Manual sandbox business + stored telemetry acceptance. Never grants IAM or deploys services."""
+import argparse
+import datetime as dt
+import json
+import os
 from pathlib import Path
-from run_release import validate,SERVICES,health
+import re
+import subprocess
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
 
-def request(url,body=None,headers=None,expected=(200,)):
+PROJECT = 'project-c9bd3d0e-266f-47bf-852'
+SERVICES = {'api-gateway','payment-service','customer-service','gateway-service','mock-bank-service','notification-service'}
+
+class EvidenceBlocked(Exception):
+    pass
+
+def request(url, body=None, headers=None, expected=(200,), response_headers=None):
     req=urllib.request.Request(url,data=None if body is None else json.dumps(body).encode(),
         headers={'Content-Type':'application/json',**(headers or {})})
     try:
-        with urllib.request.urlopen(req,timeout=15) as response:status,raw=response.status,response.read()
-    except urllib.error.HTTPError as error:status,raw=error.code,error.read()
-    assert status in expected, f'HTTP {status}; expected {expected}'
+        with urllib.request.urlopen(req,timeout=90) as response:
+            status,raw=response.status,response.read()
+            if response_headers is not None:response_headers.update({k.lower():v for k,v in response.headers.items()})
+    except urllib.error.HTTPError as error:
+        status,raw=error.code,error.read()
+        if 'googleapis.com/' in url and status in (401,403):
+            raise EvidenceBlocked('Telemetry read access denied (HTTP '+str(status)+'); no IAM was changed') from None
+    if status not in expected:raise AssertionError('HTTP '+str(status)+'; expected '+str(expected))
     try:return json.loads(raw)
     except ValueError:return raw.decode()
 
-def eventually(fn,seconds=240):
+def eventually(fn,seconds=180):
     deadline=time.monotonic()+seconds
-    while time.monotonic()<deadline:
+    last='No stored evidence yet'
+    while True:
         try:
             value=fn()
             if value:return value
-        except (AssertionError,urllib.error.HTTPError):pass
-        time.sleep(5)
-    raise AssertionError('Cloud evidence did not reach expected state within the polling window')
+        except EvidenceBlocked:raise
+        except (AssertionError,urllib.error.URLError) as error:last=type(error).__name__
+        if time.monotonic()>=deadline:raise AssertionError('Stored evidence did not converge: '+last)
+        time.sleep(min(5,max(0,deadline-time.monotonic())))
+
+def validate_config(config):
+    project=config.get('project','')
+    if not re.fullmatch(r'[a-z][a-z0-9-]{4,61}[a-z0-9]',project) or project.startswith('replace-'):
+        raise ValueError('Valid project required')
+    base=config.get('urls',{}).get('api-gateway') or config.get('apiUrl','')
+    url=urllib.parse.urlparse(base)
+    if url.scheme!='https' or not (url.hostname or '').endswith('.run.app') or url.netloc!=url.hostname or url.path or url.query or url.fragment or 'replace-' in base:
+        raise ValueError('Canonical HTTPS api-gateway Cloud Run origin required')
+    return project,base
+
+def span_service(span):
+    labels=span.get('labels',{})
+    for key in ('/service/name','service.name','/service.name','service_name','g.co/r/cloud_run_revision/service_name','/g.co/r/cloud_run_revision/service_name'):
+        if labels.get(key):return labels[key]
+    return ''
+
+def validate_trace(data,trace):
+    if data.get('traceId')!=trace:raise AssertionError('Wrong stored trace')
+    rows=data.get('spans',[])
+    services={span_service(row) for row in rows}
+    if not SERVICES<=services:raise AssertionError('Missing services: '+','.join(sorted(SERVICES-services)))
+    if not any(row.get('name')=='outbox.publish' for row in rows):raise AssertionError('Missing durable outbox span')
+    if not any(any('dbsystem' in re.sub(r'[^a-z]','',key.lower()) for key in row.get('labels',{})) for row in rows):
+        raise AssertionError('Missing database instrumentation')
+    ids={str(row['spanId']) for row in rows}
+    children={}
+    for row in rows:
+        children.setdefault(str(row.get('parentSpanId','')),[]).append(row)
+    roots=[row for row in rows if span_service(row)=='api-gateway' and str(row.get('parentSpanId','')) not in ids]
+    connected=set()
+    def visit(row):
+        sid=str(row['spanId'])
+        if sid in connected:return
+        connected.add(sid)
+        for child in children.get(sid,[]):visit(child)
+    for root in roots:visit(root)
+    if not roots or not SERVICES<={span_service(row) for row in rows if str(row['spanId']) in connected}:
+        raise AssertionError('Service spans are not connected to the gateway request')
+    # Only safe investigation metadata is written, never complete attributes or raw SQL/headers.
+    summary=[]
+    for row in rows:
+        start=dt.datetime.fromisoformat(row['startTime'].replace('Z','+00:00'))
+        end=dt.datetime.fromisoformat(row['endTime'].replace('Z','+00:00'))
+        summary.append({'service':span_service(row),'spanId':str(row['spanId']),
+            'parentSpanId':str(row.get('parentSpanId','')),'startTime':row['startTime'],
+            'durationMs':round((end-start).total_seconds()*1000,3),
+            'outboxPublish':row.get('name')=='outbox.publish'})
+    return {'traceId':trace,'services':sorted(services-{''}),'spans':summary}
+
+def metric_service(labels):
+    return labels.get('service_name') or labels.get('job','').split('/')[-1]
+
+def validate_metrics(data):
+    if data.get('status')!='success':raise AssertionError('Metric query failed')
+    rows=data.get('data',{}).get('result',[])
+    observed={metric_service(row['metric']) for row in rows}
+    required=SERVICES|{'auth-service'}
+    if not required<=observed:raise AssertionError('Missing HTTP metrics: '+','.join(sorted(required-observed)))
+    return {'services':sorted(observed), 'series':len(rows)}
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--config',required=True);args=p.parse_args()
-    config=validate(json.loads(Path(args.config).read_text()))
-    if os.getenv('ALLOW_FAKE_PAYMENT')!='true':raise ValueError('Only enable ALLOW_FAKE_PAYMENT for this isolated PoC')
-    username,password,account=[os.environ[key] for key in ['TEST_CUSTOMER_USERNAME','TEST_CUSTOMER_PASSWORD','TEST_ACCOUNT_NUMBER']]
-    root=Path('artifacts/cloud-acceptance');root.mkdir(parents=True,exist_ok=True)
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--config')
+    parser.add_argument('--project',default=PROJECT)
+    parser.add_argument('--region',default='us-central1')
+    parser.add_argument('--out',default='artifacts/cloud-acceptance')
+    args=parser.parse_args()
+    if args.config:config=json.loads(Path(args.config).read_text())
+    else:
+        if not re.fullmatch(r'[a-z][a-z0-9-]{4,61}[a-z0-9]',args.project) or not re.fullmatch(r'[a-z]+-[a-z]+[0-9]',args.region):raise ValueError('Invalid project or region')
+        origin=subprocess.check_output(['gcloud','run','services','describe','api-gateway','--project='+args.project,'--region='+args.region,'--format=value(status.url)'],text=True).strip()
+        config={'project':args.project,'apiUrl':origin}
+    project,base=validate_config(config)
+    if os.getenv('ALLOW_FAKE_PAYMENT')!='true':raise ValueError('ALLOW_FAKE_PAYMENT=true is required for the isolated sandbox')
+    root=Path(args.out);root.mkdir(parents=True,exist_ok=True)
     results=[]
+    def write(name,value):(root/name).write_text(json.dumps(value,indent=2),encoding='utf-8')
     def check(name,fn):
         started=time.monotonic()
-        try:fn();results.append({'scenario':name,'status':'PASS','seconds':round(time.monotonic()-started,2)})
-        except Exception as error:results.append({'scenario':name,'status':'FAIL','errorType':type(error).__name__});raise
-        finally:(root/'results.json').write_text(json.dumps(results,indent=2))
-    base=config['urls']['api-gateway']
-    check('All eight cloud services ready',lambda:[health(config,config['urls'][s],s) for s in SERVICES])
-    check('Private backend rejects anonymous HTTP',lambda:[request(config['urls'][s]+'/actuator/health',expected=(401,403)) for s in SERVICES if s not in {'frontend','api-gateway'}])
-    check('Application API rejects missing customer token',lambda:request(base+'/api/v1/payments',expected=(401,)))
-    customer=request(base+'/api/v1/auth/login',{'username':username,'password':password})['accessToken']
-    headers={'Authorization':'Bearer '+customer}
+        try:value=fn();state='PASS';reason=''
+        except EvidenceBlocked as error:value=None;state='BLOCKED';reason=str(error)
+        except Exception as error:value=None;state='FAIL';reason=type(error).__name__+(': '+str(error) if isinstance(error,AssertionError) else '')
+        results.append({'scenario':name,'status':state,'seconds':round(time.monotonic()-started,2),**({'reason':reason} if reason else {})})
+        write('results.json',results);print(state+': '+name+(' - '+reason if reason else ''),flush=True)
+        return value
+    check('Anonymous business API rejected',lambda:request(base+'/api/v1/payments',expected=(401,)))
+    def private_services():
+        for service in sorted((SERVICES|{'auth-service'})-{'api-gateway'}):
+            origin=subprocess.check_output(['gcloud','run','services','describe',service,'--project='+project,'--region='+args.region,'--format=value(status.url)'],text=True).strip()
+            validate_config({'project':project,'apiUrl':origin})
+            request(origin+'/actuator/health',expected=(401,403))
+    check('Private backend health rejects anonymous HTTP',private_services)
+    login=request(base+'/api/v1/auth/login',{'username':os.getenv('TEST_CUSTOMER_USERNAME') or 'demo','password':os.getenv('TEST_CUSTOMER_PASSWORD') or 'demo123'})
+    headers={'Authorization':'Bearer '+login['accessToken']}
     check('Customer cannot invoke support operations',lambda:request(base+'/api/v1/ops/health',headers=headers,expected=(403,)))
-    trace=uuid.uuid4().hex;key='cloud-acceptance-'+uuid.uuid4().hex
+    wallet=request(base+'/api/v1/wallet',headers=headers)
+    if float(wallet['balance'])<1:raise ValueError('Test wallet needs at least INR 1 of demo funds; no automatic deposit is performed')
+    trace=uuid.uuid4().hex;key=str(uuid.uuid4());response_headers={}
     trace_headers={**headers,'traceparent':'00-'+trace+'-1234567890abcdef-01','X-Correlation-Id':key}
-    payment_body={'idempotencyKey':key,'accountNumber':account,'merchant':'Isolated OTel Cloud Acceptance','amount':1.00}
-    result=request(base+'/api/v1/payments',payment_body,trace_headers,(200,201));pid=result['paymentId']
-    check('Simulated payment completes',lambda:assert_completed(result))
+    body={'idempotencyKey':key,'accountNumber':wallet['accountNumber'],'merchant':'Isolated OTel acceptance','amount':1}
+    payment=request(base+'/api/v1/payments',body,trace_headers,(200,201),response_headers)
+    pid=payment['paymentId']
+    write('transaction.json',{'paymentId':pid,'traceId':trace,'correlationId':key,'idempotencyKey':key})
+    def completed():
+        current=request(base+'/api/v1/payments/'+pid,headers=headers)
+        assert current['status']=='COMPLETED','Payment not completed';return True
+    check('Sandbox payment completed',lambda:eventually(completed))
+    def response_trace():assert response_headers.get('x-trace-id')==trace,'Gateway did not report the active trace ID'
+    check('Gateway reports the actual accepted request trace',response_trace)
     def notified():
-        data=request(base+'/api/v1/notifications?paymentId='+pid,headers=headers)
-        return any(row.get('paymentId')==pid and row.get('status')=='SENT' for row in data['content'])
-    check('Asynchronous notification delivered',lambda:eventually(notified))
+        rows=request(base+'/api/v1/notifications?paymentId='+pid,headers=headers)['content']
+        assert any(row.get('paymentId')==pid and row.get('status')=='SENT' for row in rows),'Notification not delivered'
+        return True
+    check('Async notification delivered',lambda:eventually(notified))
     def replay():
-        repeated=request(base+'/api/v1/payments',payment_body,headers,(200,201))
-        assert repeated['paymentId']==pid and repeated['status']=='COMPLETED'
+        current=request(base+'/api/v1/payments',body,headers,(200,201))
+        assert current['paymentId']==pid and current['status']=='COMPLETED','Replay changed the payment'
     check('Idempotent replay returns same completed payment',replay)
     access=subprocess.check_output(['gcloud','auth','print-access-token'],text=True).strip()
-    google={'Authorization':'Bearer '+access};project=config['project']
+    google={'Authorization':'Bearer '+access}
     def logs():
-        data=request('https://logging.googleapis.com/v2/entries:list',{
-            'resourceNames':['projects/'+project],
-            'filter':'logName="projects/'+project+'/logs/payment-poc-otel" AND trace="projects/'+project+'/traces/'+trace+'"',
+        data=request('https://logging.googleapis.com/v2/entries:list',{'resourceNames':['projects/'+project],
+            'filter':f'logName="projects/{project}/logs/payment-poc-otel" AND trace="projects/{project}/traces/{trace}"',
             'pageSize':100,'orderBy':'timestamp desc'},google)
         entries=data.get('entries',[])
-        assert entries, 'No OTLP-exported logs with this trace ID'
-        assert any('PAYMENT_COMPLETED' in json.dumps(row) for row in entries), 'Missing correlated business outcome'
-        (root/'correlated-logs.json').write_text(json.dumps(data,indent=2));return True
-    check('Cloud Logging stores this payment trace and outcome',lambda:eventually(logs))
+        assert any('PAYMENT_COMPLETED' in json.dumps(row) for row in entries),'No stored correlated payment completion log'
+        write('logs-summary.json',{'traceId':trace,'entries':len(entries),'paymentCompleted':True,
+            'timestamps':[row.get('timestamp') for row in entries]});return True
+    check('Cloud Logging contains this trace and payment outcome',lambda:eventually(logs))
     def spans():
-        data=request('https://cloudtrace.googleapis.com/v1/projects/'+project+'/traces/'+trace,headers=google)
-        rows=data.get('spans',[])
-        assert len(rows)>10 and any(row.get('name')=='outbox.publish' for row in rows), 'Missing HTTP/DB/async trace spans'
-        (root/'trace.json').write_text(json.dumps(data,indent=2));return True
-    check('Cloud Trace stores distributed spans and durable outbox span',lambda:eventually(spans))
+        data=request(f'https://cloudtrace.googleapis.com/v1/projects/{project}/traces/{trace}',headers=google)
+        write('trace-summary.json',validate_trace(data,trace));return True
+    check('Connected HTTP DB outbox and notification spans stored',lambda:eventually(spans))
     def metrics():
-        query='http_server_request_duration_seconds_count'
-        url='https://monitoring.googleapis.com/v1/projects/'+project+'/location/global/prometheus/api/v1/query?'+urllib.parse.urlencode({'query':query})
-        data=request(url,headers=google);assert data.get('status')=='success' and data['data']['result'], 'Missing application HTTP series'
-        (root/'http-metrics.json').write_text(json.dumps(data,indent=2));return True
-    check('Managed Prometheus stores application HTTP metrics',lambda:eventually(metrics))
-    (root/'transaction.json').write_text(json.dumps({'paymentId':pid,'traceId':trace,'idempotencyKey':key,'status':result['status']},indent=2))
-    print('PASS: cloud acceptance; evidence contains fake transaction IDs and signal responses, no login tokens')
+        query='sum by (job,service_name) (http_server_request_duration_seconds_count)'
+        url=f'https://monitoring.googleapis.com/v1/projects/{project}/location/global/prometheus/api/v1/query?'+urllib.parse.urlencode({'query':query})
+        summary=validate_metrics(request(url,headers=google));write('metrics-summary.json',summary);return True
+    check('Managed Prometheus contains all seven Java services',lambda:eventually(metrics))
+    status='FAIL' if any(row['status']=='FAIL' for row in results) else 'BLOCKED' if any(row['status']=='BLOCKED' for row in results) else 'PASS'
+    write('summary.json',{'status':status,'checks':results,'traceId':trace,'paymentId':pid,'scope':'Stored signal evidence; no deployment, IAM change or deliberate outage'})
+    return 0 if status=='PASS' else 2 if status=='BLOCKED' else 1
 
-def assert_completed(result):assert result['status']=='COMPLETED', 'Payment not completed'
-if __name__=='__main__':main()
+if __name__=='__main__':raise SystemExit(main())

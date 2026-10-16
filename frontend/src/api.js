@@ -1,5 +1,6 @@
 const API_BASE = import.meta.env?.VITE_API_BASE_URL || '/api';
 import { normalizeApiError } from './errors.js';
+import { recordDiagnostic } from './diagnostics.js';
 
 async function request(path, options = {}) {
   const correlationId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -12,6 +13,7 @@ async function request(path, options = {}) {
     }
   });
 
+  recordDiagnostic(path, options.method || 'GET', response, correlationId);
   const contentType = response.headers.get('content-type') || '';
   const body = response.status === 204
     ? null

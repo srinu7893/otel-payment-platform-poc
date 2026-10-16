@@ -24,14 +24,11 @@ jobs:
     - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
     - name: Validate isolated PoC cloud signals and fake transaction
       env:
-        CLOUD_CONFIG: ${{ vars.CLOUD_RUN_CONFIG_JSON }}
         ALLOW_FAKE_PAYMENT: 'true'
         TEST_CUSTOMER_USERNAME: ${{ secrets.TEST_CUSTOMER_USERNAME }}
         TEST_CUSTOMER_PASSWORD: ${{ secrets.TEST_CUSTOMER_PASSWORD }}
-        TEST_ACCOUNT_NUMBER: ${{ secrets.TEST_ACCOUNT_NUMBER }}
       run: |
-        printf '%s' "$CLOUD_CONFIG" > /tmp/otel-cloud-config.json
-        python3 scripts/cloud/cloud_acceptance.py --config /tmp/otel-cloud-config.json
+        python3 scripts/cloud/cloud_acceptance.py --project project-c9bd3d0e-266f-47bf-852 --region us-central1
     - name: Upload cloud test evidence
       if: always()
       uses: actions/upload-artifact@v4
