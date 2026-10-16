@@ -19,6 +19,15 @@ SERVICES = {'api-gateway','payment-service','customer-service','gateway-service'
 class EvidenceBlocked(Exception):
     pass
 
+def google_failure(status,raw):
+    try:error=json.loads(raw).get('error',{})
+    except (ValueError,TypeError):error={}
+    details=error.get('details',[])
+    return {'status':'BLOCKED' if status in (401,403) else 'FAIL','httpStatus':status,
+        'apiStatus':error.get('status',''),
+        'reasons':sorted({row['reason'] for row in details if row.get('reason')}),
+        'permissions':sorted(set(re.findall(r'\b(?:monitoring|logging|cloudtrace)\.(?:dashboards|timeSeries|metricDescriptors|logEntries|entries|traces)\.[A-Za-z]+\b',error.get('message',''))))}
+
 def request(url, body=None, headers=None, expected=(200,), response_headers=None):
     req=urllib.request.Request(url,data=None if body is None else json.dumps(body).encode(),
         headers={'Content-Type':'application/json',**(headers or {})})
@@ -29,7 +38,7 @@ def request(url, body=None, headers=None, expected=(200,), response_headers=None
     except urllib.error.HTTPError as error:
         status,raw=error.code,error.read()
         if 'googleapis.com/' in url and status in (401,403):
-            raise EvidenceBlocked('Telemetry read access denied (HTTP '+str(status)+'); no IAM was changed') from None
+            raise EvidenceBlocked(json.dumps(google_failure(status,raw))) from None
     if status not in expected:raise AssertionError('HTTP '+str(status)+'; expected '+str(expected))
     try:return json.loads(raw)
     except ValueError:return raw.decode()
@@ -131,6 +140,10 @@ def main():
         results.append({'scenario':name,'status':state,'seconds':round(time.monotonic()-started,2),**({'reason':reason} if reason else {})})
         write('results.json',results);print(state+': '+name+(' - '+reason if reason else ''),flush=True)
         return value
+    def finish(trace=None,pid=None):
+        status='FAIL' if any(row['status']=='FAIL' for row in results) else 'BLOCKED' if any(row['status']=='BLOCKED' for row in results) else 'PASS'
+        write('summary.json',{'status':status,'checks':results,'traceId':trace,'paymentId':pid,'scope':'Stored signal evidence; no deployment, IAM change or deliberate outage'})
+        return 0 if status=='PASS' else 2 if status=='BLOCKED' else 1
     check('Anonymous business API rejected',lambda:request(base+'/api/v1/payments',expected=(401,)))
     def private_services():
         for service in sorted((SERVICES|{'auth-service'})-{'api-gateway'}):
@@ -138,15 +151,21 @@ def main():
             validate_config({'project':project,'apiUrl':origin})
             request(origin+'/actuator/health',expected=(401,403))
     check('Private backend health rejects anonymous HTTP',private_services)
-    login=request(base+'/api/v1/auth/login',{'username':os.getenv('TEST_CUSTOMER_USERNAME') or 'demo','password':os.getenv('TEST_CUSTOMER_PASSWORD') or 'demo123'})
+    login=check('Test customer login',lambda:request(base+'/api/v1/auth/login',{'username':os.getenv('TEST_CUSTOMER_USERNAME') or 'demo','password':os.getenv('TEST_CUSTOMER_PASSWORD') or 'demo123'}))
+    if login is None:return finish()
     headers={'Authorization':'Bearer '+login['accessToken']}
     check('Customer cannot invoke support operations',lambda:request(base+'/api/v1/ops/health',headers=headers,expected=(403,)))
-    wallet=request(base+'/api/v1/wallet',headers=headers)
-    if float(wallet['balance'])<1:raise ValueError('Test wallet needs at least INR 1 of demo funds; no automatic deposit is performed')
+    wallet=check('Test wallet readable',lambda:eventually(lambda:request(base+'/api/v1/wallet',headers=headers)))
+    if wallet is None:return finish()
+    def funded():assert float(wallet['balance'])>=1,'Test wallet needs INR 1 of demo funds; no automatic deposit is performed'
+    check('Test wallet funded',funded)
+    if any(row['status']=='FAIL' for row in results):return finish()
     trace=uuid.uuid4().hex;key=str(uuid.uuid4());response_headers={}
     trace_headers={**headers,'traceparent':'00-'+trace+'-1234567890abcdef-01','X-Correlation-Id':key}
     body={'idempotencyKey':key,'accountNumber':wallet['accountNumber'],'merchant':'Isolated OTel acceptance','amount':1}
-    payment=request(base+'/api/v1/payments',body,trace_headers,(200,201),response_headers)
+    write('transaction.json',{'traceId':trace,'correlationId':key,'idempotencyKey':key})
+    payment=check('Sandbox payment accepted',lambda:request(base+'/api/v1/payments',body,trace_headers,(200,201),response_headers))
+    if payment is None:return finish(trace)
     pid=payment['paymentId']
     write('transaction.json',{'paymentId':pid,'traceId':trace,'correlationId':key,'idempotencyKey':key})
     def completed():
@@ -184,8 +203,6 @@ def main():
         url=f'https://monitoring.googleapis.com/v1/projects/{project}/location/global/prometheus/api/v1/query?'+urllib.parse.urlencode({'query':query})
         summary=validate_metrics(request(url,headers=google));write('metrics-summary.json',summary);return True
     check('Managed Prometheus contains all seven Java services',lambda:eventually(metrics))
-    status='FAIL' if any(row['status']=='FAIL' for row in results) else 'BLOCKED' if any(row['status']=='BLOCKED' for row in results) else 'PASS'
-    write('summary.json',{'status':status,'checks':results,'traceId':trace,'paymentId':pid,'scope':'Stored signal evidence; no deployment, IAM change or deliberate outage'})
-    return 0 if status=='PASS' else 2 if status=='BLOCKED' else 1
+    return finish(trace,pid)
 
 if __name__=='__main__':raise SystemExit(main())

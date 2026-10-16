@@ -2,6 +2,7 @@
 """Render Cloud Monitoring dashboards; publish only with explicit --apply. Never modifies IAM."""
 import argparse,json,re,subprocess,urllib.request,urllib.error,urllib.parse
 from pathlib import Path
+from cloud_acceptance import google_failure
 
 JAVA_SERVICES=['api-gateway','auth-service','customer-service','payment-service','gateway-service','mock-bank-service','notification-service']
 def queries(service=None):
@@ -88,8 +89,7 @@ def main():
                     present=bool(data.get('data',{}).get('result'))
                     results.append({'service':service,'panel':title,'status':'DATA' if present else 'NO_DATA'})
     except urllib.error.HTTPError as error:
-        results.append({'status':'BLOCKED' if error.code in (401,403) else 'FAIL','httpStatus':error.code,
-            'reason':'Cloud Monitoring access denied; IAM unchanged' if error.code in (401,403) else 'Dashboard API rejected request'})
+        results.append(google_failure(error.code,error.read()))
         print(results[-1]);return 2 if error.code in (401,403) else 1
     finally:(root/'results.json').write_text(json.dumps(results,indent=2),encoding='utf-8')
     print(json.dumps(results,indent=2))

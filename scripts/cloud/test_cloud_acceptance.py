@@ -1,7 +1,8 @@
-import copy
+import copy,json,os,sys,tempfile
+from pathlib import Path
 import unittest
 from unittest.mock import patch
-from cloud_acceptance import validate_config,validate_trace,validate_metrics,eventually,EvidenceBlocked,SERVICES
+from cloud_acceptance import validate_config,validate_trace,validate_metrics,eventually,EvidenceBlocked,SERVICES,google_failure,main
 
 class CloudTelemetryAcceptanceTest(unittest.TestCase):
     def trace(self):
@@ -44,5 +45,25 @@ class CloudTelemetryAcceptanceTest(unittest.TestCase):
         with patch('cloud_acceptance.time.sleep') as sleep:
             with self.assertRaises(EvidenceBlocked):eventually(lambda:(_ for _ in ()).throw(EvidenceBlocked('denied')))
             sleep.assert_not_called()
+    def test_cloud_denial_evidence_excludes_raw_error_payload(self):
+        raw=json.dumps({'error':{'status':'PERMISSION_DENIED','message':'monitoring.timeSeries.list denied; token=SECRET',
+            'details':[{'reason':'IAM_PERMISSION_DENIED','metadata':{'token':'SECRET'}}]}})
+        result=google_failure(403,raw)
+        self.assertEqual(result['permissions'],['monitoring.timeSeries.list'])
+        self.assertEqual(result['reasons'],['IAM_PERMISSION_DENIED'])
+        self.assertNotIn('SECRET',json.dumps(result))
+    def test_failed_login_is_in_complete_evidence_without_money_mutation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);config=root/'config.json'
+            config.write_text(json.dumps({'project':'valid-project','apiUrl':'https://gateway.run.app'}))
+            def respond(url,*args,**kwargs):
+                if url.endswith('/auth/login'):raise AssertionError('HTTP 504')
+                return {}
+            with patch.dict(os.environ,{'ALLOW_FAKE_PAYMENT':'true'}),patch.object(sys,'argv',['cloud_acceptance.py','--config',str(config),'--out',str(root/'out')]),patch('cloud_acceptance.subprocess.check_output',return_value='https://gateway.run.app'),patch('cloud_acceptance.request',side_effect=respond) as call:
+                self.assertEqual(main(),1)
+            result=json.loads((root/'out/summary.json').read_text())
+            self.assertEqual(result['status'],'FAIL')
+            self.assertEqual(result['checks'][-1]['scenario'],'Test customer login')
+            self.assertFalse(any('/api/v1/payments' in str(c) and len(c.args)>1 for c in call.call_args_list))
 
 if __name__=='__main__':unittest.main()

@@ -40,6 +40,8 @@ The suite checks:
 
 Artifact `cloud-acceptance-*` contains individual PASS/FAIL/BLOCKED results, transaction diagnostic IDs, safe log counts/timestamps, safe span relationships/durations and service metric coverage. It does not upload JWTs, raw log payloads, complete span attributes or request bodies. A missing signal or disconnected service fails. Cloud API 401/403 is BLOCKED and returns a nonzero exit code without waiting through the ingestion polling period. Independent signal checks continue so one denial does not hide the others.
 
+Login, wallet readability/funding and payment acceptance are recorded prerequisites. A failed prerequisite writes a complete failure summary. Wallet GETs are polled for transient startup recovery; money-changing POSTs are not automatically retried. The UUID retry key is saved before the payment POST so an interrupted request can be investigated safely. External proxy 504 responses can omit the gateway trace header; those are genuine failed acceptance checks, not evidence of an accepted trace.
+
 ## Access requirements and boundaries
 
 The observer needs access to stored data: typically `roles/logging.viewer`, `roles/cloudtrace.user` and `roles/monitoring.viewer`, scoped to this project. Publishing dashboards additionally requires appropriate dashboard create/update permissions, such as `roles/monitoring.dashboardEditor`. Existing service discovery needs Cloud Run read access. Workflows never grant roles, change private-service IAM or expose backend services. If the configured WIF account is denied, use the recorded denial to request the specific access through your administrator.
