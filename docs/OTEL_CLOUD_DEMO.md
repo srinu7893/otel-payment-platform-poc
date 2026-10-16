@@ -44,6 +44,8 @@ Login, wallet readability/funding and payment acceptance are recorded prerequisi
 
 ## Access requirements and boundaries
 
+Follow [OTEL_ACCESS_SETUP.md](OTEL_ACCESS_SETUP.md) for exact Console steps, role names, an optional dedicated observer identity, and the read-only **OTel access check** workflow. Observability workflows prefer `GCP_OBSERVABILITY_SERVICE_ACCOUNT` when configured and fall back to `GCP_SERVICE_ACCOUNT`. Access is checked before cloud acceptance creates a payment or dashboard publication begins.
+
 The observer needs access to stored data: typically `roles/logging.viewer`, `roles/cloudtrace.user` and `roles/monitoring.viewer`, scoped to this project. Publishing dashboards additionally requires appropriate dashboard create/update permissions, such as `roles/monitoring.dashboardEditor`. Existing service discovery needs Cloud Run read access. Workflows never grant roles, change private-service IAM or expose backend services. If the configured WIF account is denied, use the recorded denial to request the specific access through your administrator.
 
 The Cloud Run Collector still has ephemeral queues. This increment makes no durability guarantee across instance termination, adds no tail-sampling policy, and enables no new browser SDK. Those are separate experiments after this stored-signal baseline is verified.

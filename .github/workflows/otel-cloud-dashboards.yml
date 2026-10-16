@@ -29,8 +29,17 @@ jobs:
     - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
       with:
         workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        service_account: ${{ secrets.GCP_OBSERVABILITY_SERVICE_ACCOUNT || secrets.GCP_SERVICE_ACCOUNT }}
     - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db
+    - name: Check required access before publication or queries
+      if: inputs.apply || inputs.verify_queries
+      env:
+        APPLY: ${{ inputs.apply }}
+        OBSERVER_ACCOUNT: ${{ secrets.GCP_OBSERVABILITY_SERVICE_ACCOUNT || secrets.GCP_SERVICE_ACCOUNT }}
+      run: |
+        scope=metrics
+        if [ "$APPLY" = true ]; then scope=dashboards; fi
+        python3 scripts/cloud/otel_access.py --project project-c9bd3d0e-266f-47bf-852 --scope "$scope"
     - name: Render and optionally publish or verify
       env:
         APPLY: ${{ inputs.apply }}
@@ -47,3 +56,4 @@ jobs:
         path: |
           deploy/cloud-run/dashboards/
           artifacts/cloud-dashboards/
+          artifacts/otel-access/
