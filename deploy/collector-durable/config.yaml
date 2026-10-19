@@ -1,0 +1,53 @@
+# External host with a persistent POSIX disk. No batch buffer before queue ack.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+        max_request_body_size: 4194304
+        tls:
+          cert_file: ${env:OTEL_TLS_CERT}
+          key_file: ${env:OTEL_TLS_KEY}
+        auth:
+          authenticator: bearertokenauth
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 384
+    spike_limit_mib: 96
+exporters:
+  googlecloud:
+    project: ${env:GOOGLE_CLOUD_PROJECT}
+    log:
+      default_log_name: payment-poc-otel
+    sending_queue:
+      queue_size: 2000
+      storage: file_storage
+  googlemanagedprometheus:
+    project: ${env:GOOGLE_CLOUD_PROJECT}
+    sending_queue:
+      queue_size: 2000
+      storage: file_storage
+extensions:
+  bearertokenauth:
+    token: ${env:OTEL_INGEST_TOKEN}
+  file_storage:
+    directory: ${env:OTEL_QUEUE_DIRECTORY}
+    timeout: 10s
+  health_check:
+    endpoint: 127.0.0.1:13133
+service:
+  extensions: [bearertokenauth, file_storage, health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [googlecloud]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [googlecloud]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [googlemanagedprometheus]

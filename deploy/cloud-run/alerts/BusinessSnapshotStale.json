@@ -1,0 +1,26 @@
+{
+  "displayName": "OTel Payment POC - BusinessSnapshotStale",
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": [],
+  "userLabels": {
+    "owner": "poc-support",
+    "managed_by": "otel-payment-poc"
+  },
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "Inspect service/API dashboard, correlated logs and trace waterfall. Check snapshot freshness before interpreting business counts. No-data alerts require always-on expected emitters and are disabled by default for scale-to-zero services. Do not retry money movement without its original idempotency key. Runbook: https://github.com/srinu7893/otel-payment-platform-poc/blob/main/docs/OTEL_REMAINING_FEATURES.md"
+  },
+  "conditions": [
+    {
+      "displayName": "BusinessSnapshotStale",
+      "conditionPrometheusQueryLanguage": {
+        "query": "(time() - max(poc_business_snapshot_last_success_timestamp_seconds{job=\"payment-poc/payment-service\"}) > 60) or (min(poc_business_snapshot_healthy{job=\"payment-poc/payment-service\"}) == 0)",
+        "duration": "60s",
+        "evaluationInterval": "30s",
+        "ruleGroup": "otel-payment-poc",
+        "alertRule": "BusinessSnapshotStale"
+      }
+    }
+  ]
+}

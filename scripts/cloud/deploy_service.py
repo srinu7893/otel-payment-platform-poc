@@ -30,6 +30,13 @@ def validate_selected(config, service):
     """Validate only configuration consumed by this application's manifest."""
     if service not in SERVICES:
         raise ValueError('Unknown service')
+    warm=config.get('warmServices',[])
+    if not isinstance(warm,list) or any(target not in SERVICES for target in warm):
+        raise ValueError('warmServices must list known services')
+    if not isinstance(config.get('browserOrigins',[]),list):raise ValueError('browserOrigins must be an array')
+    for origin in config.get('browserOrigins',[]):
+        if not isinstance(origin,str) or not re.fullmatch(r'https://[a-z0-9-]+\.(?:[a-z0-9-]+\.)?run\.app',origin):
+            raise ValueError('browserOrigins must contain HTTPS Cloud Run origins')
     def value(value, pattern, label):
         if not isinstance(value, str) or 'replace-' in value or not re.fullmatch(pattern, value):
             raise ValueError('Invalid ' + label)
@@ -37,7 +44,7 @@ def validate_selected(config, service):
                          ('region', r'[a-z]+-[a-z]+[0-9]'), ('repository', r'[a-z][a-z0-9_-]+')]:
         value(config.get(key), pattern, key)
     # Optional dependency URLs are validated when supplied, never required to bootstrap.
-    targets = set(CALLS.get(service, [])) | ({'api-gateway'} if service == 'frontend' else set())
+    targets = set(CALLS.get(service, [])) | ({'api-gateway'} if service == 'frontend' else set()) | ({'frontend'} if service=='api-gateway' else set())
     urls = config.get('urls', {})
     if not isinstance(urls, dict):
         raise ValueError('Expected object: urls')
@@ -49,7 +56,7 @@ def validate_selected(config, service):
         if url.scheme != 'https' or not (url.hostname or '').endswith('.run.app') or url.netloc != url.hostname or url.path or url.query or url.fragment:
             raise ValueError('Expected canonical Cloud Run origin: ' + target)
     value(runtime_account(config, service), r'[a-z][a-z0-9-]+@' + re.escape(config['project']) + r'\.iam\.gserviceaccount\.com', 'selected runtime account')
-    needs_secrets = service in DATABASE or service in JWT or (service != 'frontend' and bool(config.get('grafana')))
+    needs_secrets = service in DATABASE or service in JWT or (service != 'frontend' and bool(config.get('grafana') or config.get('durableCollector')))
     if needs_secrets:
         value(config.get('secretVersion'), r'[1-9][0-9]*', 'pinned numeric secretVersion')
     def secrets(key, names):
@@ -80,6 +87,15 @@ def validate_selected(config, service):
         value(grafana.get('endpoint'), r'https://[a-zA-Z0-9.-]+\.grafana\.net/otlp', 'Grafana endpoint')
         value(grafana.get('username'), r'[0-9]+', 'Grafana username')
         value(grafana.get('tokenSecret'), SECRET_RE, 'Grafana token secret')
+    if service!='frontend' and config.get('durableCollector'):
+        durable=config['durableCollector']
+        if not isinstance(durable,dict):raise ValueError('Expected durableCollector object')
+        endpoint=urlparse(durable.get('endpoint',''))
+        if endpoint.scheme!='https' or not endpoint.hostname or endpoint.netloc!=endpoint.hostname+((':'+str(endpoint.port)) if endpoint.port else '') or endpoint.path or endpoint.query or endpoint.fragment:
+            raise ValueError('Durable collector requires an HTTPS origin without credentials')
+        if endpoint.hostname in {'localhost','127.0.0.1'} or 'replace-' in endpoint.hostname:raise ValueError('Expected reachable durable collector host')
+        value(durable.get('tokenSecret'),SECRET_RE,'durableCollector.tokenSecret')
+        if config.get('grafana'):raise ValueError('Choose direct Grafana export or durable forwarding, not both')
     return config
 
 def selected_manifest(config, service, image, collector, revision):
@@ -123,13 +139,20 @@ def discover(config, service):
             warnings.append(f'{target}: configured URL {configured} differs from canonical URL {actual}; using status.url')
         resolved['urls'][target] = actual
     canonical(service, previous)
-    for target in (CALLS.get(service, []) if service != 'frontend' else ['api-gateway']):
+    dependencies=list(CALLS.get(service, []) if service != 'frontend' else ['api-gateway'])
+    if service=='api-gateway':dependencies.append('frontend')
+    for target in dependencies:
         try:
             live = gcloud(config, 'run', 'services', 'describe', service_name(target))
         except subprocess.CalledProcessError:
             warnings.append(target + ': dependency not discoverable; retaining supplied URL if present')
             continue
         canonical(target, live)
+        if service=='api-gateway' and target=='frontend':
+            origins=set(resolved.get('browserOrigins',[]))|{live['status']['url']}
+            advertised=live.get('metadata',{}).get('annotations',{}).get('run.googleapis.com/urls','[]')
+            origins.update(json.loads(advertised))
+            resolved['browserOrigins']=sorted(origins)
     validate_selected(resolved, service)
     return resolved, previous, warnings
 

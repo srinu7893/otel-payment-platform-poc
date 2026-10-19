@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       apply:
-        description: Publish or update the eight POC dashboards
+        description: Publish or update the eleven POC dashboards
         type: boolean
         default: false
       verify_queries:

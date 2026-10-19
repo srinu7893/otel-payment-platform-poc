@@ -12,7 +12,7 @@
           "title": "How to investigate",
           "text": {
             "format": "MARKDOWN",
-            "content": "OTel application metrics from Managed Prometheus. Grouped by service job, route template and HTTP method. Health routes are excluded. Request counts are Prometheus estimates, not ledger audit counts. Availability is HTTP technical availability; business declines and pending outcomes need transaction investigation. No traffic produces an undefined ratio, not 100% availability. Histograms require observations. Open a request in Postman Visualize or Support > Observability to follow its Logs and Trace links. A missing series is not zero. Browser RUM is not enabled in the deployed frontend."
+            "content": "OTel application metrics from Managed Prometheus. Grouped by service job, route template and HTTP method. Health routes are excluded. Request counts are Prometheus estimates, not ledger audit counts. Availability is HTTP technical availability; business declines and pending outcomes need transaction investigation. No traffic produces an undefined ratio, not 100% availability. Histograms require observations. Open a request in Postman Visualize or Support > Observability to follow its Logs and Trace links. A missing series is not zero. Wallet attempts include retries; committed deposit and request counts come from database rows. Snapshot health must be current. Browser measurements are bounded, untrusted and sampled by page lifecycle; mixed milliseconds and CLS score are grouped by unit."
           }
         }
       },

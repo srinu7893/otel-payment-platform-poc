@@ -7,6 +7,7 @@ from cloud_acceptance import google_failure
 SIGNALS={'logging.logEntries.list','cloudtrace.traces.get','monitoring.timeSeries.list','run.services.get'}
 DASHBOARDS={'monitoring.dashboards.list','monitoring.dashboards.get','monitoring.dashboards.create','monitoring.dashboards.update'}
 SCOPES={'signals':SIGNALS,'metrics':{'monitoring.timeSeries.list'},'dashboards':DASHBOARDS|{'monitoring.timeSeries.list'},'all':SIGNALS|DASHBOARDS}
+SCOPES['alerts']={'monitoring.alertPolicies.list','monitoring.alertPolicies.get','monitoring.alertPolicies.create','monitoring.alertPolicies.update','monitoring.notificationChannels.get'}
 ROLES=['roles/logging.viewer','roles/cloudtrace.user','roles/monitoring.viewer','roles/monitoring.dashboardEditor']
 
 def assess(granted,scope):

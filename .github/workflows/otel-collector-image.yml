@@ -1,0 +1,47 @@
+name: Publish OTel collector image
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+jobs:
+  collector:
+    if: github.ref == 'refs/heads/main'
+    environment: gcp-poc
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SERVICE: api-gateway
+      REGISTRY: us-central1-docker.pkg.dev/project-c9bd3d0e-266f-47bf-852/otel-payment-platform
+      COMMIT_SHA: ${{ github.sha }}
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        persist-credentials: false
+    - name: Require passing CI
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+      run: bash scripts/cloud/workflow_service.sh ci
+    - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db
+    - name: Build, validate and publish only collector
+      run: |
+        set -euo pipefail
+        image="$REGISTRY/collector:$COMMIT_SHA-$GITHUB_RUN_ID"
+        docker build -f deploy/cloud-run/Dockerfile.collector -t "$image" .
+        docker run --rm -e GOOGLE_CLOUD_PROJECT=syntax-validation -e APPLICATION_SERVICE=validation "$image" validate --config=/etc/otelcol-contrib/config.yaml
+        gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+        docker push "$image"
+        digest=$(gcloud artifacts docker images describe "$image" --project=project-c9bd3d0e-266f-47bf-852 --format='value(image_summary.digest)')
+        [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+        mkdir -p artifacts/collector-image
+        printf '%s\n' "$REGISTRY/collector@$digest" > artifacts/collector-image/digest.txt
+    - uses: actions/upload-artifact@v4
+      with:
+        name: collector-image-${{ github.run_id }}
+        path: artifacts/collector-image/

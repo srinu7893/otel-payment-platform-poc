@@ -89,5 +89,18 @@ service:
       exporters:
       - googlemanagedprometheus
   telemetry:
+    resource:
+      service.name: otelcol-cloud-run
+      service.namespace: payment-poc
+      poc.application.service: ${env:APPLICATION_SERVICE}
     logs:
       encoding: json
+    metrics:
+      level: normal
+      readers:
+      - periodic:
+          interval: 10000
+          exporter:
+            otlp:
+              protocol: http/protobuf
+              endpoint: http://127.0.0.1:4318

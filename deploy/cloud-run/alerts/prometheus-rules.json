@@ -1,0 +1,74 @@
+{
+  "groups": [
+    {
+      "name": "otel-cloud",
+      "rules": [
+        {
+          "alert": "PaymentApiErrors",
+          "expr": "(sum(rate(http_server_request_duration_seconds_count{job=\"payment-poc/api-gateway\",http_route=~\".+\",http_route!~\".*actuator.*|.*telemetry.*\",http_response_status_code=~\"5..\"}[5m]))/sum(rate(http_server_request_duration_seconds_count{job=\"payment-poc/api-gateway\",http_route=~\".+\",http_route!~\".*actuator.*|.*telemetry.*\"}[5m])) > 0.05) and (sum(rate(http_server_request_duration_seconds_count{job=\"payment-poc/api-gateway\",http_route=~\".+\",http_route!~\".*actuator.*|.*telemetry.*\"}[5m])) > 0.1)",
+          "for": "120s"
+        },
+        {
+          "alert": "PaymentApiLatency",
+          "expr": "(histogram_quantile(0.95,sum by(le)(rate(http_server_request_duration_seconds_bucket{job=\"payment-poc/api-gateway\",http_route=~\".+\",http_route!~\".*actuator.*|.*telemetry.*\"}[5m]))) > 2.5) and (sum(rate(http_server_request_duration_seconds_count{job=\"payment-poc/api-gateway\",http_route=~\".+\",http_route!~\".*actuator.*|.*telemetry.*\"}[5m])) > 0.1)",
+          "for": "120s"
+        },
+        {
+          "alert": "PaymentOutboxDelayed",
+          "expr": "max(poc_outbox_oldest_pending_seconds{job=\"payment-poc/payment-service\"}) > 60",
+          "for": "60s"
+        },
+        {
+          "alert": "NotificationDeliveryDelayed",
+          "expr": "max(poc_notification_oldest_unsent_seconds{job=\"payment-poc/notification-service\"}) > 60",
+          "for": "60s"
+        },
+        {
+          "alert": "BusinessSnapshotStale",
+          "expr": "(time() - max(poc_business_snapshot_last_success_timestamp_seconds{job=\"payment-poc/payment-service\"}) > 60) or (min(poc_business_snapshot_healthy{job=\"payment-poc/payment-service\"}) == 0)",
+          "for": "60s"
+        },
+        {
+          "alert": "CollectorQueuePressure",
+          "expr": "max(otelcol_exporter_queue_size{job=\"payment-poc/otelcol-cloud-run\"}/otelcol_exporter_queue_capacity{job=\"payment-poc/otelcol-cloud-run\"}) > 0.8",
+          "for": "60s"
+        },
+        {
+          "alert": "TelemetryAbsent_api_gateway",
+          "expr": "absent_over_time(http_server_request_duration_seconds_count{job=\"payment-poc/api-gateway\"}[10m])",
+          "for": "60s"
+        },
+        {
+          "alert": "TelemetryAbsent_auth_service",
+          "expr": "absent_over_time(http_server_request_duration_seconds_count{job=\"payment-poc/auth-service\"}[10m])",
+          "for": "60s"
+        },
+        {
+          "alert": "TelemetryAbsent_customer_service",
+          "expr": "absent_over_time(http_server_request_duration_seconds_count{job=\"payment-poc/customer-service\"}[10m])",
+          "for": "60s"
+        },
+        {
+          "alert": "TelemetryAbsent_payment_service",
+          "expr": "absent_over_time(http_server_request_duration_seconds_count{job=\"payment-poc/payment-service\"}[10m])",
+          "for": "60s"
+        },
+        {
+          "alert": "TelemetryAbsent_gateway_service",
+          "expr": "absent_over_time(http_server_request_duration_seconds_count{job=\"payment-poc/gateway-service\"}[10m])",
+          "for": "60s"
+        },
+        {
+          "alert": "TelemetryAbsent_mock_bank_service",
+          "expr": "absent_over_time(http_server_request_duration_seconds_count{job=\"payment-poc/mock-bank-service\"}[10m])",
+          "for": "60s"
+        },
+        {
+          "alert": "TelemetryAbsent_notification_service",
+          "expr": "absent_over_time(http_server_request_duration_seconds_count{job=\"payment-poc/notification-service\"}[10m])",
+          "for": "60s"
+        }
+      ]
+    }
+  ]
+}

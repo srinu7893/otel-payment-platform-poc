@@ -1,6 +1,11 @@
 name: Deploy mock-bank-service
 on:
   workflow_dispatch:
+    inputs:
+      collector_image:
+        description: Optional immutable collector digest (otherwise use configured COLLECTOR_IMAGE)
+        type: string
+        default: ''
 permissions:
   contents: read
   actions: read
@@ -18,7 +23,7 @@ jobs:
       SERVICE: mock-bank-service
       REGISTRY: us-central1-docker.pkg.dev/project-c9bd3d0e-266f-47bf-852/otel-payment-platform
       CLOUD_CONFIG: ${{ vars.CLOUD_RUN_CONFIG_JSON }}
-      COLLECTOR_IMAGE: ${{ vars.COLLECTOR_IMAGE }}
+      COLLECTOR_IMAGE: ${{ inputs.collector_image || vars.COLLECTOR_IMAGE }}
       FRONTEND_GRAFANA_URL: ${{ vars.GRAFANA_URL }}
       COMMIT_SHA: ${{ github.sha }}
     steps:

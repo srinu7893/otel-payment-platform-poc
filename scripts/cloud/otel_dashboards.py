@@ -5,7 +5,34 @@ from pathlib import Path
 from cloud_acceptance import google_failure
 
 JAVA_SERVICES=['api-gateway','auth-service','customer-service','payment-service','gateway-service','mock-bank-service','notification-service']
+EXTRA_DASHBOARDS=['wallet-outcomes','browser-experience','collector-health']
 def queries(service=None):
+    if service=='wallet-outcomes':
+        return {
+            'Wallet operation attempts per second':'sum by(operation,outcome)(rate(poc_wallet_operation_attempts_total{job="payment-poc/payment-service"}[5m]))',
+            'Wallet operation p95 processing seconds':'histogram_quantile(0.95,sum by(le,operation)(rate(poc_wallet_operation_duration_seconds_bucket{job="payment-poc/payment-service"}[5m])))',
+            'Committed unique deposits':'max(poc_wallet_deposit_records{job="payment-poc/mock-bank-service"})',
+            'Committed deposit INR':'max(poc_wallet_deposit_amount{job="payment-poc/mock-bank-service"})',
+            'Money requests by stored status':'max by(status)(poc_money_request_records{job="payment-poc/payment-service"})',
+            'Deposit snapshot healthy':'min(poc_wallet_snapshot_healthy{job="payment-poc/mock-bank-service"})',
+            'Request snapshot healthy':'min(poc_money_request_snapshot_healthy{job="payment-poc/payment-service"})',
+        }
+    if service=='browser-experience':
+        return {
+            'Reported browser page views and JS errors':'sum by(event)(increase(poc_browser_events_total{job="payment-poc/api-gateway"}[1h]))',
+            'Reported web vitals mean by metric and unit':'sum by(metric,unit)(rate(poc_browser_measurement_sum{job="payment-poc/api-gateway"}[5m])) / sum by(metric,unit)(rate(poc_browser_measurement_count{job="payment-poc/api-gateway"}[5m]))',
+            'Reported web vital observations':'sum by(metric,unit)(increase(poc_browser_measurement_count{job="payment-poc/api-gateway"}[1h]))',
+        }
+    if service=='collector-health':
+        sent='sum(rate(otelcol_exporter_sent_spans_total{job="payment-poc/otelcol-cloud-run"}[5m]))'
+        accepted='sum(rate(otelcol_receiver_accepted_spans_total{job="payment-poc/otelcol-cloud-run"}[5m]))'
+        logs='sum(rate(otelcol_exporter_sent_log_records_total{job="payment-poc/otelcol-cloud-run"}[5m]))'
+        return {
+            'Collector queue utilization':'max by(exporter)(otelcol_exporter_queue_size{job="payment-poc/otelcol-cloud-run"} / otelcol_exporter_queue_capacity{job="payment-poc/otelcol-cloud-run"})',
+            'Collector rejected spans':f'sum(rate(otelcol_receiver_refused_spans_total{{job="payment-poc/otelcol-cloud-run"}}[5m])) or (0 * {accepted})',
+            'Collector failed span exports':f'sum(rate(otelcol_exporter_send_failed_spans_total{{job="payment-poc/otelcol-cloud-run"}}[5m])) or (0 * {sent})',
+            'Collector failed log exports':f'sum(rate(otelcol_exporter_send_failed_log_records_total{{job="payment-poc/otelcol-cloud-run"}}[5m])) or (0 * {logs})',
+        }
     job='job="payment-poc/'+service+'"' if service else 'job=~"payment-poc/.+"'
     selector='{'+job+',http_route=~".+",http_route!~".*actuator.*"}'
     count='http_server_request_duration_seconds_count'+selector
@@ -39,7 +66,7 @@ def verify_queries(api,project,end=None):
     end=int(time.time() if end is None else end)
     base=f'https://monitoring.googleapis.com/v1/projects/{project}/location/global/prometheus/api/v1/query_range?'
     results=[]
-    for service in JAVA_SERVICES:
+    for service in [*JAVA_SERVICES,*EXTRA_DASHBOARDS]:
         for title,query in queries(service).items():
             params={'query':query,'start':end-3600,'end':end,'step':60}
             counts=sample_counts(api(base+urllib.parse.urlencode(params)))
@@ -56,7 +83,8 @@ def dashboard(service=None):
         'Availability is HTTP technical availability; business declines and pending outcomes need transaction investigation. '
         'No traffic produces an undefined ratio, not 100% availability. Histograms require observations. '
         'Open a request in Postman Visualize or Support > Observability to follow its Logs and Trace links. '
-        'A missing series is not zero. Browser RUM is not enabled in the deployed frontend.'}}
+        'A missing series is not zero. Wallet attempts include retries; committed deposit and request counts come from database rows. '
+        'Snapshot health must be current. Browser measurements are bounded, untrusted and sampled by page lifecycle; mixed milliseconds and CLS score are grouped by unit.'}}
     tiles=[{'xPos':0,'yPos':0,'width':12,'height':2,'widget':text}]
     for i,(title,query) in enumerate(queries(service).items()):
         tiles.append({'xPos':(i%2)*6,'yPos':2+(i//2)*4,'width':6,'height':4,'widget':{
@@ -67,7 +95,7 @@ def dashboard(service=None):
 def render(directory):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
     files=[]
-    for service in [None,*JAVA_SERVICES]:
+    for service in [None,*JAVA_SERVICES,*EXTRA_DASHBOARDS]:
         path=directory/((service or 'platform-overview')+'.json')
         path.write_text(json.dumps(dashboard(service),indent=2)+'\n',encoding='utf-8');files.append(path)
     return files
@@ -78,7 +106,7 @@ def main():
     p.add_argument('--verify-queries',action='store_true');args=p.parse_args()
     if not re.fullmatch(r'[a-z][a-z0-9-]{4,61}[a-z0-9]',args.project):raise ValueError('Invalid project')
     files=render(args.out)
-    if not args.apply and not args.verify_queries:print('Rendered eight dashboards; no cloud changes');return 0
+    if not args.apply and not args.verify_queries:print('Rendered eleven dashboards; no cloud changes');return 0
     token=subprocess.check_output(['gcloud','auth','print-access-token'],text=True).strip()
     def api(url,body=None,method=None):
         req=urllib.request.Request(url,data=None if body is None else json.dumps(body).encode(),method=method,

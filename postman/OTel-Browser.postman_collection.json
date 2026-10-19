@@ -1,0 +1,215 @@
+{
+  "info": {
+    "name": "Payment Platform - OTel browser intake",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Ready-to-send requests to the deployed sandbox. These submit synthetic measurements to test bounded ingestion; they are not real user-experience measurements or proof of cloud storage. No login token is required. See the browser-experience Cloud Monitoring dashboard and extended acceptance workflow for storage evidence."
+  },
+  "variable": [
+    {
+      "key": "frontend_origin",
+      "value": "https://payment-frontend-52916499838.us-central1.run.app"
+    }
+  ],
+  "item": [
+    {
+      "name": "Report page view",
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{frontend_origin}}"
+          }
+        ],
+        "url": "{{frontend_origin}}/api/v1/telemetry/rum",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"PAGE_VIEW\",\n  \"value\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Expected status 204\", () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Report LCP in milliseconds",
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{frontend_origin}}"
+          }
+        ],
+        "url": "{{frontend_origin}}/api/v1/telemetry/rum",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"LCP\",\n  \"value\": 1250\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Expected status 204\", () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Report synthetic JS error count",
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{frontend_origin}}"
+          }
+        ],
+        "url": "{{frontend_origin}}/api/v1/telemetry/rum",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"JS_ERROR\",\n  \"value\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Expected status 204\", () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject unexpected account metadata",
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{frontend_origin}}"
+          }
+        ],
+        "url": "{{frontend_origin}}/api/v1/telemetry/rum",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"LCP\",\n  \"value\": 1250,\n  \"account\": \"must-be-rejected\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Expected status 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject unapproved origin",
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "https://untrusted.run.app"
+          }
+        ],
+        "url": "{{frontend_origin}}/api/v1/telemetry/rum",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"PAGE_VIEW\",\n  \"value\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Expected status 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

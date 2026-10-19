@@ -14,14 +14,14 @@ In the trace waterfall, inspect individual span start times/durations and parent
 
 ## Cloud dashboards
 
-Definitions are under `deploy/cloud-run/dashboards/`: an overview and seven Java-service dashboards. They use the Managed Prometheus job convention `payment-poc/<service>`, rather than assuming the local Collector's `service_name` label exists in cloud metrics.
+Definitions are under `deploy/cloud-run/dashboards/`: an overview, seven Java-service dashboards, wallet outcomes, browser experience and collector health. They use the Managed Prometheus job convention `payment-poc/<service>`, rather than assuming the local Collector's `service_name` label exists in cloud metrics.
 
-Each dashboard includes request rate, API operation traffic/count, 4xx/5xx rates, p50/p95/p99 latency, technical availability and JVM memory. Route templates and HTTP methods identify API operations. Actuator routes are excluded. Zero traffic leaves availability undefined; it is not replaced with 100%. Counts use Prometheus counter estimates, not bank ledger audit counts. Missing metrics must be investigated, rather than replaced with zeros. Browser RUM is still development-only and is not claimed by these Java-service dashboards.
+Each Java-service dashboard includes request rate, API operation traffic/count, 4xx/5xx rates, p50/p95/p99 latency, technical availability and JVM memory. Route templates and HTTP methods identify API operations. Actuator routes are excluded. Zero traffic leaves availability undefined; it is not replaced with 100%. Counts use Prometheus counter estimates, not bank ledger audit counts. Missing metrics must be investigated, rather than replaced with zeros. The separate browser dashboard uses the bounded production intake described in [OTEL_REMAINING_FEATURES.md](OTEL_REMAINING_FEATURES.md).
 
 Run **GitHub Actions > OTel Cloud dashboards > Run workflow**:
 
 - `apply=false`, `verify_queries=false`: render definitions only; no Cloud API writes.
-- `apply=true`: create/update the eight named POC dashboards. Existing dashboards with other names are untouched; duplicate matching names are rejected. Updates use etags.
+- `apply=true`: create/update the eleven named POC dashboards. Existing dashboards with other names are untouched; duplicate matching names are rejected. Updates use etags.
 - `verify_queries=true`: evaluate each panel over the previous hour at 60-second steps, matching a historical chart rather than checking only the current instant. Empty or NaN/Inf-only results are NO_DATA and fail verification. Sparse traffic or missing JVM metrics require investigation. Finite zero error rates are shown only when a matching observed traffic series exists.
 
 Run sandbox acceptance first, then panel verification, so there is recent traffic to inspect. A successful series-presence check for seven services does not prove every panel or latency histogram has data. The dashboard artifact records total and finite sample counts per panel to distinguish undefined results from observed values. Range query behavior is documented in the [Cloud Monitoring API](https://docs.cloud.google.com/monitoring/api/ref_v3/rest/v1/projects.location.prometheus.api.v1/query_range).
@@ -54,6 +54,6 @@ Follow [OTEL_ACCESS_SETUP.md](OTEL_ACCESS_SETUP.md) for exact Console steps, rol
 
 The observer needs access to stored data: typically `roles/logging.viewer`, `roles/cloudtrace.user` and `roles/monitoring.viewer`, scoped to this project. Publishing dashboards additionally requires appropriate dashboard create/update permissions, such as `roles/monitoring.dashboardEditor`. Existing service discovery needs Cloud Run read access. Workflows never grant roles, change private-service IAM or expose backend services. If the configured WIF account is denied, use the recorded denial to request the specific access through your administrator.
 
-The Cloud Run Collector still has ephemeral queues. This increment makes no durability guarantee across instance termination, adds no tail-sampling policy, and enables no new browser SDK. Those are separate experiments after this stored-signal baseline is verified.
+The default Cloud Run Collector still has ephemeral queues. A persistent external gateway is available as an opt-in deployment, with a real local process-kill/recovery test. See [OTEL_REMAINING_FEATURES.md](OTEL_REMAINING_FEATURES.md) for the precise durability boundary, alert activation, browser privacy controls, and manual warmup/warm-instance options. Tail sampling is not enabled.
 
 Official references: [Google OTel/Managed Prometheus mapping](https://docs.cloud.google.com/stackdriver/docs/managed-prometheus/setup-otel), [dashboard API examples](https://docs.cloud.google.com/monitoring/dashboards/api-examples), [Java API with the agent](https://opentelemetry.io/docs/languages/java/api/).

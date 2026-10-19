@@ -58,3 +58,6 @@ node artifacts\postman-tools\node_modules\newman\bin\newman.js run postman\Payme
 On a managed Windows machine where Node does not trust the corporate HTTPS certificate, use a Node version that supports `node --use-system-ca` and add that flag before the Newman path. Keep TLS verification enabled. Alternatively configure Node/Postman with the IT-provided CA certificate.
 
 The collection is manual testing material. It adds no deployment-on-push trigger and does not change application logic. Real bank linking, real funding, KYC, password recovery and external UPI/card rails remain outside this sandbox.
+# Browser telemetry intake
+
+Import `OTel-Browser.postman_collection.json` separately for ready-to-send production RUM intake checks. It uses the deployed frontend origin without login and includes synthetic metric submissions plus rejected metadata/origin requests. This tests ingestion; stored metrics and real browser events are verified by the OTel extended acceptance workflow and Selenium test. See [OTEL_REMAINING_FEATURES.md](../docs/OTEL_REMAINING_FEATURES.md).

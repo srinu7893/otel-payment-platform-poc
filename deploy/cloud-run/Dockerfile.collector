@@ -1,3 +1,4 @@
 FROM otel/opentelemetry-collector-contrib:0.136.0
 COPY deploy/cloud-run/collector.yaml /etc/otelcol-contrib/config.yaml
 COPY deploy/cloud-run/collector-grafana.yaml /etc/otelcol-contrib/grafana.yaml
+COPY deploy/cloud-run/collector-durable-forward.yaml /etc/otelcol-contrib/durable.yaml

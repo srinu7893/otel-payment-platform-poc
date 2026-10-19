@@ -1,0 +1,26 @@
+{
+  "displayName": "OTel Payment POC - CollectorQueuePressure",
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": [],
+  "userLabels": {
+    "owner": "poc-support",
+    "managed_by": "otel-payment-poc"
+  },
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "Inspect service/API dashboard, correlated logs and trace waterfall. Check snapshot freshness before interpreting business counts. No-data alerts require always-on expected emitters and are disabled by default for scale-to-zero services. Do not retry money movement without its original idempotency key. Runbook: https://github.com/srinu7893/otel-payment-platform-poc/blob/main/docs/OTEL_REMAINING_FEATURES.md"
+  },
+  "conditions": [
+    {
+      "displayName": "CollectorQueuePressure",
+      "conditionPrometheusQueryLanguage": {
+        "query": "max(otelcol_exporter_queue_size{job=\"payment-poc/otelcol-cloud-run\"}/otelcol_exporter_queue_capacity{job=\"payment-poc/otelcol-cloud-run\"}) > 0.8",
+        "duration": "60s",
+        "evaluationInterval": "30s",
+        "ruleGroup": "otel-payment-poc",
+        "alertRule": "CollectorQueuePressure"
+      }
+    }
+  ]
+}

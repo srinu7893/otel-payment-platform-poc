@@ -41,6 +41,7 @@ public class SecurityConfig {
         return http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(exchange -> exchange
+                .pathMatchers(org.springframework.http.HttpMethod.POST,"/api/v1/telemetry/rum").permitAll()
                 .pathMatchers("/api/v1/auth/login", "/api/v1/auth/register", "/actuator/health/**", "/actuator/info", "/swagger-ui.html", "/swagger-ui/**", "/webjars/**", "/openapi.yaml", "/v3/api-docs/**").permitAll()
                 .pathMatchers("/api/v1/ops/**").hasAnyRole("SUPPORT", "ADMIN")
                 .pathMatchers(org.springframework.http.HttpMethod.POST,"/api/v1/customers/**").hasRole("ADMIN")

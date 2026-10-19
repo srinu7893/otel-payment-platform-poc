@@ -1,6 +1,6 @@
 import unittest
 from urllib.parse import urlparse,parse_qs
-from otel_dashboards import dashboard,queries,JAVA_SERVICES,sample_counts,verify_queries
+from otel_dashboards import dashboard,queries,JAVA_SERVICES,EXTRA_DASHBOARDS,sample_counts,verify_queries
 
 class OtelDashboardsTest(unittest.TestCase):
     def test_every_service_has_route_and_method_latency_and_availability_panels(self):
@@ -32,16 +32,23 @@ class OtelDashboardsTest(unittest.TestCase):
             values=[] if 'histogram_quantile' in params['query'][0] else [[940,'0']]
             return {'status':'success','data':{'result':[{'values':values}]}}
         results=verify_queries(api,'test-project',end=1000)
-        self.assertEqual(len(results),70)
+        self.assertEqual(len(results),84)
         for parsed,params in calls:
             self.assertTrue(parsed.path.endswith('/query_range'))
             self.assertEqual(params['start'],['-2600']);self.assertEqual(params['end'],['1000'])
             self.assertEqual(params['step'],['60'])
-        self.assertEqual(sum(r['status']=='NO_DATA' for r in results),21)
+        self.assertEqual(sum(r['status']=='NO_DATA' for r in results),22)
 
     def test_no_client_errors_are_zero_only_when_traffic_series_exists(self):
         query=queries('payment-service')['HTTP 4xx per second']
         self.assertIn('or (0 * sum by',query)
         self.assertNotIn('vector(0)',query)
+    def test_wallet_and_browser_panels_have_bounded_labels_and_separate_ledger_truth(self):
+        self.assertEqual(len(EXTRA_DASHBOARDS),3)
+        wallet=queries('wallet-outcomes')
+        self.assertNotIn('rate(',wallet['Committed unique deposits'])
+        self.assertIn('max by(status)',wallet['Money requests by stored status'])
+        for query in queries('browser-experience').values():
+            self.assertNotIn('customer',query);self.assertNotIn('account',query)
 
 if __name__=='__main__':unittest.main()

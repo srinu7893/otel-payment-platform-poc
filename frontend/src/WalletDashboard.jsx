@@ -21,6 +21,9 @@ export default function WalletDashboard({ session }) {
   const [notice, setNotice] = useState(session.registeredAccount ? `Account created: ${session.registeredAccount}. Your opening balance is INR 0. Add demo money to get started.` : '');
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [lastChecked, setLastChecked] = useState(null);
+  const refreshSequence = useRef(0);
   const [confirmation, setConfirmation] = useState(null);
   const [detail, setDetail] = useState(null);
   // Retain the key on network failure: retrying unchanged details must not move money twice.
@@ -31,6 +34,7 @@ export default function WalletDashboard({ session }) {
     return keys.current.get(signature);
   }
   async function refresh(nextPage = page) {
+    const sequence = ++refreshSequence.current;
     setRefreshing(true);
     const jobs = [
       ['Profile', () => api.getCustomer(token, session.customerId), setProfile],
@@ -42,6 +46,7 @@ export default function WalletDashboard({ session }) {
       ['Notifications', () => api.listNotifications(token, { page: nextPage }), r => setNotifications(r.content || [])]
     ];
     const results = await Promise.allSettled(jobs.map(([, load]) => load()));
+    if (sequence !== refreshSequence.current) return;
     const failures = [];
     results.forEach((result, i) => {
       if (result.status === 'fulfilled') jobs[i][2](result.value);
@@ -51,9 +56,10 @@ export default function WalletDashboard({ session }) {
       }
     });
     setError(failures.join('\n'));
+    setLoaded(true); setLastChecked(new Date());
     setRefreshing(false);
   }
-  useEffect(() => { refresh(page); }, [token, page]);
+  useEffect(() => { refresh(page); return () => { refreshSequence.current++; }; }, [token, page]);
 
   function openTab(id) {
     setTab(id); setPage(0); setConfirmation(null); setNotice(''); setError('');
@@ -119,17 +125,18 @@ export default function WalletDashboard({ session }) {
     } catch (e) { setError(formatApiError(e)); }
     finally { setBusy(false); }
   }
-  const ready = !!profile?.active && !!wallet?.active && !busy;
+  const ready = !!profile?.active && !!wallet?.active && !busy && !refreshing;
   const tabs = [['overview', 'My account'], ['deposit', 'Add demo money'], ['payment', 'Pay merchant'], ['transfer', 'Send money'], ['request', 'Request money'], ['history', 'History'], ['notifications', 'Notifications'], ['help', 'How to use']];
-  return <section className="stack wallet">
+  return <section className="stack wallet" aria-busy={busy || refreshing}>
     <div className="demoBanner">Demo payment sandbox · INR test funds only · No real bank account or card is charged.</div>
     <div className="row"><div><h2>Hello, {profile?.name || session.customerId}</h2><p>Account {profile?.accountNumber || 'loading…'} · {profile?.email}</p></div><button className="secondary" disabled={refreshing || busy} onClick={() => refresh()}>{refreshing ? 'Refreshing…' : 'Refresh account'}</button></div>
-    <nav className="tabs" aria-label="Payment features">{tabs.map(([id, label]) => <button key={id} className={tab === id ? 'active' : 'secondary'} onClick={() => openTab(id)}>{label}</button>)}</nav>
+    <nav className="tabs" aria-label="Payment features">{tabs.map(([id, label]) => <button key={id} aria-current={tab === id ? 'page' : undefined} disabled={busy} className={tab === id ? 'active' : 'secondary'} onClick={() => openTab(id)}>{label}</button>)}</nav>
+    <div className="accountStatus" role="status">{refreshing ? 'Checking account services… This can take a moment after idle.' : lastChecked ? `Last account check: ${lastChecked.toLocaleTimeString()}` : 'Loading your account…'}{loaded && !wallet && !refreshing && ' Account data is unavailable. Refresh before making a transaction.'}</div>
     {error && <p role="alert" className="error">{error}</p>}
     {notice && <p role="status" className={/FAILED|DECLINED/.test(notice) ? 'error' : 'success'}>{notice}</p>}
     {confirmation && <section className="card confirmation" aria-label="Review transaction"><h2>Review {confirmation.kind}</h2><p>{money(confirmation.payload.amount)} {confirmation.kind === 'request' ? 'requested from' : 'to'} <b>{confirmation.name}</b></p><p>Account: {confirmation.account}</p>{confirmation.payload.note && <p>Note: {confirmation.payload.note}</p>}<p>{confirmation.kind === 'request' ? 'This sends a request only. The payer must approve it.' : confirmation.kind === 'deposit' ? 'This adds simulated funds to your demo account.' : 'Confirm the recipient and amount before continuing.'}</p><div className="headerActions"><button disabled={busy} onClick={confirm}>{busy ? 'Processing…' : 'Confirm transaction'}</button><button className="secondary" disabled={busy} onClick={() => setConfirmation(null)}>Go back</button></div></section>}
     {tab === 'overview' && <>
-      <section className="dashboardGrid"><article className="card metric"><span>Available balance</span><strong data-testid="balance">{wallet ? money(wallet.balance) : 'Unavailable'}</strong><small>{wallet?.active ? 'Account active' : 'Refresh to check account status'}</small></article><article className="card metric"><span>Your account number</span><strong>{profile?.accountNumber || '—'}</strong><small>Share this to receive a transfer</small></article><article className="card metric"><span>Money requests</span><strong>{requests.filter(r => r.status === 'OPEN' && r.payerAccount === profile?.accountNumber).length}</strong><small>Awaiting your response on this page</small></article><article className="card metric"><span>Get started</span><button onClick={() => openTab('deposit')}>Add demo funds</button><button className="secondary" onClick={() => openTab('transfer')}>Send money</button></article></section>
+      <section className="dashboardGrid"><article className="card metric balanceCard"><span>Available balance</span><strong data-testid="balance">{wallet ? money(wallet.balance) : loaded ? 'Unavailable' : 'Loading…'}</strong><small>{wallet?.active ? 'INR · Account active' : 'Refresh to check account status'}</small></article><article className="card metric"><span>Your account number</span><strong>{profile?.accountNumber || '—'}</strong><small>Share this to receive a transfer</small></article><article className="card metric"><span>Money requests</span><strong>{requests.filter(r => r.status === 'OPEN' && r.payerAccount === profile?.accountNumber).length}</strong><small>Awaiting your response on this page</small></article><article className="card metric"><span>Quick actions</span><button disabled={busy} onClick={() => openTab('deposit')}>Add demo funds</button><button className="secondary" disabled={busy} onClick={() => openTab('transfer')}>Send money</button></article></section>
       <Activity rows={activity} />
       <section className="card"><h2>Try a complete payment journey</h2><ol><li>Add INR 500 in <b>Add demo money</b>.</li><li>Send INR 25 to <b>ACC2001</b>, the receiver account.</li><li>Open History for the result and transaction details.</li><li>Sign out and sign in as <b>receiver / receiver123</b> to see the credit.</li></ol></section>
     </>}

@@ -1,0 +1,26 @@
+{
+  "displayName": "OTel Payment POC - PaymentApiErrors",
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": [],
+  "userLabels": {
+    "owner": "poc-support",
+    "managed_by": "otel-payment-poc"
+  },
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "Inspect service/API dashboard, correlated logs and trace waterfall. Check snapshot freshness before interpreting business counts. No-data alerts require always-on expected emitters and are disabled by default for scale-to-zero services. Do not retry money movement without its original idempotency key. Runbook: https://github.com/srinu7893/otel-payment-platform-poc/blob/main/docs/OTEL_REMAINING_FEATURES.md"
+  },
+  "conditions": [
+    {
+      "displayName": "PaymentApiErrors",
+      "conditionPrometheusQueryLanguage": {
+        "query": "(sum(rate(http_server_request_duration_seconds_count{job=\"payment-poc/api-gateway\",http_route=~\".+\",http_route!~\".*actuator.*|.*telemetry.*\",http_response_status_code=~\"5..\"}[5m]))/sum(rate(http_server_request_duration_seconds_count{job=\"payment-poc/api-gateway\",http_route=~\".+\",http_route!~\".*actuator.*|.*telemetry.*\"}[5m])) > 0.05) and (sum(rate(http_server_request_duration_seconds_count{job=\"payment-poc/api-gateway\",http_route=~\".+\",http_route!~\".*actuator.*|.*telemetry.*\"}[5m])) > 0.1)",
+        "duration": "120s",
+        "evaluationInterval": "30s",
+        "ruleGroup": "otel-payment-poc",
+        "alertRule": "PaymentApiErrors"
+      }
+    }
+  ]
+}

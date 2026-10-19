@@ -1,0 +1,20 @@
+# Optional overlay; requires an existing TLS gateway and Secret Manager token.
+exporters:
+  otlphttp/durable:
+    endpoint: ${env:DURABLE_COLLECTOR_ENDPOINT}
+    headers:
+      Authorization: Bearer ${env:DURABLE_COLLECTOR_TOKEN}
+    sending_queue:
+      queue_size: 200
+    retry_on_failure:
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 300s
+service:
+  pipelines:
+    traces:
+      exporters: [otlphttp/durable]
+    logs:
+      exporters: [otlphttp/durable]
+    metrics:
+      exporters: [otlphttp/durable]

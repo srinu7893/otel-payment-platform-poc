@@ -98,6 +98,9 @@ def render(config, service, image, collector, revision):
             if target in config['urls']: env[key] = config['urls'][target]
     if service == 'gateway-service' and 'mock-bank-service' in config['urls']: env['CLIENTS_BANK_BASE_URL'] = config['urls']['mock-bank-service']
     if service == 'api-gateway':
+        origins=set(config.get('browserOrigins',[]))
+        if config['urls'].get('frontend'):origins.add(config['urls']['frontend'])
+        env['TELEMETRY_RUM_ALLOWED_ORIGINS']=','.join(sorted(origins))
         for key, target in [('AUTH', 'auth-service'), ('CUSTOMER', 'customer-service'), ('PAYMENT', 'payment-service'), ('NOTIFICATION', 'notification-service'), ('GATEWAY', 'gateway-service'), ('BANK', 'mock-bank-service')]:
             if target in config['urls']: env[f'SERVICES_{key}_URL'] = config['urls'][target]
     if service == 'frontend':
@@ -126,10 +129,11 @@ def render(config, service, image, collector, revision):
                             'run.googleapis.com/vpc-access-egress': 'private-ranges-only'})
     # minScale matters for the existing scheduler/consumer implementation. Revisions can overlap during a rollout.
     if service in {'payment-service', 'notification-service'}: annotations['autoscaling.knative.dev/minScale'] = '1'
+    if service in config.get('warmServices',[]):annotations['autoscaling.knative.dev/minScale']='1'
     if service != 'frontend':
         annotations['run.googleapis.com/container-dependencies'] = json.dumps({'app': ['collector']})
         containers.append({'name': 'collector', 'image': collector, 'resources': {'limits': {'cpu': '1', 'memory': '256Mi'}},
-                           'env': [{'name': 'GOOGLE_CLOUD_PROJECT', 'value': config['project']}],
+                           'env': [{'name': 'GOOGLE_CLOUD_PROJECT', 'value': config['project']}, {'name':'APPLICATION_SERVICE','value':service}],
                            'startupProbe': {'httpGet': {'path': '/', 'port': 13133}, 'periodSeconds': 3, 'timeoutSeconds': 3, 'failureThreshold': 20}})
     if config.get('grafana') and service != 'frontend':
         sidecar = containers[-1]
@@ -138,6 +142,11 @@ def render(config, service, image, collector, revision):
             {'name': 'GRAFANA_OTLP_ENDPOINT', 'value': config['grafana']['endpoint']},
             {'name': 'GRAFANA_OTLP_USERNAME', 'value': config['grafana']['username']},
             secret(config, 'GRAFANA_OTLP_TOKEN', config['grafana']['tokenSecret'])])
+    if config.get('durableCollector') and service!='frontend':
+        sidecar=containers[-1]
+        sidecar['args']=['--config=/etc/otelcol-contrib/config.yaml','--config=/etc/otelcol-contrib/durable.yaml']
+        sidecar['env'].extend([{'name':'DURABLE_COLLECTOR_ENDPOINT','value':config['durableCollector']['endpoint']},
+                               secret(config,'DURABLE_COLLECTOR_TOKEN',config['durableCollector']['tokenSecret'])])
     prefix = config.get('prefix', 'otel-poc')
     return {'apiVersion': 'serving.knative.dev/v1', 'kind': 'Service', 'metadata': {'name': prefix + '-' + service,
               'annotations': {'run.googleapis.com/ingress': config.get('ingress', 'all'),

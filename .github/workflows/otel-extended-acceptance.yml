@@ -1,0 +1,35 @@
+name: OTel extended acceptance
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: otel-gcp-poc
+  cancel-in-progress: false
+jobs:
+  extended:
+    if: github.ref == 'refs/heads/main'
+    environment: gcp-poc
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        persist-credentials: false
+    - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.GCP_OBSERVABILITY_SERVICE_ACCOUNT || secrets.GCP_SERVICE_ACCOUNT }}
+    - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db
+    - name: Check access before test account or deposit
+      run: python3 scripts/cloud/otel_access.py --project project-c9bd3d0e-266f-47bf-852 --scope signals
+    - name: Verify RUM wallet telemetry and collector metrics
+      run: python3 scripts/cloud/extended_observability.py
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: otel-extended-${{ github.run_id }}
+        path: |
+          artifacts/extended-observability/
+          artifacts/otel-access/
