@@ -17,13 +17,20 @@ def main():
     results=[]
     for row in rows:
         payload=row.get('jsonPayload',{});http=row.get('httpRequest',{})
+        body=payload.get('body',{})
+        if isinstance(body,str):
+            try:body=json.loads(body)
+            except ValueError:body={'message':body}
+        if not isinstance(body,dict):body={}
+        nested=body.get('message') or body.get('stringValue') or ''
         trace=row.get('trace','').split('/')[-1]
         results.append({'timestamp':row.get('timestamp'),'service':row.get('resource',{}).get('labels',{}).get('service_name'),
             'revision':row.get('resource',{}).get('labels',{}).get('revision_name'),
             'traceId':trace if re.fullmatch(r'[a-f0-9]{32}',trace) else '',
             'severity':row.get('severity'),'httpStatus':http.get('status'),'latency':http.get('latency'),
-            'message':safe(payload.get('message') or row.get('textPayload') or row.get('protoPayload',{}).get('status',{}).get('message','')),
-            'stack':safe(payload.get('stack_trace',''))})
+            'message':safe(payload.get('message') or nested or row.get('textPayload') or row.get('protoPayload',{}).get('status',{}).get('message','')),
+            'stack':safe(payload.get('stack_trace') or body.get('stack_trace') or payload.get('attributes',{}).get('exception.stacktrace','')),
+            'entryFields':sorted(row),'payloadFields':sorted(payload)})
     out=Path('artifacts/stored-errors');out.mkdir(parents=True,exist_ok=True)
     (out/'results.json').write_text(json.dumps(results,indent=2),encoding='utf-8')
     print(json.dumps({'entries':len(results),'scope':'Last 72h; maximum 300 existing failure entries. No business requests or cloud mutations.'}))
