@@ -54,6 +54,9 @@ exporters:
       queue_size: 200
   googlemanagedprometheus:
     project: ${env:GOOGLE_CLOUD_PROJECT}
+    metric:
+      extra_metrics_config:
+        enable_scope_info: false
     timeout: 30s
     sending_queue:
       queue_size: 200

@@ -35,7 +35,10 @@ def main():
                 point={'startTimeUnixNano':str(start),'timeUnixNano':str(time.time_ns()),'asInt':str(value)}
                 data={'resourceMetrics':[{'resource':{'attributes':[{'key':'service.name','value':{'stringValue':'isolated-metrics'}}]},'scopeMetrics':[{'scope':{'name':'regression'},'metrics':[
                     {'name':'test_counter','sum':{'aggregationTemporality':2,'isMonotonic':True,'dataPoints':[point]}},
-                    {'name':'test_gauge','gauge':{'dataPoints':[{**point,'asInt':str(value*10)}]}}]}]}]}
+                    {'name':'test_gauge','gauge':{'dataPoints':[{**point,'asInt':str(value*10)}]}},
+                    {'name':'test_histogram','unit':'s','histogram':{'aggregationTemporality':2,'dataPoints':[{
+                        'startTimeUnixNano':str(start),'timeUnixNano':str(time.time_ns()),'count':str(value),
+                        'sum':value*.1,'explicitBounds':[.5],'bucketCounts':[str(value),'0']}]}}]}]}]}
                 req=urllib.request.Request(f'http://127.0.0.1:{receiver}/v1/metrics',data=json.dumps(data).encode(),headers={'Content-Type':'application/json'})
                 with urllib.request.urlopen(req,timeout=5) as response:assert response.status==200
             wait(lambda:any(batch.get('resourceMetrics') or batch.get('resource_metrics') for batch in batches))
@@ -44,11 +47,13 @@ def main():
                 for resource in batch.get('resourceMetrics',[]):
                     if 'scope_metrics' in resource:resource['scopeMetrics']=resource.pop('scope_metrics')
             metrics=[metric for batch in batches for resource in batch.get('resourceMetrics',[]) for scope in resource['scopeMetrics'] for metric in scope['metrics']]
-            assert len(metrics)==2,'Duplicate time series remained in emitted interval'
-            values={m['name']:next(iter(m.get('sum',m.get('gauge'))['dataPoints']))['asInt'] for m in metrics}
+            assert len(metrics)==3,'Metric lost or duplicate time series remained in emitted interval'
+            values={m['name']:next(iter(m.get('sum',m.get('gauge'))['dataPoints']))['asInt'] for m in metrics if m['name']!='test_histogram'}
             assert int(values['test_counter'])==2,'Cumulative total was lost'
             assert int(values['test_gauge'])==20,'Latest gauge was not selected'
-            result={'status':'PASS','inputExports':2,'outputSeries':2,'counterTotal':2,'latestGauge':20,'intervalSeconds':10}
+            histogram=next(m for m in metrics if m['name']=='test_histogram')['histogram']['dataPoints'][0]
+            assert int(histogram['count'])==2,'Histogram count was lost'
+            result={'status':'PASS','inputExports':2,'outputSeries':3,'counterTotal':2,'latestGauge':20,'histogramCount':2,'intervalSeconds':10}
             out=Path('artifacts/collector-metric-coalescing/results.json');out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(result,indent=2));print(json.dumps(result))
         except Exception:
             print('Synthetic received payloads:',json.dumps(batches)[:2000])

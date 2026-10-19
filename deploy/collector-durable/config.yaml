@@ -25,6 +25,9 @@ exporters:
       storage: file_storage
   googlemanagedprometheus:
     project: ${env:GOOGLE_CLOUD_PROJECT}
+    metric:
+      extra_metrics_config:
+        enable_scope_info: false
     sending_queue:
       queue_size: 2000
       storage: file_storage

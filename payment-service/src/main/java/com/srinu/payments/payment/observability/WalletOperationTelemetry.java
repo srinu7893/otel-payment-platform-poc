@@ -34,7 +34,12 @@ public class WalletOperationTelemetry {
             span.setAttribute("poc.operation",operation);span.setAttribute("poc.outcome",outcome);span.end();
             registry.counter("poc.wallet.operation.attempts","operation",operation,"outcome",outcome).increment();
             timer.stop(Timer.builder("poc.wallet.operation.duration").tags("operation",operation,"outcome",outcome)
-                .description("Operation processing time; includes retries as separate attempts").publishPercentileHistogram().register(registry));
+                .description("Operation processing time; includes retries as separate attempts")
+                .serviceLevelObjectives(java.time.Duration.ofMillis(5),java.time.Duration.ofMillis(10),java.time.Duration.ofMillis(25),
+                    java.time.Duration.ofMillis(50),java.time.Duration.ofMillis(100),java.time.Duration.ofMillis(250),
+                    java.time.Duration.ofMillis(500),java.time.Duration.ofSeconds(1),java.time.Duration.ofMillis(2500),
+                    java.time.Duration.ofSeconds(5),java.time.Duration.ofSeconds(10),java.time.Duration.ofSeconds(30),
+                    java.time.Duration.ofSeconds(60),java.time.Duration.ofSeconds(120)).register(registry));
         }
     }
 }

@@ -14,6 +14,9 @@ class WalletOperationTelemetryTest {
         Object result=new Object();when(call.proceed()).thenReturn(result);
         assertSame(result,telemetry.observe(call));assertSame(result,telemetry.observe(call));
         assertEquals(2,meters.get("poc.wallet.operation.attempts").tags("operation","wallet.deposit","outcome","success").counter().count());
+        var duration=meters.get("poc.wallet.operation.duration").tags("operation","wallet.deposit","outcome","success").timer();
+        assertEquals(2,duration.count());
+        assertTrue(duration.takeSnapshot().histogramCounts().length>0);
         var error=new IllegalArgumentException("SECRET-account-123");when(call.proceed()).thenThrow(error);
         assertSame(error,assertThrows(IllegalArgumentException.class,()->telemetry.observe(call)));
         assertEquals(1,meters.get("poc.wallet.operation.attempts").tags("operation","wallet.deposit","outcome","rejected").counter().count());

@@ -51,7 +51,10 @@ public class BrowserTelemetryController {
                 String name=body.get("name").textValue();double value=body.get("value").doubleValue();
                 if(!LIMITS.containsKey(name) || !Double.isFinite(value) || value<0 || value>LIMITS.get(name) || ((name.equals("PAGE_VIEW") || name.equals("JS_ERROR")) && value!=1))return ResponseEntity.badRequest().<Void>build();
                 if(name.equals("PAGE_VIEW") || name.equals("JS_ERROR"))meters.counter("poc.browser.events","event",name).increment();
-                else meters.summary("poc.browser.measurement","metric",name,"unit",name.equals("CLS")?"score":"ms").record(value);
+                else io.micrometer.core.instrument.DistributionSummary.builder("poc.browser.measurement")
+                    .tags("metric",name,"unit",name.equals("CLS")?"score":"ms")
+                    .serviceLevelObjectives(.001,.01,.1,.5,1,5,10,50,100,250,500,1000,2500,5000,10000,30000,120000)
+                    .register(meters).record(value);
                 return ResponseEntity.noContent().<Void>build();
             }catch(Exception invalid){return ResponseEntity.badRequest().<Void>build();}
             finally{DataBufferUtils.release(buffer);}

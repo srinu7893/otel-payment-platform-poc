@@ -18,6 +18,9 @@ class BrowserTelemetryControllerTest {
         post("https://frontend.run.app","{\"name\":\"SECRET\",\"value\":1}",400);
         post("https://frontend.run.app","{\"name\":\"LCP\",\"value\":120001}",400);
         assertThat(meters.get("poc.browser.events").tag("event","PAGE_VIEW").counter().count()).isEqualTo(1);
+        var measurement=meters.get("poc.browser.measurement").tag("metric","LCP").summary();
+        assertThat(measurement.count()).isEqualTo(1);
+        assertThat(measurement.takeSnapshot().histogramCounts()).isNotEmpty();
         assertThat(meters.getMeters().toString()).doesNotContain("SECRET");
     }
     @Test void rejectsOversizeAndBoundsTotalRequests(){
