@@ -84,19 +84,24 @@ def validate_trace(data,trace):
     if not any(row.get('name')=='outbox.publish' for row in rows):raise AssertionError('Missing durable outbox span')
     if not any(any('dbsystem' in re.sub(r'[^a-z]','',key.lower()) for key in row.get('labels',{})) for row in rows):
         raise AssertionError('Missing database instrumentation')
-    ids={str(row['spanId']) for row in rows}
     children={}
     for row in rows:
         children.setdefault(str(row.get('parentSpanId','')),[]).append(row)
-    roots=[row for row in rows if span_service(row)=='api-gateway' and str(row.get('parentSpanId','')) not in ids]
-    connected=set()
-    def visit(row):
+    gateways=[row for row in rows if span_service(row)=='api-gateway']
+    def visit(row,connected):
         sid=str(row['spanId'])
         if sid in connected:return
         connected.add(sid)
-        for child in children.get(sid,[]):visit(child)
-    for root in roots:visit(root)
-    if not roots or not SERVICES<={span_service(row) for row in rows if str(row['spanId']) in connected}:
+        for child in children.get(sid,[]):visit(child,connected)
+    # Cloud Run can insert a platform span above the gateway. The gateway need
+    # not be a trace root, but one gateway's descendant tree must contain every
+    # required service. Never union disconnected trees sharing a trace ID.
+    complete=False
+    for gateway in gateways:
+        connected=set();visit(gateway,connected)
+        if SERVICES<={span_service(row) for row in rows if str(row['spanId']) in connected}:
+            complete=True;break
+    if not complete:
         raise AssertionError('Service spans are not connected to the gateway request')
     # Only safe investigation metadata is written, never complete attributes or raw SQL/headers.
     summary=[]

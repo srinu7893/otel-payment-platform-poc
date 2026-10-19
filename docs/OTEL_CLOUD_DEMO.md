@@ -44,6 +44,8 @@ Artifact `cloud-acceptance-*` contains individual PASS/FAIL/BLOCKED results, tra
 
 To investigate a failed trace check without creating another payment, run the same workflow with `trace_id` set to the recorded trace ID. This mode only reads that stored trace and reports missing services or disconnected/absent DB/outbox evidence. Leave `trace_id` empty for the full acceptance suite. A later successful inspection does not erase the earlier three-minute convergence failure.
 
+Cloud Run may add a platform span above the application gateway. Connectivity requires one gateway span's descendant tree to reach all six payment-path services, not that the gateway be the trace root. Disconnected gateway trees are never combined to satisfy service coverage.
+
 Login, wallet readability/funding and payment acceptance are recorded prerequisites. A failed prerequisite writes a complete failure summary. Wallet GETs are polled for transient startup recovery; money-changing POSTs are not automatically retried. The UUID retry key is saved before the payment POST so an interrupted request can be investigated safely. External proxy 504 responses can omit the gateway trace header; those are genuine failed acceptance checks, not evidence of an accepted trace.
 
 ## Access requirements and boundaries

@@ -27,6 +27,18 @@ class CloudTelemetryAcceptanceTest(unittest.TestCase):
         data=self.trace()
         next(row for row in data['spans'] if row['labels']['/service/name']=='notification-service')['parentSpanId']='999'
         with self.assertRaisesRegex(AssertionError,'connected'):validate_trace(data,'a'*32)
+    def test_cloud_run_platform_parent_above_gateway_is_connected(self):
+        data=self.trace()
+        data['spans'].append({'spanId':'99','parentSpanId':'100','name':'platform HTTP',
+                             'startTime':'2026-10-16T00:00:00Z','endTime':'2026-10-16T00:00:00.100Z','labels':{}})
+        self.assertEqual(set(validate_trace(data,'a'*32)['services']),SERVICES)
+    def test_disconnected_gateway_trees_cannot_be_combined(self):
+        data=self.trace()
+        notification=next(row for row in data['spans'] if row['labels']['/service/name']=='notification-service')
+        notification['parentSpanId']='88'
+        extra=copy.deepcopy(data['spans'][0]);extra.update(spanId='88',parentSpanId='77')
+        data['spans'].append(extra)
+        with self.assertRaisesRegex(AssertionError,'connected'):validate_trace(data,'a'*32)
     def test_missing_db_outbox_or_service_fails(self):
         for mutation in ['db','outbox','service']:
             data=self.trace()
