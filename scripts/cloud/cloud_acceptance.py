@@ -120,13 +120,35 @@ def validate_metrics(data):
     if not required<=observed:raise AssertionError('Missing HTTP metrics: '+','.join(sorted(required-observed)))
     return {'services':sorted(observed), 'series':len(rows)}
 
+def inspect_stored_trace(project,trace,root):
+    """Recheck existing evidence without business traffic or a new payment."""
+    if not re.fullmatch(r'[a-z][a-z0-9-]{4,61}[a-z0-9]',project) or not re.fullmatch(r'[0-9a-f]{32}',trace) or trace=='0'*32:
+        raise ValueError('Valid project and nonzero lowercase trace ID required')
+    root=Path(root);root.mkdir(parents=True,exist_ok=True)
+    token=subprocess.check_output(['gcloud','auth','print-access-token'],text=True).strip()
+    data=request(f'https://cloudtrace.googleapis.com/v1/projects/{project}/traces/{trace}',headers={'Authorization':'Bearer '+token})
+    rows=data.get('spans',[])
+    observed={span_service(row) for row in rows}-{''}
+    result={'traceId':trace,'services':sorted(observed),'missingServices':sorted(SERVICES-observed),'spanCount':len(rows)}
+    try:
+        summary=validate_trace(data,trace)
+        (root/'trace-summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
+        result['status']='PASS'
+    except AssertionError as error:
+        result.update(status='FAIL',reason=str(error))
+    (root/'summary.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+    print(json.dumps(result,indent=2))
+    return 0 if result['status']=='PASS' else 1
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config')
     parser.add_argument('--project',default=PROJECT)
     parser.add_argument('--region',default='us-central1')
     parser.add_argument('--out',default='artifacts/cloud-acceptance')
+    parser.add_argument('--trace-id',help='Read-only inspection of an existing trace; no business requests')
     args=parser.parse_args()
+    if args.trace_id:return inspect_stored_trace(args.project,args.trace_id,args.out)
     if args.config:config=json.loads(Path(args.config).read_text())
     else:
         if not re.fullmatch(r'[a-z][a-z0-9-]{4,61}[a-z0-9]',args.project) or not re.fullmatch(r'[a-z]+-[a-z]+[0-9]',args.region):raise ValueError('Invalid project or region')

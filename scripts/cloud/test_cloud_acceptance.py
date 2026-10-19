@@ -2,7 +2,7 @@ import copy,json,os,sys,tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch
-from cloud_acceptance import validate_config,validate_trace,validate_metrics,eventually,EvidenceBlocked,SERVICES,google_failure,main
+from cloud_acceptance import validate_config,validate_trace,validate_metrics,eventually,EvidenceBlocked,SERVICES,google_failure,main,inspect_stored_trace
 
 class CloudTelemetryAcceptanceTest(unittest.TestCase):
     def trace(self):
@@ -72,5 +72,18 @@ class CloudTelemetryAcceptanceTest(unittest.TestCase):
             self.assertEqual(result['status'],'FAIL')
             self.assertEqual(result['checks'][-1]['scenario'],'Test customer login')
             self.assertFalse(any('/api/v1/payments' in str(c) and len(c.args)>1 for c in call.call_args_list))
+    def test_existing_trace_inspection_reports_missing_service_without_business_traffic(self):
+        data=self.trace();data['spans'].pop()
+        with tempfile.TemporaryDirectory() as directory,patch('cloud_acceptance.subprocess.check_output',return_value='SECRET'),patch('cloud_acceptance.request',return_value=data) as call:
+            self.assertEqual(inspect_stored_trace('valid-project','a'*32,directory),1)
+            result=json.loads((Path(directory)/'summary.json').read_text())
+            self.assertEqual(len(result['missingServices']),1)
+            self.assertNotIn('SECRET',json.dumps(result))
+            self.assertEqual(call.call_count,1)
+            self.assertTrue(call.call_args.args[0].startswith('https://cloudtrace.googleapis.com/'))
+    def test_invalid_trace_rejected_before_getting_credentials(self):
+        with patch('cloud_acceptance.subprocess.check_output') as credentials:
+            with self.assertRaises(ValueError):inspect_stored_trace('valid-project','../invalid','unused')
+            credentials.assert_not_called()
 
 if __name__=='__main__':unittest.main()

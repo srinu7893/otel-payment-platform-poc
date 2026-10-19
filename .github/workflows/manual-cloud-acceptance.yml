@@ -1,6 +1,11 @@
 name: manual-cloud-acceptance
 on:
   workflow_dispatch:
+    inputs:
+      trace_id:
+        description: Optional existing trace ID for read-only recheck (no new payment)
+        type: string
+        default: ''
 permissions:
   contents: read
   id-token: write
@@ -31,8 +36,11 @@ jobs:
         ALLOW_FAKE_PAYMENT: 'true'
         TEST_CUSTOMER_USERNAME: ${{ secrets.TEST_CUSTOMER_USERNAME }}
         TEST_CUSTOMER_PASSWORD: ${{ secrets.TEST_CUSTOMER_PASSWORD }}
+        TRACE_ID: ${{ inputs.trace_id }}
       run: |
-        python3 scripts/cloud/cloud_acceptance.py --project project-c9bd3d0e-266f-47bf-852 --region us-central1
+        args=()
+        if [ -n "$TRACE_ID" ]; then args+=(--trace-id "$TRACE_ID"); fi
+        python3 scripts/cloud/cloud_acceptance.py --project project-c9bd3d0e-266f-47bf-852 --region us-central1 "${args[@]}"
     - name: Upload cloud test evidence
       if: always()
       uses: actions/upload-artifact@v4
