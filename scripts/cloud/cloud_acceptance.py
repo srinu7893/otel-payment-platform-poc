@@ -129,7 +129,9 @@ def inspect_stored_trace(project,trace,root):
     data=request(f'https://cloudtrace.googleapis.com/v1/projects/{project}/traces/{trace}',headers={'Authorization':'Bearer '+token})
     rows=data.get('spans',[])
     observed={span_service(row) for row in rows}-{''}
-    result={'traceId':trace,'services':sorted(observed),'missingServices':sorted(SERVICES-observed),'spanCount':len(rows)}
+    result={'traceId':trace,'services':sorted(observed),'missingServices':sorted(SERVICES-observed),'spanCount':len(rows),
+            'relationships':[{'service':span_service(row),'spanId':str(row['spanId']),
+                              'parentSpanId':str(row.get('parentSpanId',''))} for row in rows]}
     try:
         summary=validate_trace(data,trace)
         (root/'trace-summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
