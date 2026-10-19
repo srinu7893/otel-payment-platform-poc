@@ -135,8 +135,8 @@ def main():
             results.extend(verify_queries(api,args.project))
             # Keep actual exporter names in evidence so a missing panel can be
             # diagnosed without guessing Micrometer/OTel unit conversion.
-            query='count by (__name__,job) ({__name__=~"poc_wallet_.*|poc_browser_.*|poc_money_request_.*|otelcol_exporter_.*"})'
-            inventory=api(f'https://monitoring.googleapis.com/v1/projects/{args.project}/location/global/prometheus/api/v1/query?'+urllib.parse.urlencode({'query':query}))
+            inventory=api(f'https://monitoring.googleapis.com/v1/projects/{args.project}/location/global/prometheus/api/v1/label/__name__/values')
+            inventory['data']=[name for name in inventory.get('data',[]) if name.startswith(('poc_wallet_','poc_browser_','poc_money_request_','otelcol_exporter_'))]
             (root/'metric-inventory.json').write_text(json.dumps(inventory,indent=2),encoding='utf-8')
     except urllib.error.HTTPError as error:
         results.append(google_failure(error.code,error.read()))
