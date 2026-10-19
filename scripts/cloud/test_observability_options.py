@@ -33,5 +33,16 @@ class ObservabilityOptionsTest(unittest.TestCase):
         self.assertIn('https://numbered-frontend.us-central1.run.app',resolved['browserOrigins'])
         self.config=resolved;env=self.manifest()['spec']['template']['spec']['containers'][0]['env']
         self.assertIn('https://payment-frontend.run.app',next(e['value'] for e in env if e['name']=='TELEMETRY_RUM_ALLOWED_ORIGINS'))
+    def test_cold_read_budgets_fit_outer_request_without_changing_transfer_timeout(self):
+        for service in ['frontend','api-gateway','auth-service','gateway-service','payment-service']:
+            spec=self.manifest(service)['spec']['template']['spec']
+            self.assertEqual(spec['timeoutSeconds'],180)
+            env={entry['name']:entry.get('value') for entry in spec['containers'][0]['env']}
+            if service=='payment-service':
+                self.assertEqual(env['CLIENTS_WALLET_READ_TIMEOUT'],'90s')
+                self.assertEqual(env['CLIENTS_CUSTOMER_READ_TIMEOUT'],'45s')
+            if service=='gateway-service':
+                self.assertEqual(env['CLIENTS_WALLET_BANK_READ_TIMEOUT'],'45s')
+                self.assertNotIn('CLIENTS_HTTP_READ_TIMEOUT',env)
 
 if __name__=='__main__':unittest.main()

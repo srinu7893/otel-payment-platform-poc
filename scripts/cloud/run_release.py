@@ -91,12 +91,15 @@ def render(config, service, image, collector, revision):
     if service in CALLS and audiences:
         env.update({'CLOUD_RUN_IAM_ENABLED': 'true', 'CLOUD_RUN_AUDIENCES': ','.join(audiences)})
     if service == 'auth-service':
+        env['CLIENTS_HTTP_READ_TIMEOUT']='45s'
         for key, target in [('CLIENTS_CUSTOMER_BASE_URL', 'customer-service'), ('CLIENTS_BANK_BASE_URL', 'mock-bank-service')]:
             if target in config['urls']: env[key] = config['urls'][target]
     if service == 'payment-service':
+        env.update({'CLIENTS_CUSTOMER_READ_TIMEOUT':'45s','CLIENTS_WALLET_READ_TIMEOUT':'90s'})
         for key, target in [('CLIENTS_GATEWAY_BASE_URL', 'gateway-service'), ('CLIENTS_CUSTOMER_BASE_URL', 'customer-service')]:
             if target in config['urls']: env[key] = config['urls'][target]
     if service == 'gateway-service' and 'mock-bank-service' in config['urls']: env['CLIENTS_BANK_BASE_URL'] = config['urls']['mock-bank-service']
+    if service=='gateway-service':env['CLIENTS_WALLET_BANK_READ_TIMEOUT']='45s'
     if service == 'api-gateway':
         origins=set(config.get('browserOrigins',[]))
         if config['urls'].get('frontend'):origins.add(config['urls']['frontend'])
@@ -153,7 +156,7 @@ def render(config, service, image, collector, revision):
                               'run.googleapis.com/invoker-iam-disabled': 'false'}},
             'spec': {'template': {'metadata': {'name': prefix + '-' + service + '-' + revision,
                                 'annotations': annotations}, 'spec': {'serviceAccountName': config['serviceAccounts'][service],
-                                'containerConcurrency': 20, 'timeoutSeconds': 60, 'containers': containers}}}}
+                                'containerConcurrency': 20, 'timeoutSeconds': 180, 'containers': containers}}}}
 
 def gcloud(config, *args):
     try:

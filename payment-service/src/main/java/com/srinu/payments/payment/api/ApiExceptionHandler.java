@@ -18,6 +18,22 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ApiError> unsupportedMedia(org.springframework.web.HttpMediaTypeNotSupportedException ex,HttpServletRequest request){
+        return ResponseEntity.status(415).body(error("UNSUPPORTED_MEDIA_TYPE","Use application/json for this request",request,Map.of()));
+    }
+    @ExceptionHandler(org.springframework.web.bind.ServletRequestBindingException.class)
+    ResponseEntity<ApiError> missingParameter(org.springframework.web.bind.ServletRequestBindingException ex,HttpServletRequest request){
+        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR","A required request parameter or header is missing",request,Map.of()));
+    }
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    ResponseEntity<ApiError> unreadable(org.springframework.http.converter.HttpMessageNotReadableException ex,HttpServletRequest request){
+        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR","Request body must contain valid JSON and field types",request,Map.of()));
+    }
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ApiError> unsupportedMethod(org.springframework.web.HttpRequestMethodNotSupportedException ex,HttpServletRequest request){
+        return ResponseEntity.status(405).body(error("METHOD_NOT_ALLOWED","This HTTP method is not supported for this operation",request,Map.of()));
+    }
     @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
     ResponseEntity<ApiError> invalidParameter(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex,
                                                HttpServletRequest request) {
@@ -91,7 +107,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     ResponseEntity<ApiError> conflict(IllegalStateException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(error("INVALID_STATE", ex.getMessage(), request, Map.of()));
+            .body(error("INVALID_STATE", "The operation cannot be completed in its current state. Check your account status and refresh.", request, Map.of()));
     }
 
     @ExceptionHandler(org.springframework.web.client.RestClientResponseException.class)

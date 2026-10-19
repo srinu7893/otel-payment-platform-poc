@@ -4,7 +4,7 @@ import org.springframework.boot.web.client.RestClientCustomizer;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import java.time.Duration;
 @Configuration public class RestClientConfig {
-    @Bean RestClientCustomizer registrationTimeouts(){return builder->{
-        var factory=new SimpleClientHttpRequestFactory();factory.setConnectTimeout(Duration.ofSeconds(3));factory.setReadTimeout(Duration.ofSeconds(25));builder.requestFactory(factory);
+    @Bean RestClientCustomizer registrationTimeouts(@org.springframework.beans.factory.annotation.Value("${clients.http.read-timeout:25s}") Duration readTimeout){return builder->{
+        var factory=new SimpleClientHttpRequestFactory();factory.setConnectTimeout(Duration.ofSeconds(3));factory.setReadTimeout(readTimeout);builder.requestFactory(factory);
     };}
 }

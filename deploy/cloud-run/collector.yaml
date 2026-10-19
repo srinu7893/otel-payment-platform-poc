@@ -4,6 +4,11 @@ receivers:
       http:
         endpoint: 127.0.0.1:4318
 processors:
+  interval/metrics:
+    interval: 10s
+    pass_through:
+      gauge: false
+      summary: false
   memory_limiter:
     check_interval: 1s
     limit_mib: 192
@@ -49,8 +54,10 @@ exporters:
       queue_size: 200
   googlemanagedprometheus:
     project: ${env:GOOGLE_CLOUD_PROJECT}
+    timeout: 30s
     sending_queue:
       queue_size: 200
+      num_consumers: 1
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
@@ -85,7 +92,7 @@ service:
       processors:
       - memory_limiter
       - resourcedetection
-      - batch
+      - interval/metrics
       exporters:
       - googlemanagedprometheus
   telemetry:

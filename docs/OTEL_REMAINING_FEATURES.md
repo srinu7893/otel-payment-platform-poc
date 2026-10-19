@@ -23,6 +23,8 @@ Keep the existing service-by-service WIF, exact-source CI gate, immutable digest
 
 Startup CPU boost, liveness probes and bounded read retries remain enabled. A scale-to-zero chain can still take tens of seconds after idle; money-changing POSTs are never blindly retried.
 
+Stored failures showed wallet read timeouts at 25–45 seconds. Cloud settings now allow 45 seconds for customer/bank wallet reads, 90 seconds for the enclosing wallet read, and 180 seconds at the Cloud Run/Nginx boundary. This accommodates a dependency startup chain; it does not make a cold dependency instantly ready. Transfer/debit client timeouts and reconciliation behavior are unchanged.
+
 Before a manual demo, run **Warm OTel demo services**. It calls current private readiness endpoints in parallel using audience-bound identity tokens and records startup duration. It does not deploy, change minimum instances, schedule keepalive traffic, or move money. After a later idle interval the services can scale down again.
 
 To keep the entire login/wallet path warm, merge this optional field into `gcp-poc`'s `CLOUD_RUN_CONFIG_JSON`, then manually redeploy the selected services:
@@ -52,6 +54,8 @@ Local tests evaluate the actual error/latency/no-data/delivery expressions with 
 ## Collector durability boundary
 
 The Cloud Run collector exports its internal queue/export/refusal metrics through OTLP to Managed Prometheus. Its 200-request queues are bounded memory queues. The pinned Google exporters own retry behavior and do not accept the generic `retry_on_failure` YAML field; real-binary configuration validation protects against unsupported settings. Internal telemetry shares the exporter path, so a total exporter failure also requires no-data/backend monitoring.
+
+Historical logs also revealed rejected metric writes: duplicate time series in merged batches and samples less than five seconds apart. The metrics path now coalesces cumulative metrics and gauges over ten seconds and exports them through one queue consumer, without the generic batch processor. This avoids merging repeated samples into a single Google write and preserves cumulative totals. Gauge peaks between samples can be lost; this is a sampling tradeoff, not a bank ledger aggregation. The interval processor is alpha in the pinned release and is covered by a real collector regression test. [Pinned processor behavior](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.136.0/processor/intervalprocessor/README.md), [Google exporter restrictions](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.136.0/exporter/googlemanagedprometheusexporter/README.md).
 
 `scripts/e2e/collector-restart.py` runs the real pinned collector against an isolated failing backend. It enqueues 20 spans, kills the process, restarts using the same `file_storage` directory, and verifies all 20 arrive without resubmission. This demonstrates process-restart recovery on retained disk. Disk-full, corrupt storage, exhausted retries, permanent backend rejection and ingress buffers can still lose data. It is not an exactly-once promise.
 

@@ -33,10 +33,11 @@ def validate_selected(config, service):
     warm=config.get('warmServices',[])
     if not isinstance(warm,list) or any(target not in SERVICES for target in warm):
         raise ValueError('warmServices must list known services')
-    if not isinstance(config.get('browserOrigins',[]),list):raise ValueError('browserOrigins must be an array')
-    for origin in config.get('browserOrigins',[]):
-        if not isinstance(origin,str) or not re.fullmatch(r'https://[a-z0-9-]+\.(?:[a-z0-9-]+\.)?run\.app',origin):
-            raise ValueError('browserOrigins must contain HTTPS Cloud Run origins')
+    if service=='api-gateway':
+        if not isinstance(config.get('browserOrigins',[]),list):raise ValueError('browserOrigins must be an array')
+        for origin in config.get('browserOrigins',[]):
+            if not isinstance(origin,str) or not re.fullmatch(r'https://[a-z0-9-]+\.(?:[a-z0-9-]+\.)?run\.app',origin):
+                raise ValueError('browserOrigins must contain HTTPS Cloud Run origins')
     def value(value, pattern, label):
         if not isinstance(value, str) or 'replace-' in value or not re.fullmatch(pattern, value):
             raise ValueError('Invalid ' + label)
