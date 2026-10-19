@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Render Cloud Monitoring dashboards; publish only with explicit --apply. Never modifies IAM."""
-import argparse,json,re,subprocess,urllib.request,urllib.error,urllib.parse
+import argparse,json,math,re,subprocess,time,urllib.request,urllib.error,urllib.parse
 from pathlib import Path
 from cloud_acceptance import google_failure
 
@@ -23,8 +23,30 @@ def queries(service=None):
     for percentile in [50,95,99]:
         result[f'API operation p{percentile} latency (seconds)']=f'histogram_quantile({percentile/100},sum by (le,{group}) (rate(http_server_request_duration_seconds_bucket{selector}[5m])))'
     result['JVM memory used (bytes)']='sum by (job) (jvm_memory_used_bytes{'+job+',jvm_memory_type=~".+"})'
-    result['HTTP 4xx per second']=f'sum by ({group}) (rate('+count[:-1]+',http_response_status_code=~"4.."}[5m]))'
+    client_errors=f'sum by ({group}) (rate('+count[:-1]+',http_response_status_code=~"4.."}[5m]))'
+    result['HTTP 4xx per second']=f'{client_errors} or (0 * {denominator})'
     return result
+
+def sample_counts(data):
+    """A NaN/Inf-only series is not evidence of a working panel."""
+    if data.get('status')!='success':raise ValueError('PromQL query rejected')
+    samples=[value for row in data.get('data',{}).get('result',[])
+             for _,value in row.get('values',[]) ]
+    return {'samples':len(samples),'finiteSamples':sum(math.isfinite(float(v)) for v in samples)}
+
+def verify_queries(api,project,end=None):
+    """Check the chart's last hour, rather than only the instant after traffic stops."""
+    end=int(time.time() if end is None else end)
+    base=f'https://monitoring.googleapis.com/v1/projects/{project}/location/global/prometheus/api/v1/query_range?'
+    results=[]
+    for service in JAVA_SERVICES:
+        for title,query in queries(service).items():
+            params={'query':query,'start':end-3600,'end':end,'step':60}
+            counts=sample_counts(api(base+urllib.parse.urlencode(params)))
+            results.append({'service':service,'panel':title,
+                            'status':'DATA' if counts['finiteSamples'] else 'NO_DATA',
+                            'windowSeconds':3600,**counts})
+    return results
 
 def dashboard(service=None):
     label=service or 'platform-overview'
@@ -82,12 +104,11 @@ def main():
                     'url':'https://console.cloud.google.com/monitoring/dashboards/builder/'+saved['name'].split('/')[-1]+'?project='+args.project})
                 (root/'results.json').write_text(json.dumps(results,indent=2),encoding='utf-8')
         if args.verify_queries:
-            for service in JAVA_SERVICES:
-                for title,query in queries(service).items():
-                    data=api(f'https://monitoring.googleapis.com/v1/projects/{args.project}/location/global/prometheus/api/v1/query?'+urllib.parse.urlencode({'query':query}))
-                    if data.get('status')!='success':raise ValueError('PromQL query rejected: '+title)
-                    present=bool(data.get('data',{}).get('result'))
-                    results.append({'service':service,'panel':title,'status':'DATA' if present else 'NO_DATA'})
+            results.extend(verify_queries(api,args.project))
+            inventory_query='count by (__name__,job) ({job=~"payment-poc/.+",__name__=~"http_server_request_duration_seconds.*|jvm_memory_used_bytes"})'
+            inventory=api(f'https://monitoring.googleapis.com/v1/projects/{args.project}/location/global/prometheus/api/v1/query_range?'+urllib.parse.urlencode(
+                {'query':inventory_query,'start':int(time.time())-3600,'end':int(time.time()),'step':60}))
+            (root/'metric-inventory.json').write_text(json.dumps(inventory,indent=2),encoding='utf-8')
     except urllib.error.HTTPError as error:
         results.append(google_failure(error.code,error.read()))
         print(results[-1]);return 2 if error.code in (401,403) else 1

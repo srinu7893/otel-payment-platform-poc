@@ -22,7 +22,9 @@ Run **GitHub Actions > OTel Cloud dashboards > Run workflow**:
 
 - `apply=false`, `verify_queries=false`: render definitions only; no Cloud API writes.
 - `apply=true`: create/update the eight named POC dashboards. Existing dashboards with other names are untouched; duplicate matching names are rejected. Updates use etags.
-- `verify_queries=true`: execute panel queries; empty results are reported as NO_DATA and make verification fail. Sparse traffic or missing JVM metrics require investigation.
+- `verify_queries=true`: evaluate each panel over the previous hour at 60-second steps, matching a historical chart rather than checking only the current instant. Empty or NaN/Inf-only results are NO_DATA and fail verification. Sparse traffic or missing JVM metrics require investigation. Finite zero error rates are shown only when a matching observed traffic series exists.
+
+Run sandbox acceptance first, then panel verification, so there is recent traffic to inspect. A successful series-presence check for seven services does not prove every panel or latency histogram has data. The dashboard artifact includes a bounded metric-name/service inventory to distinguish missing histogram families from a quiet measurement window. Range query behavior is documented in the [Cloud Monitoring API](https://docs.cloud.google.com/monitoring/api/ref_v3/rest/v1/projects.location.prometheus.api.v1/query_range).
 
 Access dashboards at https://console.cloud.google.com/monitoring/dashboards?project=project-c9bd3d0e-266f-47bf-852 . Published resource names and direct links are saved in the workflow's `otel-cloud-dashboards-*` artifact. Rendered files alone do not establish that dashboards were installed or populated.
 

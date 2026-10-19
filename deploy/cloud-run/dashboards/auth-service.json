@@ -243,7 +243,7 @@
             "dataSets": [
               {
                 "timeSeriesQuery": {
-                  "prometheusQuery": "sum by (job,http_route,http_request_method) (rate(http_server_request_duration_seconds_count{job=\"payment-poc/auth-service\",http_route=~\".+\",http_route!~\".*actuator.*\",http_response_status_code=~\"4..\"}[5m]))"
+                  "prometheusQuery": "sum by (job,http_route,http_request_method) (rate(http_server_request_duration_seconds_count{job=\"payment-poc/auth-service\",http_route=~\".+\",http_route!~\".*actuator.*\",http_response_status_code=~\"4..\"}[5m])) or (0 * sum by (job,http_route,http_request_method) (rate(http_server_request_duration_seconds_count{job=\"payment-poc/auth-service\",http_route=~\".+\",http_route!~\".*actuator.*\"}[5m])))"
                 },
                 "plotType": "LINE"
               }
