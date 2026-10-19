@@ -48,14 +48,16 @@ def main():
               'poc_wallet_snapshot_healthy','poc_money_request_records','poc_money_request_snapshot_healthy',
               'poc_browser_events_total','poc_browser_measurement_count','otelcol_exporter_queue_size']
     def metrics():
-        found=[]
+        found=[];missing=[]
         for metric in families:
             query='count('+metric+')'
             data=request(f'https://monitoring.googleapis.com/v1/projects/{a.project}/location/global/prometheus/api/v1/query?'+urlencode({'query':query}),headers=google)
             rows=data.get('data',{}).get('result',[])
-            assert rows and float(rows[0]['value'][1])>0,'Missing '+metric
-            found.append(metric)
-        (root/'metrics-summary.json').write_text(json.dumps({'families':found,'traceId':trace},indent=2));return True
+            if rows and float(rows[0]['value'][1])>0:found.append(metric)
+            else:missing.append(metric)
+        (root/'metrics-summary.json').write_text(json.dumps({'families':found,'missing':missing,'traceId':trace},indent=2))
+        assert not missing,'Missing metric families: '+', '.join(missing)
+        return True
     check('Wallet browser and collector metric families stored',lambda:eventually(metrics))
     print(json.dumps({'status':'PASS','checks':len(results),'traceId':trace,'scope':'One isolated test user and INR 0.01 sandbox deposit; no tokens in evidence'}))
 if __name__=='__main__':main()

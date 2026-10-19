@@ -27,9 +27,9 @@ def main():
         assert 'Unavailable' not in driver.find_element(By.CSS_SELECTOR,'[data-testid=balance]').text
         checks.append('Account loads and shows last-check status')
         driver.set_window_size(390,844)
-        assert not driver.execute_script('return document.documentElement.scrollWidth > innerWidth')
+        assert not driver.execute_script('return document.documentElement.scrollWidth > innerWidth'), 'Mobile page overflows horizontally'
         checks.append('Mobile wallet has no page overflow');driver.set_window_size(1440,1000)
-        driver.execute_script('''window.__originalFetch=window.fetch; window.fetch=(url,opts)=>{
+        driver.execute_script(r'''window.__originalFetch=window.fetch; window.fetch=(url,opts)=>{
           if(String(url).match(/\/api\/v1\/wallet(?:\?|$)/))return Promise.resolve(new Response(JSON.stringify({code:'INTERNAL_ERROR',message:'password=SECRET-MUST-NOT-LEAK'}),{status:503,headers:{'Content-Type':'application/json'}}));
           return window.__originalFetch(url,opts);};''')
         click('Refresh account');refreshed();assert 'SECRET-MUST-NOT-LEAK' not in body()

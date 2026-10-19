@@ -85,14 +85,14 @@ def review(tab,amount,**extra):
     kinds={'Add demo money':'deposit','Pay merchant':'payment','Send money':'transfer','Request money':'request'}
     click('Review '+kinds[tab]);wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR,'[aria-label="Review transaction"]')))
 def confirm(status='COMPLETED'):
-    click('Confirm transaction');wait.until(lambda d: d.find_elements(By.CSS_SELECTOR,'[role=status]') and status in d.find_element(By.CSS_SELECTOR,'[role=status]').text);ready()
+    click('Confirm transaction');status_contains(status)
 def deposit(amount):review('Add demo money',amount);confirm()
 def request(note,amount='1'):
     review('Request money',amount,account=users['b']['account'],note=note);confirm('OPEN')
 def request_row(note):return wait.until(EC.presence_of_element_located((By.XPATH,"//tr[td[normalize-space(.)="+json.dumps(note)+"]]")))
 def row_click(note,label):request_row(note).find_element(By.XPATH,".//button[normalize-space(.)="+json.dumps(label)+"]").click()
 def accept():wait.until(EC.alert_is_present()).accept()
-def status_contains(value):wait.until(lambda d:d.find_elements(By.CSS_SELECTOR,'[role=status]') and value in d.find_element(By.CSS_SELECTOR,'[role=status]').text);ready()
+def status_contains(value):wait.until(lambda d:any(value in node.text for node in d.find_elements(By.CSS_SELECTOR,'[role=status]')));ready()
 def lost_payment(merchant,amount):
     driver.execute_script('window.__seleniumLosePayment=true')
     review('Pay merchant',amount,merchant=merchant);click('Confirm transaction')
