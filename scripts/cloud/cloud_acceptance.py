@@ -20,9 +20,14 @@ class EvidenceBlocked(Exception):
     pass
 
 def google_failure(status,raw):
-    try:error=json.loads(raw).get('error',{})
+    try:
+        payload=json.loads(raw)
+        error=payload.get('error',{}) if isinstance(payload,dict) else {}
     except (ValueError,TypeError):error={}
+    if not isinstance(error,dict):error={}
     details=error.get('details',[])
+    if not isinstance(details,list):details=[]
+    details=[row for row in details if isinstance(row,dict)]
     return {'status':'BLOCKED' if status in (401,403) else 'FAIL','httpStatus':status,
         'apiStatus':error.get('status',''),
         'reasons':sorted({row['reason'] for row in details if row.get('reason')}),

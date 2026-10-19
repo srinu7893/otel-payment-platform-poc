@@ -105,10 +105,6 @@ def main():
                 (root/'results.json').write_text(json.dumps(results,indent=2),encoding='utf-8')
         if args.verify_queries:
             results.extend(verify_queries(api,args.project))
-            inventory_query='count by (__name__,job) ({job=~"payment-poc/.+",__name__=~"http_server_request_duration_seconds.*|jvm_memory_used_bytes"})'
-            inventory=api(f'https://monitoring.googleapis.com/v1/projects/{args.project}/location/global/prometheus/api/v1/query_range?'+urllib.parse.urlencode(
-                {'query':inventory_query,'start':int(time.time())-3600,'end':int(time.time()),'step':60}))
-            (root/'metric-inventory.json').write_text(json.dumps(inventory,indent=2),encoding='utf-8')
     except urllib.error.HTTPError as error:
         results.append(google_failure(error.code,error.read()))
         print(results[-1]);return 2 if error.code in (401,403) else 1

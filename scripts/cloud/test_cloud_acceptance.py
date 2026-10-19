@@ -52,6 +52,13 @@ class CloudTelemetryAcceptanceTest(unittest.TestCase):
         self.assertEqual(result['permissions'],['monitoring.timeSeries.list'])
         self.assertEqual(result['reasons'],['IAM_PERMISSION_DENIED'])
         self.assertNotIn('SECRET',json.dumps(result))
+    def test_prometheus_string_errors_and_non_object_payloads_are_safe(self):
+        for payload in [{'status':'error','errorType':'bad_data','error':'invalid query SECRET'},[],{'error':None},{'error':{'details':['SECRET']}}]:
+            with self.subTest(payload=payload):
+                result=google_failure(400,json.dumps(payload))
+                self.assertEqual(result['status'],'FAIL')
+                self.assertEqual(result['httpStatus'],400)
+                self.assertNotIn('SECRET',json.dumps(result))
     def test_failed_login_is_in_complete_evidence_without_money_mutation(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);config=root/'config.json'
