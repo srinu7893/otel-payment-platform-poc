@@ -44,14 +44,14 @@ IT must also allow the existing GitHub WIF principal to impersonate the dedicate
 
 This is a conservative project-level permission check. Custom resource-conditional grants may require administrator review. A successful preflight does not prove API enablement, service-perimeter access, telemetry ingestion, stored data or dashboard correctness. Those require the separate live workflows. A denied permission test is reported as blocked, never as a pass.
 
-## Remaining OTel implementation order
+## Additional features and activation
 
-1. **Complete the cloud baseline after access:** publish the eight dashboards, verify every query, retrieve the connected payment/outbox/notification trace and correlated logs, and correct any real label/exporter gaps revealed by stored data.
-2. **Wallet and money-request business telemetry:** add bounded operation/outcome spans and metrics for deposits and request creation/approval/decline/cancel. Verify replay does not inflate successful money-movement counts. Keep account/customer/payment IDs out of metric labels.
-3. **Alert and recovery evidence:** validate latency/error/no-data and delayed-delivery alerts using controlled scenarios in an isolated sandbox. Establish an incident channel and prove recovery delivery before claiming working paging. Creating alert policies/channels requires separate permissions and routing details.
-4. **Browser telemetry:** the follow-up implements bounded production ingestion, LCP/INP/CLS and JS-error counts without messages, identities or URLs. Verify the browser-experience dashboard after deployment.
-5. **Collector resilience and sampling:** measure queue pressure/export failure and observed loss during backend outages, then evaluate sampling and replica routing. Cloud Run ephemeral storage is not a durable queue guarantee.
+The repository now includes eleven dashboards, wallet/request spans and metrics, bounded production browser telemetry, manual warmup, alert policy generation, and collector queue/export metrics. Real local drills cover alert firing/recovery delivery and persistent-queue process restart. Follow [the feature and activation guide](OTEL_REMAINING_FEATURES.md) for release and verification commands.
 
-The baseline comes first because a passing business request or returned trace ID does not prove storage. The additional instrumentation, alerts, browser ingestion and failure drills above are subsequent work; they are not claimed as implemented by this access update.
+After each release, verify stored signals and every dashboard query. A passing business request or returned trace ID alone does not prove storage. Wallet attempts count retries; committed database snapshots supply unique deposit/request counts.
+
+Cloud alert publication additionally requires an administrator to grant `roles/monitoring.alertPolicyEditor` to the selected workflow account and supply an existing enabled/verified notification channel. The four baseline roles above do not grant policy publication. Local delivery tests do not prove delivery through that cloud channel.
+
+Warm minimum instances and an external persistent collector are opt-in infrastructure choices. No new always-on services or external queue host are enabled by the access setup. Cloud Run ephemeral storage does not provide durable queues across instance replacement.
 
 References: [Monitoring access and dashboard roles](https://docs.cloud.google.com/monitoring/access-control), [Cloud Trace access](https://docs.cloud.google.com/trace/docs/iam), [permission testing](https://docs.cloud.google.com/resource-manager/reference/rest/v3/projects/testIamPermissions).
