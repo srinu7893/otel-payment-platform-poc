@@ -12,8 +12,8 @@ def safe(text):
 def main():
     services=['api-gateway','auth-service','customer-service','payment-service','gateway-service','mock-bank-service','notification-service']
     selector=' OR '.join('resource.labels.service_name="'+service+'"' for service in services)
-    query='resource.type="cloud_run_revision" AND ('+selector+') AND (severity>=ERROR OR httpRequest.status>=500 OR jsonPayload.level="ERROR" OR jsonPayload.message=~"TRANSFER_.*(EXCEPTION|RECONCILIATION|NOT_COMPLETED)")'
-    rows=json.loads(subprocess.check_output(['gcloud','logging','read',query,'--project=project-c9bd3d0e-266f-47bf-852','--freshness=72h','--order=desc','--limit=300','--format=json'],text=True))
+    query='((resource.type="cloud_run_revision" AND ('+selector+')) OR logName="projects/project-c9bd3d0e-266f-47bf-852/logs/payment-poc-otel") AND (severity>=WARNING OR httpRequest.status>=500 OR jsonPayload.level="ERROR" OR jsonPayload.level="WARN" OR jsonPayload.message=~"TRANSFER_" OR textPayload=~"TRANSFER_")'
+    rows=json.loads(subprocess.check_output(['gcloud','logging','read',query,'--project=project-c9bd3d0e-266f-47bf-852','--freshness=7d','--order=desc','--limit=300','--format=json'],text=True))
     results=[]
     for row in rows:
         payload=row.get('jsonPayload',{});http=row.get('httpRequest',{})
@@ -28,10 +28,12 @@ def main():
             'revision':row.get('resource',{}).get('labels',{}).get('revision_name'),
             'traceId':trace if re.fullmatch(r'[a-f0-9]{32}',trace) else '',
             'severity':row.get('severity'),'httpStatus':http.get('status'),'latency':http.get('latency'),
-            'message':safe(payload.get('message') or nested or row.get('textPayload') or row.get('protoPayload',{}).get('status',{}).get('message','')),
-            'stack':safe(payload.get('stack_trace') or body.get('stack_trace') or payload.get('attributes',{}).get('exception.stacktrace','')),
+            'message':safe(payload.get('message') or payload.get('msg') or nested or row.get('textPayload') or row.get('protoPayload',{}).get('status',{}).get('message','')),
+            'stack':safe(payload.get('stack_trace') or payload.get('stacktrace') or body.get('stack_trace') or payload.get('attributes',{}).get('exception.stacktrace','')),
+            'collectorError':safe(payload.get('error','')),'droppedItems':payload.get('dropped_items'),
+            'signal':payload.get('otelcol.signal'),
             'entryFields':sorted(row),'payloadFields':sorted(payload)})
     out=Path('artifacts/stored-errors');out.mkdir(parents=True,exist_ok=True)
     (out/'results.json').write_text(json.dumps(results,indent=2),encoding='utf-8')
-    print(json.dumps({'entries':len(results),'scope':'Last 72h; maximum 300 existing failure entries. No business requests or cloud mutations.'}))
+    print(json.dumps({'entries':len(results),'scope':'Last 7d; maximum 300 existing warning/error/transfer entries. No business requests or cloud mutations.'}))
 if __name__=='__main__':main()
