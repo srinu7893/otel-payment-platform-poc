@@ -59,6 +59,11 @@
       "key": "otel_require_trace",
       "value": "true",
       "type": "string"
+    },
+    {
+      "key": "live_latest_refund_payment_id",
+      "value": "bdd45d03-ddea-42b1-9c80-60c729900a37",
+      "type": "string"
     }
   ],
   "auth": {
@@ -72,7 +77,7 @@
         "exec": [
           "// This collection intentionally ignores environments, including a stale selected environment.",
           "const BASE=\"https://payment-frontend-52916499838.us-central1.run.app/api/v1\";",
-          "const routes={\"Login existing demo customer\": \"/auth/login\", \"Login existing receiver\": \"/auth/login\", \"Register a new sandbox customer and bank account\": \"/auth/register\", \"Login the registered customer\": \"/auth/login\", \"My existing profile\": \"/customers/{{live_sender_customer_id}}\", \"My current balance\": \"/wallet\", \"My real bank activity\": \"/wallet/activity?page=0&size=20\", \"My payment history\": \"/payments?page=0&size=20\", \"Retrieve latest payment by ID\": \"/payments/{{live_payment_id}}\", \"Retrieve seeded refund\": \"/payments/{{live_refund_payment_id}}/refund\", \"My outgoing transfers\": \"/transfers?page=0&size=20\", \"Retrieve latest transfer by ID\": \"/transfers/{{live_transfer_id}}\", \"My money requests\": \"/money-requests?page=0&size=20\", \"My notifications\": \"/notifications?page=0&size=20\", \"Receiver: current balance\": \"/wallet\", \"Lookup receiver account\": \"/wallet/recipients/{{live_receiver_account}}\", \"Add INR 10 demo money\": \"/wallet/deposits\", \"Receiver: add INR 10 demo money\": \"/wallet/deposits\", \"Create INR 2 merchant payment\": \"/payments\", \"Fetch the payment just created\": \"/payments/{{live_payment_id}}\", \"Create INR 1 transfer to receiver\": \"/transfers\", \"Fetch the transfer just created\": \"/transfers/{{live_transfer_id}}\", \"Create INR 1 money request\": \"/money-requests\", \"Receiver: pay latest money request\": \"/money-requests/{{live_request_id}}/pay\", \"Refund latest merchant payment\": \"/payments/{{live_payment_id}}/refunds\", \"Fetch refund just created\": \"/payments/{{live_payment_id}}/refund\", \"Fetch updated balance\": \"/wallet\", \"Fetch updated activity\": \"/wallet/activity?page=0&size=20\", \"Fetch updated payment history\": \"/payments?page=0&size=20\", \"Fetch updated transfers\": \"/transfers?page=0&size=20\", \"Fetch updated money requests\": \"/money-requests?page=0&size=20\"};",
+          "const routes={\"Login existing demo customer\": \"/auth/login\", \"Login existing receiver\": \"/auth/login\", \"Register a new sandbox customer and bank account\": \"/auth/register\", \"Login the registered customer\": \"/auth/login\", \"My existing profile\": \"/customers/{{live_sender_customer_id}}\", \"My current balance\": \"/wallet\", \"My real bank activity\": \"/wallet/activity?page=0&size=20\", \"My payment history\": \"/payments?page=0&size=20\", \"Retrieve latest payment by ID\": \"/payments/{{live_payment_id}}\", \"Retrieve seeded refund\": \"/payments/{{live_refund_payment_id}}/refund\", \"My outgoing transfers\": \"/transfers?page=0&size=20\", \"Retrieve latest transfer by ID\": \"/transfers/{{live_transfer_id}}\", \"My money requests\": \"/money-requests?page=0&size=20\", \"My notifications\": \"/notifications?page=0&size=20\", \"Receiver: current balance\": \"/wallet\", \"Lookup receiver account\": \"/wallet/recipients/{{live_receiver_account}}\", \"Add INR 10 demo money\": \"/wallet/deposits\", \"Receiver: add INR 10 demo money\": \"/wallet/deposits\", \"Create INR 2 merchant payment\": \"/payments\", \"Fetch the payment just created\": \"/payments/{{live_payment_id}}\", \"Create INR 1 transfer to receiver\": \"/transfers\", \"Fetch the transfer just created\": \"/transfers/{{live_transfer_id}}\", \"Create INR 1 money request\": \"/money-requests\", \"Receiver: pay latest money request\": \"/money-requests/{{live_request_id}}/pay\", \"Refund latest merchant payment\": \"/payments/{{live_payment_id}}/refunds\", \"Fetch refund just created\": \"/payments/{{live_latest_refund_payment_id}}/refund\", \"Fetch updated balance\": \"/wallet\", \"Fetch updated activity\": \"/wallet/activity?page=0&size=20\", \"Fetch updated payment history\": \"/payments?page=0&size=20\", \"Fetch updated transfers\": \"/transfers?page=0&size=20\", \"Fetch updated money requests\": \"/money-requests?page=0&size=20\"};",
           "const actors={sender:{username:'demo',password:'demo123',name:'Demo User',email:'demo@example.com'},receiver:{username:'receiver',password:'receiver123',name:'Receiver User',email:'receiver@example.com'}};",
           "const requestedTrace=pm.variables.replaceIn('{{$guid}}').replace(/-/g,'');",
           "pm.variables.set('otel_requested_trace_id',requestedTrace);",
@@ -1016,7 +1021,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));"
+                  "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));",
+                  "if(pm.response.code===201) pm.collectionVariables.set(\"live_latest_refund_payment_id\",pm.response.json().paymentId);"
                 ]
               }
             }
@@ -1026,7 +1032,7 @@
           "name": "Fetch refund just created",
           "request": {
             "method": "GET",
-            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/payments/747c8a7d-93e2-4d6a-bb59-753fc57a7712/refund",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/payments/bdd45d03-ddea-42b1-9c80-60c729900a37/refund",
             "header": [
               {
                 "key": "X-Correlation-Id",

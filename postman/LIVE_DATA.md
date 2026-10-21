@@ -10,6 +10,8 @@ https://payment-frontend-52916499838.us-central1.run.app/api/v1
 
 The frontend/API gateway calls private Cloud Run services with its runtime identity. Do not replace these URLs with private service URLs. Direct mock-bank access was verified to return HTTP 403; calls through the frontend succeeded. No private service was made public.
 
+Verified on 21 October 2026: all 31 collection requests passed 68 assertions with no environment; the repeated run with a stale localhost environment also passed 68 assertions. All 20 read requests passed individually without setup/create steps. Automatic provisioning of missing customers passed. The CMD curl journey passed 20 checks, including persisted transfers and conserved balances.
+
 ## What to click
 
 1. **00 - Login and registration** has filled demo/receiver login bodies, a filled new-customer registration, and its matching login. Registration creates a sandbox bank account with zero balance. The new example customer was created during verification, so its login is already usable. It is separate from the shared transaction accounts.

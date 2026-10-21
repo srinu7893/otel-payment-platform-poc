@@ -5,7 +5,7 @@ BASE='https://payment-frontend-52916499838.us-central1.run.app/api/v1'
 path=Path('postman/Live-Data.postman_collection.json')
 old=json.loads(path.read_text())
 seed=json.loads(Path('artifacts/postman-live-curl/seed.json').read_text())
-values={**seed,'gcp_project_id':'project-c9bd3d0e-266f-47bf-852','otel_require_trace':'true'}
+values={**seed,'live_latest_refund_payment_id':seed['live_refund_payment_id'],'gcp_project_id':'project-c9bd3d0e-266f-47bf-852','otel_require_trace':'true'}
 routes={};folders=[]
 def request(name,method,route,body=None,expected=200,tests=(),save=None):
     routes[name]=route
@@ -49,8 +49,8 @@ folders.append({'name':'02 - Create and retrieve new transactions','item':[
     request('Fetch the transfer just created','GET','/transfers/{{live_transfer_id}}'),
     request('Create INR 1 money request','POST','/money-requests',{'idempotencyKey':key(),'payerAccount':seed['live_receiver_account'],'amount':1,'note':'Postman manual shared coffee'},save=('live_request_id','id')),
     request('Receiver: pay latest money request','POST','/money-requests/{{live_request_id}}/pay',{},tests=['pm.test("Request paid",()=>pm.expect(pm.response.json().status).to.eql("PAID"));']),
-    request('Refund latest merchant payment','POST','/payments/{{live_payment_id}}/refunds',{'idempotencyKey':key()},201),
-    request('Fetch refund just created','GET','/payments/{{live_payment_id}}/refund'),
+    request('Refund latest merchant payment','POST','/payments/{{live_payment_id}}/refunds',{'idempotencyKey':key()},201,save=('live_latest_refund_payment_id','paymentId')),
+    request('Fetch refund just created','GET','/payments/{{live_latest_refund_payment_id}}/refund'),
     request('Fetch updated balance','GET','/wallet'),
     request('Fetch updated activity','GET','/wallet/activity?page=0&size=20'),
     request('Fetch updated payment history','GET','/payments?page=0&size=20'),
