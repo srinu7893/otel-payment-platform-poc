@@ -1,8 +1,68 @@
 {
   "info": {
-    "name": "Payment Platform - Live sandbox data - Send directly",
+    "name": "Payment Platform - Live Data - Ready to Send (No Environment)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Import Live-Data.postman_environment.json and Send any read immediately. Existing demo accounts and persisted IDs are populated. A fresh login runs automatically for every request. Create requests update IDs in the selected environment so subsequent GETs return the newly created records. All funds are simulated. Read LIVE_DATA.md for retry instructions."
+    "description": "Import ONLY this collection. Full public frontend URLs, existing customer accounts, persisted transaction IDs and all JSON bodies are filled. No environment or copied JWT required. Each business request logs into sandbox accounts automatically. Run all three folders in order for registration/create/fetch testing; existing reads can be sent individually. All money is simulated INR."
+  },
+  "variable": [
+    {
+      "key": "live_sender_account",
+      "value": "ACC1001",
+      "type": "string"
+    },
+    {
+      "key": "live_receiver_account",
+      "value": "ACC2001",
+      "type": "string"
+    },
+    {
+      "key": "live_sender_customer_id",
+      "value": "demo-customer",
+      "type": "string"
+    },
+    {
+      "key": "live_receiver_customer_id",
+      "value": "receiver-customer",
+      "type": "string"
+    },
+    {
+      "key": "live_payment_id",
+      "value": "747c8a7d-93e2-4d6a-bb59-753fc57a7712",
+      "type": "string"
+    },
+    {
+      "key": "live_refund_payment_id",
+      "value": "bdd45d03-ddea-42b1-9c80-60c729900a37",
+      "type": "string"
+    },
+    {
+      "key": "live_transfer_id",
+      "value": "fc072473-b6fe-4bc0-a4a8-746cfd7b4abf",
+      "type": "string"
+    },
+    {
+      "key": "live_request_id",
+      "value": "a2f20b5d-375e-3c74-a430-789ebf36a008",
+      "type": "string"
+    },
+    {
+      "key": "live_deposit_id",
+      "value": "f928dd40-cd7e-44c9-8eed-b49999cebf81",
+      "type": "string"
+    },
+    {
+      "key": "gcp_project_id",
+      "value": "project-c9bd3d0e-266f-47bf-852",
+      "type": "string"
+    },
+    {
+      "key": "otel_require_trace",
+      "value": "true",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "noauth"
   },
   "event": [
     {
@@ -10,34 +70,56 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// Explicit W3C parent lets the gateway confirm the actual accepted trace.",
+          "// This collection intentionally ignores environments, including a stale selected environment.",
+          "const BASE=\"https://payment-frontend-52916499838.us-central1.run.app/api/v1\";",
+          "const routes={\"Login existing demo customer\": \"/auth/login\", \"Login existing receiver\": \"/auth/login\", \"Register a new sandbox customer and bank account\": \"/auth/register\", \"Login the registered customer\": \"/auth/login\", \"My existing profile\": \"/customers/{{live_sender_customer_id}}\", \"My current balance\": \"/wallet\", \"My real bank activity\": \"/wallet/activity?page=0&size=20\", \"My payment history\": \"/payments?page=0&size=20\", \"Retrieve latest payment by ID\": \"/payments/{{live_payment_id}}\", \"Retrieve seeded refund\": \"/payments/{{live_refund_payment_id}}/refund\", \"My outgoing transfers\": \"/transfers?page=0&size=20\", \"Retrieve latest transfer by ID\": \"/transfers/{{live_transfer_id}}\", \"My money requests\": \"/money-requests?page=0&size=20\", \"My notifications\": \"/notifications?page=0&size=20\", \"Receiver: current balance\": \"/wallet\", \"Lookup receiver account\": \"/wallet/recipients/{{live_receiver_account}}\", \"Add INR 10 demo money\": \"/wallet/deposits\", \"Receiver: add INR 10 demo money\": \"/wallet/deposits\", \"Create INR 2 merchant payment\": \"/payments\", \"Fetch the payment just created\": \"/payments/{{live_payment_id}}\", \"Create INR 1 transfer to receiver\": \"/transfers\", \"Fetch the transfer just created\": \"/transfers/{{live_transfer_id}}\", \"Create INR 1 money request\": \"/money-requests\", \"Receiver: pay latest money request\": \"/money-requests/{{live_request_id}}/pay\", \"Refund latest merchant payment\": \"/payments/{{live_payment_id}}/refunds\", \"Fetch refund just created\": \"/payments/{{live_payment_id}}/refund\", \"Fetch updated balance\": \"/wallet\", \"Fetch updated activity\": \"/wallet/activity?page=0&size=20\", \"Fetch updated payment history\": \"/payments?page=0&size=20\", \"Fetch updated transfers\": \"/transfers?page=0&size=20\", \"Fetch updated money requests\": \"/money-requests?page=0&size=20\"};",
+          "const actors={sender:{username:'demo',password:'demo123',name:'Demo User',email:'demo@example.com'},receiver:{username:'receiver',password:'receiver123',name:'Receiver User',email:'receiver@example.com'}};",
           "const requestedTrace=pm.variables.replaceIn('{{$guid}}').replace(/-/g,'');",
           "pm.variables.set('otel_requested_trace_id',requestedTrace);",
           "pm.request.headers.upsert({key:'traceparent',value:'00-'+requestedTrace+'-'+pm.variables.replaceIn('{{$guid}}').replace(/-/g,'').slice(0,16)+'-01'});",
-          "// Fetch a fresh sandbox JWT for every request; never commit expiring tokens.",
-          "const receiver = pm.info.requestName.startsWith('Receiver:');",
-          "const prefix = receiver ? 'live_receiver_' : 'live_sender_';",
-          "function login(attempt) { pm.sendRequest({url:pm.environment.get('base_url')+'/auth/login',method:'POST',",
-          "  header:{'Content-Type':'application/json'},",
-          "  body:{mode:'raw',raw:JSON.stringify({username:pm.environment.get(prefix+'username'),password:pm.environment.get(prefix+'password')})}",
-          "}, (error, response) => {",
-          "  if((error || [429,502,503,504].includes(response.code)) && attempt<2) {",
-          "    setTimeout(()=>login(attempt+1),1000);return;",
-          "  }",
-          "  if(error || response.code!==200) {",
-          "    if(pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
-          "    throw new Error('Sandbox login failed. Check base_url and demo credentials.');",
-          "  }",
-          "  const session=response.json();",
-          "  pm.variables.set('live_token',session.accessToken);",
-          "  pm.environment.set(prefix+'customer_id',session.customerId);",
-          "}); }",
-          "login(0);",
-          "// Retain operation keys on repeated Send, including after a lost response.",
-          "const raw=pm.request.body && pm.request.body.raw || '';",
-          "for(const match of raw.matchAll(/\\{\\{(live_new_[a-z_]+_key)\\}\\}/g)) {",
-          "  if(!pm.environment.get(match[1])) pm.environment.set(match[1],pm.variables.replaceIn('{{$guid}}'));",
-          "}"
+          "function stop(message){if(pm.execution && pm.execution.skipRequest)pm.execution.skipRequest();throw new Error(message);}",
+          "function call(path,body,token,done,attempt=0){",
+          " const headers={'Content-Type':'application/json'};if(token)headers.Authorization='Bearer '+token;",
+          " pm.sendRequest({url:BASE+path,method:body===null?'GET':'POST',header:headers,...(body===null?{}:{body:{mode:'raw',raw:JSON.stringify(body)}})},(error,response)=>{",
+          "   // Only reads and login are retried. Registration/money operations are never blindly retried.",
+          "   if((body===null || path==='/auth/login') && (error || [429,502,503,504].includes(response.code)) && attempt<2){setTimeout(()=>call(path,body,token,done,attempt+1),1000);return;}",
+          "   if(error)return stop('Unable to reach the deployed frontend. Check Postman Console/TLS/network; the business request was skipped.');",
+          "   done(response);",
+          " });",
+          "}",
+          "function ensure(who,done){",
+          " const actor=actors[who];",
+          " function profile(session){",
+          "   call('/customers/'+session.customerId,null,session.accessToken,response=>{",
+          "     if(response.code!==200)return stop('Customer profile unavailable (HTTP '+response.code+'). Business request skipped.');",
+          "     const data=response.json();pm.collectionVariables.set('live_'+who+'_customer_id',session.customerId);pm.collectionVariables.set('live_'+who+'_account',data.accountNumber);done(session.accessToken);",
+          "   });",
+          " }",
+          " call('/auth/login',{username:actor.username,password:actor.password},null,response=>{",
+          "   if(response.code===200)return profile(response.json());",
+          "   if(response.code!==401)return stop('Sandbox login failed (HTTP '+response.code+'). Business request skipped.');",
+          "   // Fresh database: create this sandbox customer/account, then use its actual assigned account.",
+          "   call('/auth/register',actor,null,created=>{",
+          "     if(created.code!==200)return stop('Sandbox account setup returned HTTP '+created.code+'. Retry the same request after checking the response; no money request was sent.');",
+          "     call('/auth/login',{username:actor.username,password:actor.password},null,logged=>{if(logged.code!==200)return stop('New sandbox account login failed.');profile(logged.json());});",
+          "   });",
+          " });",
+          "}",
+          "const path=routes[pm.info.requestName];",
+          "if(path.startsWith('/auth/')){pm.request.url.update(BASE+path);}",
+          "else ensure('sender',sender=>ensure('receiver',receiver=>{",
+          " const route=path.replace(/{{(w+)}}/g,(_,key)=>{const value=pm.collectionVariables.get(key);if(!value)return stop('Missing saved record '+key+'. Run the create requests first.');return encodeURIComponent(value);});",
+          " pm.request.url.update(BASE+route);",
+          " pm.request.headers.upsert({key:'Authorization',value:'Bearer '+(pm.info.requestName.startsWith('Receiver:')?receiver:sender)});",
+          " if(pm.request.body && pm.request.body.raw){",
+          "   const body=JSON.parse(pm.request.body.raw);",
+          "   if('accountNumber' in body)body.accountNumber=pm.collectionVariables.get('live_sender_account');",
+          "   if('senderAccount' in body)body.senderAccount=pm.collectionVariables.get('live_sender_account');",
+          "   if('receiverAccount' in body)body.receiverAccount=pm.collectionVariables.get('live_receiver_account');",
+          "   if('payerAccount' in body)body.payerAccount=pm.collectionVariables.get('live_receiver_account');",
+          "   pm.request.body.update(JSON.stringify(body,null,2));",
+          " }",
+          "}));"
         ]
       }
     },
@@ -46,26 +128,26 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "const project=pm.environment.get('gcp_project_id') || '';",
+          "const project=pm.collectionVariables.get('gcp_project_id') || '';",
           "const reportedTrace=pm.response.headers.get('X-Trace-Id') || '';",
           "const correlation=pm.response.headers.get('X-Correlation-Id') || '';",
           "const validTrace=/^[a-f0-9]{32}$/i.test(reportedTrace) && !/^0+$/.test(reportedTrace);",
-          "pm.environment.set('last_trace_id',validTrace ? reportedTrace : '');",
-          "pm.environment.set('last_correlation_id',/^[A-Za-z0-9._-]{1,100}$/.test(correlation) ? correlation : '');",
+          "pm.collectionVariables.set('last_trace_id',validTrace ? reportedTrace : '');",
+          "pm.collectionVariables.set('last_correlation_id',/^[A-Za-z0-9._-]{1,100}$/.test(correlation) ? correlation : '');",
           "const validProject=/^[a-z][a-z0-9-]{4,61}[a-z0-9]$/.test(project);",
           "const query=validTrace ? 'trace=\"projects/'+project+'/traces/'+reportedTrace+'\"' : '';",
           "const logsUrl=validProject && validTrace ? 'https://console.cloud.google.com/logs/query?project='+encodeURIComponent(project)+'&query='+encodeURIComponent(query) : '';",
           "const traceUrl=validProject && validTrace ? 'https://console.cloud.google.com/traces/list?project='+encodeURIComponent(project)+'&tid='+reportedTrace : '';",
-          "pm.environment.set('last_logs_url',logsUrl);pm.environment.set('last_trace_url',traceUrl);",
-          "if(String(pm.environment.get('otel_require_trace'))==='true') {",
+          "pm.collectionVariables.set('last_logs_url',logsUrl);pm.collectionVariables.set('last_trace_url',traceUrl);",
+          "if(String(pm.collectionVariables.get('otel_require_trace'))==='true') {",
           "  pm.test('Gateway reports the accepted OTel trace',()=>pm.expect(reportedTrace).to.eql(pm.variables.get('otel_requested_trace_id')));",
           "}",
           "if(pm.request.method==='POST' && /\\/v1\\/payments$/.test(pm.request.url.getPath()) && pm.response.code===201 && validTrace) {",
           "  const paymentResult=pm.response.json();",
-          "  if(pm.environment.get('otel_payment_id')!==paymentResult.paymentId) {",
-          "    pm.environment.set('otel_payment_id',paymentResult.paymentId);",
-          "    pm.environment.set('otel_payment_trace_id',reportedTrace);",
-          "    pm.environment.set('otel_payment_trace_url',traceUrl);pm.environment.set('otel_payment_logs_url',logsUrl);",
+          "  if(pm.collectionVariables.get('otel_payment_id')!==paymentResult.paymentId) {",
+          "    pm.collectionVariables.set('otel_payment_id',paymentResult.paymentId);",
+          "    pm.collectionVariables.set('otel_payment_trace_id',reportedTrace);",
+          "    pm.collectionVariables.set('otel_payment_trace_url',traceUrl);pm.collectionVariables.set('otel_payment_logs_url',logsUrl);",
           "  }",
           "}",
           "pm.visualizer.set('<h3>Request telemetry</h3><p>Trace: {{trace}}</p><p>Correlation: {{correlation}}</p>{{#if traceUrl}}<p><a href=\"{{traceUrl}}\" target=\"_blank\">Open distributed trace</a> | <a href=\"{{logsUrl}}\" target=\"_blank\">Open correlated logs</a></p>{{else}}<p>No active trace reported.</p>{{/if}}<p>Links require your Google Cloud viewing permissions. A returned trace ID does not prove backend storage.</p>',{trace:validTrace ? reportedTrace : 'Not reported',correlation,traceUrl,logsUrl});"
@@ -75,13 +157,183 @@
   ],
   "item": [
     {
+      "name": "00 - Login and registration - bodies already filled",
+      "item": [
+        {
+          "name": "Login existing demo customer",
+          "request": {
+            "method": "POST",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/auth/login",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"demo\",\n  \"password\": \"demo123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
+                  "pm.test(\"Login returns a session\",()=>pm.expect(pm.response.json().accessToken).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login existing receiver",
+          "request": {
+            "method": "POST",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/auth/login",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"receiver\",\n  \"password\": \"receiver123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register a new sandbox customer and bank account",
+          "request": {
+            "method": "POST",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/auth/register",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"postman_ready_2142f04f05\",\n  \"password\": \"Postman-ready-724a806f656647d4!9\",\n  \"name\": \"Postman Ready Customer\",\n  \"email\": \"postman_ready_2142f04f05@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login the registered customer",
+          "request": {
+            "method": "POST",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/auth/login",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"postman_ready_2142f04f05\",\n  \"password\": \"Postman-ready-724a806f656647d4!9\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "01 - Fetch existing data immediately",
       "item": [
         {
           "name": "My existing profile",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/customers/{{live_sender_customer_id}}",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/customers/demo-customer",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -89,16 +341,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -116,7 +361,7 @@
           "name": "My current balance",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/wallet",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/wallet",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -124,16 +369,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -151,7 +389,7 @@
           "name": "My real bank activity",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/wallet/activity?page=0&size=20",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/wallet/activity?page=0&size=20",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -159,16 +397,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -177,7 +408,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
-                  "pm.test('Persisted activity exists',()=>pm.expect(pm.response.json().length).to.be.above(0));"
+                  "pm.test(\"Persisted activity exists\",()=>pm.expect(pm.response.json().length).to.be.above(0));"
                 ]
               }
             }
@@ -187,7 +418,7 @@
           "name": "My payment history",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/payments?page=0&size=20",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/payments?page=0&size=20",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -195,16 +426,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -222,7 +446,7 @@
           "name": "Retrieve latest payment by ID",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/payments/{{live_payment_id}}",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/payments/747c8a7d-93e2-4d6a-bb59-753fc57a7712",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -230,16 +454,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -248,7 +465,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
-                  "pm.test('Correct persisted payment',()=>pm.expect(pm.response.json().paymentId).to.eql(pm.environment.get('live_payment_id')));"
+                  "pm.test(\"Correct persisted payment\",()=>pm.expect(pm.response.json().paymentId).to.eql(pm.collectionVariables.get(\"live_payment_id\")));"
                 ]
               }
             }
@@ -258,7 +475,7 @@
           "name": "Retrieve seeded refund",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/payments/{{live_refund_payment_id}}/refund",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/payments/bdd45d03-ddea-42b1-9c80-60c729900a37/refund",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -266,16 +483,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -293,7 +503,7 @@
           "name": "My outgoing transfers",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/transfers?page=0&size=20",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/transfers?page=0&size=20",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -301,16 +511,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -328,7 +531,7 @@
           "name": "Retrieve latest transfer by ID",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/transfers/{{live_transfer_id}}",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/transfers/fc072473-b6fe-4bc0-a4a8-746cfd7b4abf",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -336,16 +539,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -354,7 +550,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
-                  "pm.test('Correct persisted transfer',()=>pm.expect(pm.response.json().transferId).to.eql(pm.environment.get('live_transfer_id')));"
+                  "pm.test(\"Correct persisted transfer\",()=>pm.expect(pm.response.json().transferId).to.eql(pm.collectionVariables.get(\"live_transfer_id\")));"
                 ]
               }
             }
@@ -364,7 +560,7 @@
           "name": "My money requests",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/money-requests?page=0&size=20",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/money-requests?page=0&size=20",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -372,16 +568,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -399,7 +588,7 @@
           "name": "My notifications",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/notifications?page=0&size=20",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/notifications?page=0&size=20",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -407,16 +596,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -434,7 +616,7 @@
           "name": "Receiver: current balance",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/wallet",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/wallet",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -442,16 +624,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -466,10 +641,10 @@
           ]
         },
         {
-          "name": "Receiver: incoming activity",
+          "name": "Lookup receiver account",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/wallet/activity?page=0&size=20",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/wallet/recipients/ACC2001",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -477,86 +652,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Receiver: received money requests",
-          "request": {
-            "method": "GET",
-            "url": "{{base_url}}/money-requests?page=0&size=20",
-            "header": [
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{$guid}}"
-              }
-            ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Look up existing recipient ACC2001",
-          "request": {
-            "method": "GET",
-            "url": "{{base_url}}/wallet/recipients/{{live_receiver_account}}",
-            "header": [
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{$guid}}"
-              }
-            ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -576,10 +674,10 @@
       "name": "02 - Create and retrieve new transactions",
       "item": [
         {
-          "name": "Add INR 10 demo funds",
+          "name": "Add INR 10 demo money",
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/wallet/deposits",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/wallet/deposits",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -591,19 +689,12 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money.",
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"{{live_new_deposit_key}}\",\n  \"amount\": 10\n}",
+              "raw": "{\n  \"idempotencyKey\": \"aa049b81-b328-4ea6-b36c-789e688d6e94\",\n  \"amount\": 10\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -618,17 +709,17 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
-                  "pm.environment.set(\"live_deposit_id\",pm.response.json().id);"
+                  "if(pm.response.code===200) pm.collectionVariables.set(\"live_deposit_id\",pm.response.json()[\"id\"]);"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Create INR 2 merchant payment",
+          "name": "Receiver: add INR 10 demo money",
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/payments",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/wallet/deposits",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -640,61 +731,18 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money.",
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"{{live_new_payment_key}}\",\n  \"accountNumber\": \"{{live_sender_account}}\",\n  \"merchant\": \"Postman manual coffee purchase\",\n  \"amount\": 2\n}",
+              "raw": "{\n  \"idempotencyKey\": \"3b52517e-ef38-4512-a769-08b37769f8df\",\n  \"amount\": 10\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));",
-                  "pm.environment.set(\"live_payment_id\",pm.response.json().paymentId);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Fetch the payment just created",
-          "request": {
-            "method": "GET",
-            "url": "{{base_url}}/payments/{{live_payment_id}}",
-            "header": [
-              {
-                "key": "X-Correlation-Id",
-                "value": "{{$guid}}"
-              }
-            ],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
           },
           "event": [
             {
@@ -709,10 +757,10 @@
           ]
         },
         {
-          "name": "Create INR 1 transfer to ACC2001",
+          "name": "Create INR 2 merchant payment",
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/transfers",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/payments",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -724,19 +772,12 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money.",
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"{{live_new_transfer_key}}\",\n  \"senderAccount\": \"{{live_sender_account}}\",\n  \"receiverAccount\": \"{{live_receiver_account}}\",\n  \"amount\": 1,\n  \"currency\": \"INR\"\n}",
+              "raw": "{\n  \"idempotencyKey\": \"c4373eeb-7192-49a4-ab8b-093a042e3ae4\",\n  \"accountNumber\": \"ACC1001\",\n  \"merchant\": \"Postman manual coffee purchase\",\n  \"amount\": 2\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -751,7 +792,78 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));",
-                  "pm.environment.set(\"live_transfer_id\",pm.response.json().transferId);"
+                  "if(pm.response.code===201) pm.collectionVariables.set(\"live_payment_id\",pm.response.json()[\"paymentId\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fetch the payment just created",
+          "request": {
+            "method": "GET",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/payments/747c8a7d-93e2-4d6a-bb59-753fc57a7712",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create INR 1 transfer to receiver",
+          "request": {
+            "method": "POST",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/transfers",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"3b6ed1d5-50d9-4a7a-bac6-45cb356fabab\",\n  \"senderAccount\": \"ACC1001\",\n  \"receiverAccount\": \"ACC2001\",\n  \"amount\": 1,\n  \"currency\": \"INR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\",()=>pm.response.to.have.status(201));",
+                  "pm.test(\"Transfer completed\",()=>pm.expect(pm.response.json().status).to.eql(\"COMPLETED\"));",
+                  "if(pm.response.code===201) pm.collectionVariables.set(\"live_transfer_id\",pm.response.json()[\"transferId\"]);"
                 ]
               }
             }
@@ -761,7 +873,7 @@
           "name": "Fetch the transfer just created",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/transfers/{{live_transfer_id}}",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/transfers/fc072473-b6fe-4bc0-a4a8-746cfd7b4abf",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -769,16 +881,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -796,7 +901,7 @@
           "name": "Create INR 1 money request",
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/money-requests",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/money-requests",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -808,19 +913,12 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money.",
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"{{live_new_request_key}}\",\n  \"payerAccount\": \"{{live_receiver_account}}\",\n  \"amount\": 1,\n  \"note\": \"Postman manual shared coffee\"\n}",
+              "raw": "{\n  \"idempotencyKey\": \"015856b8-0910-4b29-88bd-2b68a097f130\",\n  \"payerAccount\": \"ACC2001\",\n  \"amount\": 1,\n  \"note\": \"Postman manual shared coffee\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -835,7 +933,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
-                  "pm.environment.set(\"live_request_id\",pm.response.json().id);"
+                  "if(pm.response.code===200) pm.collectionVariables.set(\"live_request_id\",pm.response.json()[\"id\"]);"
                 ]
               }
             }
@@ -845,7 +943,7 @@
           "name": "Receiver: pay latest money request",
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/money-requests/{{live_request_id}}/pay",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/money-requests/a2f20b5d-375e-3c74-a430-789ebf36a008/pay",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -857,16 +955,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money.",
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -884,7 +975,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"HTTP 200\",()=>pm.response.to.have.status(200));",
-                  "pm.test('Request paid',()=>pm.expect(pm.response.json().status).to.eql('PAID'));"
+                  "pm.test(\"Request paid\",()=>pm.expect(pm.response.json().status).to.eql(\"PAID\"));"
                 ]
               }
             }
@@ -894,7 +985,7 @@
           "name": "Refund latest merchant payment",
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/payments/{{live_payment_id}}/refunds",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/payments/747c8a7d-93e2-4d6a-bb59-753fc57a7712/refunds",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -906,19 +997,12 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money.",
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"{{live_new_refund_key}}\"\n}",
+              "raw": "{\n  \"idempotencyKey\": \"629bfde5-7618-4073-8a0d-424504dec888\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -942,7 +1026,7 @@
           "name": "Fetch refund just created",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/payments/{{live_payment_id}}/refund",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/payments/747c8a7d-93e2-4d6a-bb59-753fc57a7712/refund",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -950,16 +1034,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -977,7 +1054,7 @@
           "name": "Fetch updated balance",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/wallet",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/wallet",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -985,16 +1062,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -1012,7 +1082,7 @@
           "name": "Fetch updated activity",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/wallet/activity?page=0&size=20",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/wallet/activity?page=0&size=20",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -1020,16 +1090,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -1047,7 +1110,7 @@
           "name": "Fetch updated payment history",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/payments?page=0&size=20",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/payments?page=0&size=20",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -1055,16 +1118,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -1082,7 +1138,7 @@
           "name": "Fetch updated transfers",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/transfers?page=0&size=20",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/transfers?page=0&size=20",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -1090,16 +1146,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {
@@ -1117,7 +1166,7 @@
           "name": "Fetch updated money requests",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/money-requests?page=0&size=20",
+            "url": "https://payment-frontend-52916499838.us-central1.run.app/api/v1/money-requests?page=0&size=20",
             "header": [
               {
                 "key": "X-Correlation-Id",
@@ -1125,16 +1174,9 @@
               }
             ],
             "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{live_token}}",
-                  "type": "string"
-                }
-              ]
+              "type": "noauth"
             },
-            "description": "Ready to Send with the Live Data environment. Authentication is automatic. Uses existing persisted sandbox data; no real money."
+            "description": "Ready to Send. Full deployed URL and body are filled. No environment required. The collection obtains a fresh sandbox JWT automatically; private services remain private."
           },
           "event": [
             {

@@ -2,7 +2,7 @@
 
 **OTel investigation:** send a request and open **Visualize** for its trace/log links. Cloud environments assert that the gateway reports the actual accepted trace. Latest diagnostic IDs/links are saved in environment variables; no JWT is put into a link. See [the Cloud OTel demo](../docs/OTEL_CLOUD_DEMO.md).
 
-**Want existing data you can fetch immediately?** Import `Live-Data.postman_collection.json` and `Live-Data.postman_environment.json`. This collection has existing demo accounts, persisted transaction IDs and automatic login, plus create-then-fetch requests. See [LIVE_DATA.md](LIVE_DATA.md). The original collection below is for isolated acceptance testing with newly registered users.
+**Want existing data you can fetch immediately?** Import only `Live-Data.postman_collection.json`. Its 31 requests have full deployed URLs and filled bodies, existing accounts, persisted transaction IDs and automatic login. **No environment file is required.** Replace the older imported copy. See [LIVE_DATA.md](LIVE_DATA.md). The original collection below is for isolated acceptance testing with newly registered users.
 
 Verified against the deployed sandbox on 2026-10-15 with Newman: **63 requests, 94 assertions, zero failures**. The collection tests existing features; it does not require an application deployment.
 
