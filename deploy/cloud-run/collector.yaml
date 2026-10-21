@@ -57,6 +57,7 @@ exporters:
     metric:
       extra_metrics_config:
         enable_scope_info: false
+        enable_target_info: false
     timeout: 30s
     sending_queue:
       queue_size: 200
