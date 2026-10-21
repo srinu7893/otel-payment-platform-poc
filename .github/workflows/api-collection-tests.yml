@@ -1,0 +1,55 @@
+name: Run API collections and document results
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Collection suite
+        type: choice
+        options: [all, live, acceptance, rum]
+        default: all
+      collect_logs:
+        description: Collect stored Cloud Logging entries for tested traces
+        type: boolean
+        default: true
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: manual-api-collection-tests
+  cancel-in-progress: false
+jobs:
+  test:
+    if: github.ref == 'refs/heads/main'
+    environment: gcp-poc
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+    - name: Install pinned Newman
+      run: npm install --prefix artifacts/postman-tools --no-save newman@6.2.3
+    - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+      if: inputs.collect_logs
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.GCP_OBSERVABILITY_SERVICE_ACCOUNT || secrets.GCP_SERVICE_ACCOUNT }}
+    - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db
+      if: inputs.collect_logs
+    - name: Verify observability read access
+      if: inputs.collect_logs
+      run: python3 scripts/cloud/otel_access.py --project project-c9bd3d0e-266f-47bf-852 --scope signals
+    - name: Run collections and write sanitized request response reports
+      env:
+        SUITE: ${{ inputs.suite }}
+      run: node --use-system-ca scripts/run-api-tests.mjs --suite="$SUITE"
+    - name: Collect actual stored API logs
+      if: always() && inputs.collect_logs
+      run: python3 scripts/cloud/api_test_logs.py
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: api-collection-tests-${{ github.run_id }}
+        path: artifacts/api-tests/latest/
+        retention-days: 14

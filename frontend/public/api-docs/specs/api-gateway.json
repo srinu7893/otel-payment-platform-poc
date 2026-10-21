@@ -1,0 +1,365 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Payment platform \u2014 api-gateway",
+    "version": "1.1.0",
+    "description": "Generated build-time contracts from controller handlers. Private catalogs document service-only endpoints; they are not public routes. Request/response execution evidence is produced separately by scripts/run-api-tests.cmd."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current frontend origin; routes through the API gateway"
+    },
+    {
+      "url": "https://payment-frontend-52916499838.us-central1.run.app",
+      "description": "Deployed sandbox frontend"
+    }
+  ],
+  "paths": {
+    "/api/v1/telemetry/rum": {
+      "post": {
+        "operationId": "api_gateway_post_api_v1_telemetry_rum",
+        "tags": [
+          "api-gateway"
+        ],
+        "summary": "Ingest \u2014 rum",
+        "description": "Anonymous with allowed Origin and bounded body. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: api-gateway/src/main/java/com/srinu/otelpoc/gateway/ops/BrowserTelemetryController.java",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "example": "https://payment-frontend-52916499838.us-central1.run.app",
+            "description": "Browser sends its current origin automatically. Curl must send this allowed frontend origin."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful response; business outcome is in the returned status, if present."
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "api-gateway/src/main/java/com/srinu/otelpoc/gateway/ops/BrowserTelemetryController.java",
+        "x-required-access": "Anonymous with allowed Origin and bounded body",
+        "x-private": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": [
+                      "CLS",
+                      "FCP",
+                      "INP",
+                      "LCP",
+                      "TTFB",
+                      "PAGE_VIEW",
+                      "JS_ERROR"
+                    ]
+                  },
+                  "value": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "description": "CLS: 0..5; web-vital milliseconds: 0..120000; PAGE_VIEW and JS_ERROR: exactly 1. Only name/value fields accepted.",
+                "example": {
+                  "name": "PAGE_VIEW",
+                  "value": 1
+                }
+              },
+              "example": {
+                "name": "PAGE_VIEW",
+                "value": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/health": {
+      "get": {
+        "operationId": "api_gateway_get_api_v1_ops_health",
+        "tags": [
+          "api-gateway"
+        ],
+        "summary": "Health \u2014 health",
+        "description": "Bearer JWT: SUPPORT or ADMIN. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: api-gateway/src/main/java/com/srinu/otelpoc/gateway/ops/OperationsController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Mono<OperationsHealthResponse> response; observed fields are in the execution report."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "api-gateway/src/main/java/com/srinu/otelpoc/gateway/ops/OperationsController.java",
+        "x-required-access": "Bearer JWT: SUPPORT or ADMIN",
+        "x-private": false
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "fieldErrors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Application JWT from POST /api/v1/auth/login. Swagger Sign in acquires it in memory."
+      }
+    }
+  }
+}

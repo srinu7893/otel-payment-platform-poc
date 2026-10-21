@@ -1,0 +1,6 @@
+{
+  "idempotencyKey": "c4373eeb-7192-49a4-ab8b-093a042e3ae4",
+  "accountNumber": "ACC1001",
+  "merchant": "Postman manual coffee purchase",
+  "amount": 2
+}

@@ -1,0 +1,7 @@
+{
+  "idempotencyKey": "3b6ed1d5-50d9-4a7a-bac6-45cb356fabab",
+  "senderAccount": "ACC1001",
+  "receiverAccount": "ACC2001",
+  "amount": 1,
+  "currency": "INR"
+}

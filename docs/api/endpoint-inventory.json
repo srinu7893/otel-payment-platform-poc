@@ -1,0 +1,522 @@
+[
+  {
+    "service": "api-gateway",
+    "method": "POST",
+    "path": "/api/v1/telemetry/rum",
+    "handler": "ingest",
+    "responseType": "Mono<ResponseEntity<Void>>",
+    "bodyType": null,
+    "source": "api-gateway/src/main/java/com/srinu/otelpoc/gateway/ops/BrowserTelemetryController.java",
+    "private": false
+  },
+  {
+    "service": "api-gateway",
+    "method": "GET",
+    "path": "/api/v1/ops/health",
+    "handler": "health",
+    "responseType": "Mono<OperationsHealthResponse>",
+    "bodyType": null,
+    "source": "api-gateway/src/main/java/com/srinu/otelpoc/gateway/ops/OperationsController.java",
+    "private": false
+  },
+  {
+    "service": "auth-service",
+    "method": "POST",
+    "path": "/api/v1/auth/login",
+    "handler": "login",
+    "responseType": "ResponseEntity<AuthenticationService.LoginResult>",
+    "bodyType": "LoginRequest",
+    "source": "auth-service/src/main/java/com/srinu/otelpoc/auth/api/AuthController.java",
+    "private": false
+  },
+  {
+    "service": "auth-service",
+    "method": "POST",
+    "path": "/api/v1/auth/register",
+    "handler": "register",
+    "responseType": "RegistrationService.Result",
+    "bodyType": "Request",
+    "source": "auth-service/src/main/java/com/srinu/otelpoc/auth/api/RegistrationController.java",
+    "private": false
+  },
+  {
+    "service": "customer-service",
+    "method": "GET",
+    "path": "/api/v1/customers",
+    "handler": "list",
+    "responseType": "List<Customer>",
+    "bodyType": null,
+    "source": "customer-service/src/main/java/com/srinu/otelpoc/customer/api/CustomerController.java",
+    "private": false
+  },
+  {
+    "service": "customer-service",
+    "method": "GET",
+    "path": "/api/v1/customers/{id}",
+    "handler": "get",
+    "responseType": "Customer",
+    "bodyType": null,
+    "source": "customer-service/src/main/java/com/srinu/otelpoc/customer/api/CustomerController.java",
+    "private": false
+  },
+  {
+    "service": "customer-service",
+    "method": "POST",
+    "path": "/api/v1/customers",
+    "handler": "create",
+    "responseType": "ResponseEntity<Customer>",
+    "bodyType": "CustomerRequest",
+    "source": "customer-service/src/main/java/com/srinu/otelpoc/customer/api/CustomerController.java",
+    "private": false
+  },
+  {
+    "service": "customer-service",
+    "method": "PUT",
+    "path": "/api/v1/customers/{id}",
+    "handler": "update",
+    "responseType": "Customer",
+    "bodyType": "CustomerRequest",
+    "source": "customer-service/src/main/java/com/srinu/otelpoc/customer/api/CustomerController.java",
+    "private": false
+  },
+  {
+    "service": "customer-service",
+    "method": "DELETE",
+    "path": "/api/v1/customers/{id}",
+    "handler": "deactivate",
+    "responseType": "void",
+    "bodyType": null,
+    "source": "customer-service/src/main/java/com/srinu/otelpoc/customer/api/CustomerController.java",
+    "private": false
+  },
+  {
+    "service": "customer-service",
+    "method": "PUT",
+    "path": "/internal/onboarding/customers/{id}",
+    "handler": "provision",
+    "responseType": "Customer",
+    "bodyType": "Request",
+    "source": "customer-service/src/main/java/com/srinu/otelpoc/customer/api/OnboardingController.java",
+    "private": true
+  },
+  {
+    "service": "payment-service",
+    "method": "GET",
+    "path": "/api/v1/money-requests",
+    "handler": "list",
+    "responseType": "Page<MoneyRequest>",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "POST",
+    "path": "/api/v1/money-requests",
+    "handler": "create",
+    "responseType": "MoneyRequest",
+    "bodyType": "Request",
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "POST",
+    "path": "/api/v1/money-requests/{id}/pay",
+    "handler": "act",
+    "responseType": "MoneyRequest",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "POST",
+    "path": "/api/v1/money-requests/{id}/decline",
+    "handler": "act",
+    "responseType": "MoneyRequest",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "POST",
+    "path": "/api/v1/money-requests/{id}/cancel",
+    "handler": "act",
+    "responseType": "MoneyRequest",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "POST",
+    "path": "/api/v1/payments",
+    "handler": "create",
+    "responseType": "ResponseEntity<PaymentResponse>",
+    "bodyType": "PaymentRequest",
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "GET",
+    "path": "/api/v1/payments/{id}",
+    "handler": "get",
+    "responseType": "PaymentResponse",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "GET",
+    "path": "/api/v1/payments",
+    "handler": "list",
+    "responseType": "Page<PaymentResponse>",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "POST",
+    "path": "/api/v1/payments/{id}/cancel",
+    "handler": "cancel",
+    "responseType": "PaymentResponse",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "POST",
+    "path": "/api/v1/payments/{id}/refunds",
+    "handler": "refund",
+    "responseType": "ResponseEntity<RefundResponse>",
+    "bodyType": "RefundRequest",
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "GET",
+    "path": "/api/v1/payments/{id}/refund",
+    "handler": "getRefund",
+    "responseType": "RefundResponse",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "POST",
+    "path": "/api/v1/transfers",
+    "handler": "create",
+    "responseType": "ResponseEntity<TransferResponse>",
+    "bodyType": "TransferRequest",
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/TransferController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "GET",
+    "path": "/api/v1/transfers/{id}",
+    "handler": "get",
+    "responseType": "TransferResponse",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/TransferController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "GET",
+    "path": "/api/v1/transfers",
+    "handler": "list",
+    "responseType": "Page<TransferResponse>",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/TransferController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "GET",
+    "path": "/api/v1/wallet",
+    "handler": "balance",
+    "responseType": "WalletClient.Balance",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "GET",
+    "path": "/api/v1/wallet/recipients/{account}",
+    "handler": "recipient",
+    "responseType": "WalletClient.Recipient",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "GET",
+    "path": "/api/v1/wallet/activity",
+    "handler": "activity",
+    "responseType": "List<WalletClient.Activity>",
+    "bodyType": null,
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+    "private": false
+  },
+  {
+    "service": "payment-service",
+    "method": "POST",
+    "path": "/api/v1/wallet/deposits",
+    "handler": "deposit",
+    "responseType": "WalletClient.Deposit",
+    "bodyType": "DepositRequest",
+    "source": "payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+    "private": false
+  },
+  {
+    "service": "gateway-service",
+    "method": "POST",
+    "path": "/api/v1/authorizations",
+    "handler": "authorize",
+    "responseType": "ResponseEntity<AuthorizationResponse>",
+    "bodyType": "AuthorizationRequest",
+    "source": "gateway-service/src/main/java/com/srinu/payments/gateway/api/AuthorizationController.java",
+    "private": true
+  },
+  {
+    "service": "gateway-service",
+    "method": "POST",
+    "path": "/api/v1/refund-authorizations",
+    "handler": "authorize",
+    "responseType": "ResponseEntity<RefundAuthorizationResponse>",
+    "bodyType": "RefundAuthorizationRequest",
+    "source": "gateway-service/src/main/java/com/srinu/payments/gateway/api/RefundAuthorizationController.java",
+    "private": true
+  },
+  {
+    "service": "gateway-service",
+    "method": "POST",
+    "path": "/api/v1/transfer-authorizations",
+    "handler": "authorize",
+    "responseType": "ResponseEntity<TransferAuthorizationResponse>",
+    "bodyType": "TransferAuthorizationRequest",
+    "source": "gateway-service/src/main/java/com/srinu/payments/gateway/api/TransferAuthorizationController.java",
+    "private": true
+  },
+  {
+    "service": "gateway-service",
+    "method": "GET",
+    "path": "/api/v1/wallet/{account}",
+    "handler": "balance",
+    "responseType": "Object",
+    "bodyType": null,
+    "source": "gateway-service/src/main/java/com/srinu/payments/gateway/api/WalletController.java",
+    "private": true
+  },
+  {
+    "service": "gateway-service",
+    "method": "GET",
+    "path": "/api/v1/wallet/recipients/{account}",
+    "handler": "recipient",
+    "responseType": "Object",
+    "bodyType": null,
+    "source": "gateway-service/src/main/java/com/srinu/payments/gateway/api/WalletController.java",
+    "private": true
+  },
+  {
+    "service": "gateway-service",
+    "method": "GET",
+    "path": "/api/v1/wallet/{account}/activity",
+    "handler": "activity",
+    "responseType": "Object",
+    "bodyType": null,
+    "source": "gateway-service/src/main/java/com/srinu/payments/gateway/api/WalletController.java",
+    "private": true
+  },
+  {
+    "service": "gateway-service",
+    "method": "POST",
+    "path": "/api/v1/wallet/{account}/deposits",
+    "handler": "deposit",
+    "responseType": "Object",
+    "bodyType": "Map<String,Object>",
+    "source": "gateway-service/src/main/java/com/srinu/payments/gateway/api/WalletController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "POST",
+    "path": "/api/v1/admin/accounts",
+    "handler": "create",
+    "responseType": "Account",
+    "bodyType": "AccountAdminRequest",
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/AccountAdminController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "GET",
+    "path": "/api/v1/admin/accounts/{accountNumber}",
+    "handler": "get",
+    "responseType": "Account",
+    "bodyType": null,
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/AccountAdminController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "GET",
+    "path": "/api/v1/admin/accounts",
+    "handler": "list",
+    "responseType": "Page<Account>",
+    "bodyType": null,
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/AccountAdminController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "PUT",
+    "path": "/api/v1/admin/accounts/{accountNumber}",
+    "handler": "update",
+    "responseType": "Account",
+    "bodyType": "AccountAdminRequest",
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/AccountAdminController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "POST",
+    "path": "/api/v1/admin/accounts/{accountNumber}/deactivate",
+    "handler": "deactivate",
+    "responseType": "Account",
+    "bodyType": null,
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/AccountAdminController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "POST",
+    "path": "/api/v1/admin/accounts/{accountNumber}/activate",
+    "handler": "activate",
+    "responseType": "Account",
+    "bodyType": null,
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/AccountAdminController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "POST",
+    "path": "/api/v1/bank/debits",
+    "handler": "debit",
+    "responseType": "ResponseEntity<DebitResponse>",
+    "bodyType": "DebitRequest",
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/BankController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "POST",
+    "path": "/api/v1/bank/refunds",
+    "handler": "refund",
+    "responseType": "ResponseEntity<RefundResponse>",
+    "bodyType": "RefundRequest",
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/BankController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "PUT",
+    "path": "/internal/onboarding/accounts/{number}",
+    "handler": "provision",
+    "responseType": "Object",
+    "bodyType": "Request",
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/OnboardingController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "POST",
+    "path": "/api/v1/bank/transfers",
+    "handler": "transfer",
+    "responseType": "ResponseEntity<TransferResponse>",
+    "bodyType": "TransferRequest",
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/TransferController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "GET",
+    "path": "/api/v1/bank/wallet/{account}",
+    "handler": "balance",
+    "responseType": "WalletService.Balance",
+    "bodyType": null,
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/WalletController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "GET",
+    "path": "/api/v1/bank/wallet/recipients/{account}",
+    "handler": "recipient",
+    "responseType": "WalletService.Recipient",
+    "bodyType": null,
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/WalletController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "GET",
+    "path": "/api/v1/bank/wallet/{account}/activity",
+    "handler": "activity",
+    "responseType": "List<WalletService.Activity>",
+    "bodyType": null,
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/WalletController.java",
+    "private": true
+  },
+  {
+    "service": "mock-bank-service",
+    "method": "POST",
+    "path": "/api/v1/bank/wallet/{account}/deposits",
+    "handler": "deposit",
+    "responseType": "WalletService.Deposit",
+    "bodyType": "DepositRequest",
+    "source": "mock-bank-service/src/main/java/com/srinu/payments/bank/api/WalletController.java",
+    "private": true
+  },
+  {
+    "service": "notification-service",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "handler": "list",
+    "responseType": "Page<NotificationRecord>",
+    "bodyType": null,
+    "source": "notification-service/src/main/java/com/srinu/payments/notification/api/NotificationController.java",
+    "private": false
+  },
+  {
+    "service": "notification-service",
+    "method": "GET",
+    "path": "/api/v1/notifications/{id}",
+    "handler": "get",
+    "responseType": "NotificationRecord",
+    "bodyType": null,
+    "source": "notification-service/src/main/java/com/srinu/payments/notification/api/NotificationController.java",
+    "private": false
+  },
+  {
+    "service": "frontend",
+    "method": "GET",
+    "path": "/health",
+    "handler": "health",
+    "responseType": "String",
+    "bodyType": null,
+    "source": "frontend/cloud-run.conf.template",
+    "private": false
+  }
+]

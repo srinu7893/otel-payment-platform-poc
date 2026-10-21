@@ -1,5 +1,7 @@
 # Payment Platform in Postman
 
+**Automatic run and response documentation:** run `scripts\run-api-tests.cmd` from the repository root. It runs all three collections and creates `artifacts/api-tests/latest/index.html` with actual request/response bodies, assertions, timings, curl and log/trace links. Use the manual **Run API collections and document results** GitHub workflow to include stored API logs. See [API testing and Swagger](../docs/API_TESTING_AND_SWAGGER.md).
+
 **OTel investigation:** send a request and open **Visualize** for its trace/log links. Cloud environments assert that the gateway reports the actual accepted trace. Latest diagnostic IDs/links are saved in environment variables; no JWT is put into a link. See [the Cloud OTel demo](../docs/OTEL_CLOUD_DEMO.md).
 
 **Want existing data you can fetch immediately?** Import only `Live-Data.postman_collection.json`. Its 31 requests have full deployed URLs and filled bodies, existing accounts, persisted transaction IDs and automatic login. **No environment file is required.** Replace the older imported copy. See [LIVE_DATA.md](LIVE_DATA.md). The original collection below is for isolated acceptance testing with newly registered users.

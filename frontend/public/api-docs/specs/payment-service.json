@@ -1,0 +1,3287 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Payment platform \u2014 payment-service",
+    "version": "1.1.0",
+    "description": "Generated build-time contracts from controller handlers. Private catalogs document service-only endpoints; they are not public routes. Request/response execution evidence is produced separately by scripts/run-api-tests.cmd."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current frontend origin; routes through the API gateway"
+    },
+    {
+      "url": "https://payment-frontend-52916499838.us-central1.run.app",
+      "description": "Deployed sandbox frontend"
+    }
+  ],
+  "paths": {
+    "/api/v1/money-requests": {
+      "get": {
+        "operationId": "payment_service_get_api_v1_money_requests",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "List \u2014 money-requests",
+        "description": "Bearer JWT: CUSTOMER; ownership/payer rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "MoneyRequest response; observed fields are in the execution report."
+                      }
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "size": {
+                      "type": "integer"
+                    },
+                    "totalElements": {
+                      "type": "integer"
+                    },
+                    "totalPages": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER; ownership/payer rules apply",
+        "x-private": false
+      },
+      "post": {
+        "operationId": "payment_service_post_api_v1_money_requests",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Create \u2014 money-requests",
+        "description": "Bearer JWT: CUSTOMER; ownership/payer rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "MoneyRequest response; observed fields are in the execution report."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER; ownership/payer rules apply",
+        "x-private": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "1c18df69-257d-5645-aa7a-c5e799e86076"
+                  },
+                  "payerAccount": {
+                    "type": "string",
+                    "example": "ACC2001",
+                    "pattern": "[A-Za-z0-9-]{3,64}"
+                  },
+                  "amount": {
+                    "type": "number",
+                    "example": 1,
+                    "minimum": 0.01,
+                    "maximum": 100000.0,
+                    "multipleOf": 0.01
+                  },
+                  "note": {
+                    "type": "string",
+                    "example": "Swagger sandbox request",
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "idempotencyKey",
+                  "payerAccount",
+                  "amount",
+                  "note"
+                ]
+              },
+              "example": {
+                "idempotencyKey": "015856b8-0910-4b29-88bd-2b68a097f130",
+                "payerAccount": "ACC2001",
+                "amount": 1,
+                "note": "Postman manual shared coffee"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/money-requests/{id}/pay": {
+      "post": {
+        "operationId": "payment_service_post_api_v1_money_requests_id_pay",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Act \u2014 pay",
+        "description": "Bearer JWT: CUSTOMER; ownership/payer rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "a2f20b5d-375e-3c74-a430-789ebf36a008"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "MoneyRequest response; observed fields are in the execution report."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER; ownership/payer rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/money-requests/{id}/decline": {
+      "post": {
+        "operationId": "payment_service_post_api_v1_money_requests_id_decline",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Act \u2014 decline",
+        "description": "Bearer JWT: CUSTOMER; ownership/payer rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "a2f20b5d-375e-3c74-a430-789ebf36a008"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "MoneyRequest response; observed fields are in the execution report."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER; ownership/payer rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/money-requests/{id}/cancel": {
+      "post": {
+        "operationId": "payment_service_post_api_v1_money_requests_id_cancel",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Act \u2014 cancel",
+        "description": "Bearer JWT: CUSTOMER; ownership/payer rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "a2f20b5d-375e-3c74-a430-789ebf36a008"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "MoneyRequest response; observed fields are in the execution report."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/MoneyRequestController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER; ownership/payer rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/payments": {
+      "post": {
+        "operationId": "payment_service_post_api_v1_payments",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Create \u2014 payments",
+        "description": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "paymentId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "ef4a4866-6421-5352-823a-ccdfacecd218"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "merchant": {
+                      "type": "string",
+                      "example": "Swagger sandbox purchase"
+                    },
+                    "account": {
+                      "type": "string",
+                      "example": "ACC1001"
+                    },
+                    "failureCode": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-10-21T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply",
+        "x-private": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "example": "022b80f1-0724-5058-b3ff-51d345462b0a",
+                    "maxLength": 100
+                  },
+                  "accountNumber": {
+                    "type": "string",
+                    "example": "ACC1001",
+                    "maxLength": 64
+                  },
+                  "merchant": {
+                    "type": "string",
+                    "example": "Swagger sandbox purchase",
+                    "maxLength": 120
+                  },
+                  "amount": {
+                    "type": "number",
+                    "example": 1,
+                    "minimum": 0.01,
+                    "multipleOf": 0.01
+                  }
+                },
+                "required": [
+                  "idempotencyKey",
+                  "accountNumber",
+                  "merchant",
+                  "amount"
+                ]
+              },
+              "example": {
+                "idempotencyKey": "c4373eeb-7192-49a4-ab8b-093a042e3ae4",
+                "accountNumber": "ACC1001",
+                "merchant": "Postman manual coffee purchase",
+                "amount": 2
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "payment_service_get_api_v1_payments",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "List \u2014 payments",
+        "description": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "PROCESSING",
+                "RECONCILIATION_REQUIRED",
+                "COMPLETED",
+                "DECLINED",
+                "FAILED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "paymentId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "b3903b0e-c7f4-5535-be6a-4fafe4b4500e"
+                          },
+                          "status": {
+                            "type": "string",
+                            "example": "example"
+                          },
+                          "amount": {
+                            "type": "number",
+                            "example": 1
+                          },
+                          "merchant": {
+                            "type": "string",
+                            "example": "Swagger sandbox purchase"
+                          },
+                          "account": {
+                            "type": "string",
+                            "example": "ACC1001"
+                          },
+                          "failureCode": {
+                            "type": "string",
+                            "example": "example"
+                          },
+                          "message": {
+                            "type": "string",
+                            "example": "example"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "example": "2026-10-21T00:00:00Z"
+                          }
+                        }
+                      }
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "size": {
+                      "type": "integer"
+                    },
+                    "totalElements": {
+                      "type": "integer"
+                    },
+                    "totalPages": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/payments/{id}": {
+      "get": {
+        "operationId": "payment_service_get_api_v1_payments_id",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Get \u2014 {id}",
+        "description": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "747c8a7d-93e2-4d6a-bb59-753fc57a7712"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "paymentId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "69137316-da99-5fa8-9bd0-cdc1b34db4f4"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "merchant": {
+                      "type": "string",
+                      "example": "Swagger sandbox purchase"
+                    },
+                    "account": {
+                      "type": "string",
+                      "example": "ACC1001"
+                    },
+                    "failureCode": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-10-21T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/payments/{id}/cancel": {
+      "post": {
+        "operationId": "payment_service_post_api_v1_payments_id_cancel",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Cancel \u2014 cancel",
+        "description": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "747c8a7d-93e2-4d6a-bb59-753fc57a7712"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "paymentId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "98a7ddb9-3768-5aa0-aad6-7fb6c44d75e4"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "merchant": {
+                      "type": "string",
+                      "example": "Swagger sandbox purchase"
+                    },
+                    "account": {
+                      "type": "string",
+                      "example": "ACC1001"
+                    },
+                    "failureCode": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-10-21T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/payments/{id}/refunds": {
+      "post": {
+        "operationId": "payment_service_post_api_v1_payments_id_refunds",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Refund \u2014 refunds",
+        "description": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "747c8a7d-93e2-4d6a-bb59-753fc57a7712"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "refundId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "bce1da94-6c25-53e6-be8d-9186f214a388"
+                    },
+                    "paymentId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "da42ad3e-cec0-5ee2-a456-091d376a6b49"
+                    },
+                    "bankTransactionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "3b30c21f-8d5a-51ee-a698-a24910b0598c"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "failureCode": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-10-21T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply",
+        "x-private": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "example": "43426b29-3ab0-5dbb-8694-e5b2b4dd06f4",
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "idempotencyKey"
+                ]
+              },
+              "example": {
+                "idempotencyKey": "43426b29-3ab0-5dbb-8694-e5b2b4dd06f4"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments/{id}/refund": {
+      "get": {
+        "operationId": "payment_service_get_api_v1_payments_id_refund",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Get refund \u2014 refund",
+        "description": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "747c8a7d-93e2-4d6a-bb59-753fc57a7712"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "refundId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "7aaa2e35-e9e1-5f4a-97b8-ee8eaec4b935"
+                    },
+                    "paymentId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "38f79257-4d7e-523f-a9da-4c81625e8eb0"
+                    },
+                    "bankTransactionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "c7df6384-880a-58c3-a8ca-bbaeaaa81922"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "failureCode": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-10-21T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/PaymentController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/transfers": {
+      "post": {
+        "operationId": "payment_service_post_api_v1_transfers",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Create \u2014 transfers",
+        "description": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/TransferController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transferId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "a8f0305e-01a5-5909-bb2f-f4cdd1357568"
+                    },
+                    "bankTransactionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "093c4806-9ac8-5b87-b3c7-60c055fd621c"
+                    },
+                    "senderAccount": {
+                      "type": "string",
+                      "example": "ACC1001"
+                    },
+                    "receiverAccount": {
+                      "type": "string",
+                      "example": "ACC2001"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "currency": {
+                      "type": "string",
+                      "example": "INR"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-10-21T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/TransferController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply",
+        "x-private": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "example": "ea990d80-2439-599b-bdb1-0094afdb7ff0"
+                  },
+                  "senderAccount": {
+                    "type": "string",
+                    "example": "ACC1001"
+                  },
+                  "receiverAccount": {
+                    "type": "string",
+                    "example": "ACC2001"
+                  },
+                  "amount": {
+                    "type": "number",
+                    "example": 1,
+                    "minimum": 0.01,
+                    "multipleOf": 0.01
+                  },
+                  "currency": {
+                    "type": "string",
+                    "example": "INR",
+                    "pattern": "INR"
+                  }
+                },
+                "required": [
+                  "idempotencyKey",
+                  "senderAccount",
+                  "receiverAccount",
+                  "amount",
+                  "currency"
+                ]
+              },
+              "example": {
+                "idempotencyKey": "3b6ed1d5-50d9-4a7a-bac6-45cb356fabab",
+                "senderAccount": "ACC1001",
+                "receiverAccount": "ACC2001",
+                "amount": 1,
+                "currency": "INR"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "payment_service_get_api_v1_transfers",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "List \u2014 transfers",
+        "description": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/TransferController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "transferId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "0b85037a-b742-5da9-98b8-c92f2e6ef702"
+                          },
+                          "bankTransactionId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "f4a7d00d-73f2-53b7-bddc-eca7210ae86b"
+                          },
+                          "senderAccount": {
+                            "type": "string",
+                            "example": "ACC1001"
+                          },
+                          "receiverAccount": {
+                            "type": "string",
+                            "example": "ACC2001"
+                          },
+                          "amount": {
+                            "type": "number",
+                            "example": 1
+                          },
+                          "currency": {
+                            "type": "string",
+                            "example": "INR"
+                          },
+                          "status": {
+                            "type": "string",
+                            "example": "example"
+                          },
+                          "message": {
+                            "type": "string",
+                            "example": "example"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "example": "2026-10-21T00:00:00Z"
+                          }
+                        }
+                      }
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "size": {
+                      "type": "integer"
+                    },
+                    "totalElements": {
+                      "type": "integer"
+                    },
+                    "totalPages": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/TransferController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/transfers/{id}": {
+      "get": {
+        "operationId": "payment_service_get_api_v1_transfers_id",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Get \u2014 {id}",
+        "description": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/TransferController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "fc072473-b6fe-4bc0-a4a8-746cfd7b4abf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transferId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "22b04962-491c-54a2-a0c3-2b9db9e52432"
+                    },
+                    "bankTransactionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "2905f123-c612-5ca7-a0e1-86e653259579"
+                    },
+                    "senderAccount": {
+                      "type": "string",
+                      "example": "ACC1001"
+                    },
+                    "receiverAccount": {
+                      "type": "string",
+                      "example": "ACC2001"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "currency": {
+                      "type": "string",
+                      "example": "INR"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-10-21T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/TransferController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER, SUPPORT or ADMIN; operation-specific ownership/role rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/wallet": {
+      "get": {
+        "operationId": "payment_service_get_api_v1_wallet",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Balance \u2014 wallet",
+        "description": "Bearer JWT: CUSTOMER; ownership/payer rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accountNumber": {
+                      "type": "string",
+                      "example": "ACC1001"
+                    },
+                    "customerName": {
+                      "type": "string",
+                      "example": "Demo Customer"
+                    },
+                    "balance": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "currency": {
+                      "type": "string",
+                      "example": "INR"
+                    },
+                    "active": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER; ownership/payer rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/wallet/recipients/{account}": {
+      "get": {
+        "operationId": "payment_service_get_api_v1_wallet_recipients_account",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Recipient \u2014 {account}",
+        "description": "Bearer JWT: CUSTOMER; ownership/payer rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "ACC1001"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accountNumber": {
+                      "type": "string",
+                      "example": "ACC1001"
+                    },
+                    "customerName": {
+                      "type": "string",
+                      "example": "Demo Customer"
+                    },
+                    "active": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER; ownership/payer rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/wallet/activity": {
+      "get": {
+        "operationId": "payment_service_get_api_v1_wallet_activity",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Activity \u2014 activity",
+        "description": "Bearer JWT: CUSTOMER; ownership/payer rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "272e689f-b2c6-5ccd-9a4c-db23ede85dd4"
+                      },
+                      "type": {
+                        "type": "string",
+                        "example": "example"
+                      },
+                      "direction": {
+                        "type": "string",
+                        "example": "example"
+                      },
+                      "amount": {
+                        "type": "number",
+                        "example": 1
+                      },
+                      "currency": {
+                        "type": "string",
+                        "example": "INR"
+                      },
+                      "status": {
+                        "type": "string",
+                        "example": "example"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-10-21T00:00:00Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER; ownership/payer rules apply",
+        "x-private": false
+      }
+    },
+    "/api/v1/wallet/deposits": {
+      "post": {
+        "operationId": "payment_service_post_api_v1_wallet_deposits",
+        "tags": [
+          "payment-service"
+        ],
+        "summary": "Deposit \u2014 deposits",
+        "description": "Bearer JWT: CUSTOMER; ownership/payer rules apply. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "5231b03e-f9d8-5e96-bf33-829269553fcf"
+                    },
+                    "accountNumber": {
+                      "type": "string",
+                      "example": "ACC1001"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "payment-service/src/main/java/com/srinu/payments/payment/api/WalletController.java",
+        "x-required-access": "Bearer JWT: CUSTOMER; ownership/payer rules apply",
+        "x-private": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "c2ccd84d-9ed0-573c-931e-f9b2848304f5"
+                  },
+                  "amount": {
+                    "type": "number",
+                    "example": 1,
+                    "minimum": 0.01,
+                    "maximum": 100000.0,
+                    "multipleOf": 0.01
+                  }
+                },
+                "required": [
+                  "idempotencyKey",
+                  "amount"
+                ]
+              },
+              "example": {
+                "idempotencyKey": "aa049b81-b328-4ea6-b36c-789e688d6e94",
+                "amount": 10
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "fieldErrors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Application JWT from POST /api/v1/auth/login. Swagger Sign in acquires it in memory."
+      }
+    }
+  }
+}

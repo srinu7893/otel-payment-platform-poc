@@ -1,0 +1,187 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Payment platform \u2014 frontend",
+    "version": "1.1.0",
+    "description": "Generated build-time contracts from controller handlers. Private catalogs document service-only endpoints; they are not public routes. Request/response execution evidence is produced separately by scripts/run-api-tests.cmd."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current frontend origin; routes through the API gateway"
+    },
+    {
+      "url": "https://payment-frontend-52916499838.us-central1.run.app",
+      "description": "Deployed sandbox frontend"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "frontend_get_health",
+        "tags": [
+          "frontend"
+        ],
+        "summary": "Health \u2014 health",
+        "description": "Anonymous frontend health check. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: frontend/cloud-run.conf.template",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "frontend/cloud-run.conf.template",
+        "x-required-access": "Anonymous frontend health check",
+        "x-private": false
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "fieldErrors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Application JWT from POST /api/v1/auth/login. Swagger Sign in acquires it in memory."
+      }
+    }
+  }
+}

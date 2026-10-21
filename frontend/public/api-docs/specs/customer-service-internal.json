@@ -1,0 +1,235 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Payment platform \u2014 customer-service",
+    "version": "1.1.0",
+    "description": "Generated build-time contracts from controller handlers. Private catalogs document service-only endpoints; they are not public routes. Request/response execution evidence is produced separately by scripts/run-api-tests.cmd."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8084",
+      "description": "Authenticated local proxy / native service; private contracts are not public gateway routes"
+    }
+  ],
+  "paths": {
+    "/internal/onboarding/customers/{id}": {
+      "put": {
+        "operationId": "customer_service_put_internal_onboarding_customers_id",
+        "tags": [
+          "customer-service"
+        ],
+        "summary": "Provision \u2014 {id}",
+        "description": "Cloud Run invoker identity; trusted service/operator only. Internal-only contract, not routed by the public API gateway. Browser execution is disabled in the private catalog. Source: customer-service/src/main/java/com/srinu/otelpoc/customer/api/OnboardingController.java",
+        "security": [
+          {
+            "cloudRunIdentity": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "demo-customer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Customer response; observed fields are in the execution report."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "customer-service/src/main/java/com/srinu/otelpoc/customer/api/OnboardingController.java",
+        "x-required-access": "Cloud Run invoker identity; trusted service/operator only",
+        "x-private": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Demo Customer",
+                    "maxLength": 120
+                  },
+                  "email": {
+                    "type": "string",
+                    "example": "demo@example.com",
+                    "maxLength": 160,
+                    "format": "email"
+                  },
+                  "accountNumber": {
+                    "type": "string",
+                    "example": "ACCAAAAAAAAAAAAAAAAAAAAAAAA",
+                    "pattern": "ACC[A-F0-9]{24}"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email",
+                  "accountNumber"
+                ]
+              },
+              "example": {
+                "name": "Demo Customer",
+                "email": "demo@example.com",
+                "accountNumber": "ACCAAAAAAAAAAAAAAAAAAAAAAAA"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "fieldErrors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "cloudRunIdentity": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Serverless-Authorization",
+        "description": "Bearer Google ID token with the selected private service canonical URL as audience; caller must have run.invoker. This is separate from the application JWT."
+      }
+    }
+  }
+}

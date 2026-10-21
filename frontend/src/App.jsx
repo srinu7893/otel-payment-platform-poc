@@ -37,8 +37,9 @@ export default function App() {
     </form>
     {!registering && <div className="demoCredentials"><b>Demo accounts · test funds only</b><span>demo / demo123 — ACC1001</span><span>receiver / receiver123 — ACC2001</span><span>support / support123 — SUPPORT</span><span>admin / admin123 — ADMIN</span></div>}
     {error && <p role="alert" className="error">{error}</p>}
+    <p><a href="/api-docs/" target="_blank" rel="noreferrer">API explorer and Swagger documentation</a></p>
   </section></main>;
   const roles = session.roles || [];
   const privileged = roles.some(role => role === 'SUPPORT' || role === 'ADMIN');
-  return <main className="shell"><header><div><p className="eyebrow">Payment Platform</p><h1>{privileged ? 'Operations' : 'Your wallet'}</h1></div><button className="secondary" onClick={() => { setSession(null); setError(''); }}>Sign out</button></header>{privileged ? <OperationsPanel token={session.accessToken} roles={roles} /> : <WalletDashboard key={session.customerId} session={session} />}</main>;
+  return <main className="shell"><header><div><p className="eyebrow">Payment Platform</p><h1>{privileged ? 'Operations' : 'Your wallet'}</h1></div><div className="headerActions"><a href="/api-docs/" target="_blank" rel="noreferrer">API explorer</a><button className="secondary" onClick={() => { setSession(null); setError(''); }}>Sign out</button></div></header>{privileged ? <OperationsPanel token={session.accessToken} roles={roles} /> : <WalletDashboard key={session.customerId} session={session} />}</main>;
 }

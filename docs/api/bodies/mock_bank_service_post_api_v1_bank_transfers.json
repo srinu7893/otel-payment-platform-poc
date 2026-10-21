@@ -1,0 +1,7 @@
+{
+  "paymentId": "40ea03d9-30bf-5c82-8035-9648f010df3d",
+  "senderAccount": "ACC1001",
+  "receiverAccount": "ACC2001",
+  "amount": 1,
+  "currency": "INR"
+}

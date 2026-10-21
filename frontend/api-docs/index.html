@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Payment API documentation</title></head>
+<body>
+  <header class="docs-header">
+    <a href="/">← Payment app</a><h1>Payment platform API explorer</h1>
+    <p>Endpoints, required bodies, authentication and curl for every application. All funds are sandbox INR.</p>
+    <label>Service catalog <select id="service" aria-label="Service catalog"></select></label>
+    <form id="signin"><label>Username <input id="username" value="demo" autocomplete="username"></label><label>Password <input id="password" type="password" value="demo123" autocomplete="current-password"></label><button>Sign in for API requests</button><button id="clear-token" type="button">Clear session</button></form>
+    <p id="auth-status" role="status">Protected public requests need an application session. Sign in here; no token copying is needed.</p>
+    <p id="catalog-status"></p><p>Use <code>scripts\run-api-tests.cmd</code> for automatic collection runs and actual request/response, assertion, log and trace reports.</p>
+  </header>
+  <main id="swagger-ui"></main><script type="module" src="../src/api-docs.js"></script>
+</body></html>

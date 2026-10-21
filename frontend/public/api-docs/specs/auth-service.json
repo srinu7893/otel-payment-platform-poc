@@ -1,0 +1,444 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Payment platform \u2014 auth-service",
+    "version": "1.1.0",
+    "description": "Generated build-time contracts from controller handlers. Private catalogs document service-only endpoints; they are not public routes. Request/response execution evidence is produced separately by scripts/run-api-tests.cmd."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current frontend origin; routes through the API gateway"
+    },
+    {
+      "url": "https://payment-frontend-52916499838.us-central1.run.app",
+      "description": "Deployed sandbox frontend"
+    }
+  ],
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "auth_service_post_api_v1_auth_login",
+        "tags": [
+          "auth-service"
+        ],
+        "summary": "Login \u2014 login",
+        "description": "Anonymous. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: auth-service/src/main/java/com/srinu/otelpoc/auth/api/AuthController.java",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "tokenType": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "expiresInSeconds": {
+                      "type": "integer",
+                      "example": 0
+                    },
+                    "customerId": {
+                      "type": "string",
+                      "example": "example"
+                    },
+                    "roles": {
+                      "type": "object",
+                      "description": "java.util.Set<String> response; observed fields are in the execution report."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "auth-service/src/main/java/com/srinu/otelpoc/auth/api/AuthController.java",
+        "x-required-access": "Anonymous",
+        "x-private": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "example": "demo"
+                  },
+                  "password": {
+                    "type": "string",
+                    "example": "demo123"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ]
+              },
+              "example": {
+                "username": "demo",
+                "password": "demo123"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "operationId": "auth_service_post_api_v1_auth_register",
+        "tags": [
+          "auth-service"
+        ],
+        "summary": "Register \u2014 register",
+        "description": "Anonymous. Use the public frontend entry point. No Google identity token is needed by the browser/Postman client. Source: auth-service/src/main/java/com/srinu/otelpoc/auth/api/RegistrationController.java",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response; business outcome is in the returned status, if present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "accessToken": {
+                          "type": "string",
+                          "example": "example"
+                        },
+                        "tokenType": {
+                          "type": "string",
+                          "example": "example"
+                        },
+                        "expiresInSeconds": {
+                          "type": "integer",
+                          "example": 0
+                        },
+                        "customerId": {
+                          "type": "string",
+                          "example": "example"
+                        },
+                        "roles": {
+                          "type": "object",
+                          "description": "java.util.Set<String> response; observed fields are in the execution report."
+                        }
+                      }
+                    },
+                    "accountNumber": {
+                      "type": "string",
+                      "example": "ACC1001"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "example"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid application or Cloud Run credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role/ownership/invoker permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method not supported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "State or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Business risk policy rejected the operation where applicable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected processing failure; use correlation/trace IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency or provisioning unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-source": "auth-service/src/main/java/com/srinu/otelpoc/auth/api/RegistrationController.java",
+        "x-required-access": "Anonymous",
+        "x-private": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "example": "demo",
+                    "pattern": "[A-Za-z0-9][A-Za-z0-9._-]{2,39}"
+                  },
+                  "password": {
+                    "type": "string",
+                    "example": "Postman-documentation-123!",
+                    "minLength": 12,
+                    "maxLength": 72
+                  },
+                  "name": {
+                    "type": "string",
+                    "example": "Demo Customer",
+                    "maxLength": 120
+                  },
+                  "email": {
+                    "type": "string",
+                    "example": "demo@example.com",
+                    "maxLength": 160,
+                    "format": "email"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password",
+                  "name",
+                  "email"
+                ]
+              },
+              "example": {
+                "username": "postman_ready_2142f04f05",
+                "password": "Postman-ready-724a806f656647d4!9",
+                "name": "Postman Ready Customer",
+                "email": "postman_ready_2142f04f05@example.com"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "fieldErrors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Application JWT from POST /api/v1/auth/login. Swagger Sign in acquires it in memory."
+      }
+    }
+  }
+}

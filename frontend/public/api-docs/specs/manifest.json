@@ -1,0 +1,72 @@
+[
+  {
+    "id": "public",
+    "name": "public",
+    "url": "/api-docs/specs/public.json",
+    "private": false,
+    "operations": 30
+  },
+  {
+    "id": "api-gateway",
+    "name": "api-gateway",
+    "url": "/api-docs/specs/api-gateway.json",
+    "private": false,
+    "operations": 2
+  },
+  {
+    "id": "auth-service",
+    "name": "auth-service",
+    "url": "/api-docs/specs/auth-service.json",
+    "private": false,
+    "operations": 2
+  },
+  {
+    "id": "customer-service",
+    "name": "customer-service",
+    "url": "/api-docs/specs/customer-service.json",
+    "private": false,
+    "operations": 5
+  },
+  {
+    "id": "payment-service",
+    "name": "payment-service",
+    "url": "/api-docs/specs/payment-service.json",
+    "private": false,
+    "operations": 18
+  },
+  {
+    "id": "notification-service",
+    "name": "notification-service",
+    "url": "/api-docs/specs/notification-service.json",
+    "private": false,
+    "operations": 2
+  },
+  {
+    "id": "frontend",
+    "name": "frontend",
+    "url": "/api-docs/specs/frontend.json",
+    "private": false,
+    "operations": 1
+  },
+  {
+    "id": "customer-service-internal",
+    "name": "customer-service-internal (private, documentation only)",
+    "url": "/api-docs/specs/customer-service-internal.json",
+    "private": true,
+    "operations": 1
+  },
+  {
+    "id": "gateway-service-internal",
+    "name": "gateway-service-internal (private, documentation only)",
+    "url": "/api-docs/specs/gateway-service-internal.json",
+    "private": true,
+    "operations": 7
+  },
+  {
+    "id": "mock-bank-service-internal",
+    "name": "mock-bank-service-internal (private, documentation only)",
+    "url": "/api-docs/specs/mock-bank-service-internal.json",
+    "private": true,
+    "operations": 14
+  }
+]

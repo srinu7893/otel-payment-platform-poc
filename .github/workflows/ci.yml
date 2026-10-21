@@ -33,6 +33,12 @@ jobs:
     - name: Test frontend request diagnostics and retries
       working-directory: frontend
       run: npm test
+    - name: Test API report redaction and generated documentation
+      run: |
+        node --test scripts/api-report.test.mjs
+        python3 -m unittest discover -s scripts -p 'test_api_docs.py'
+        python3 scripts/build-api-docs.py
+        git diff --exit-code -- docs/api frontend/public/api-docs/specs api-gateway/src/main/resources/static/openapi.yaml
     - name: Test local incident receiver
       run: python3 -m unittest discover -s observability/incident-inbox -p "test_*.py"
     - name: Validate cloud release contracts
