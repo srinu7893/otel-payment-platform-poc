@@ -1,5 +1,7 @@
 # Give the OTel workflows access
 
+For final sign-off, versioning and remaining owner/admin actions, see [Final POC handover](FINAL_POC_HANDOVER.md). Do not repeat baseline grants if the current WIF access checks already pass.
+
 Use the existing GitHub Workload Identity Federation connection. No password, personal login token or service-account JSON key needs to be shared.
 
 ## Simplest setup for this POC

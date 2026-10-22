@@ -1,5 +1,7 @@
 # Wallet, browser, alerts and collector resilience
 
+For the final demonstration checklist, deployed version-number meanings and minimal Cloud Shell commands, use [Final POC handover](FINAL_POC_HANDOVER.md). The manual **OTel final readiness review** inventories current service versions/readiness and alert activation without cloud mutations.
+
 ## What is implemented
 
 Wallet and money-request service methods emit bounded operation spans and Micrometer attempt counters/timers. Operation labels are fixed method names; outcomes are success/rejected/error. Retries count as attempts, not unique money movements. Arguments, exception messages, account/customer IDs and notes are never added to these spans or metric labels.

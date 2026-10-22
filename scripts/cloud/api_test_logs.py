@@ -4,13 +4,27 @@ from pathlib import Path
 from cloud_acceptance import request
 from diagnose_revision import sanitize
 
+def collect_entries(fetch, query, max_entries=5000, max_pages=10):
+ if not 1<=max_entries<=10000 or not 1<=max_pages<=20:raise ValueError('Invalid log collection bounds')
+ entries=[];page='';seen=set()
+ for number in range(max_pages):
+  body={**query,**({'pageToken':page} if page else {})}
+  data=fetch(body);received=data.get('entries',[]);remaining=max_entries-len(entries)
+  entries.extend(received[:remaining])
+  page=data.get('nextPageToken','')
+  limited=len(received)>remaining
+  if not page:return {'entries':entries,'limited':limited,'pagesRead':number+1}
+  if len(entries)>=max_entries or number+1==max_pages:return {'entries':entries,'limited':True,'pagesRead':number+1}
+  if page in seen:raise ValueError('Cloud Logging repeated a page token; refusing an incomplete success')
+  seen.add(page)
+
 def clean(value):
  text=sanitize(str(value))
  text=re.sub(r'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+','[REDACTED JWT]',text)
  text=re.sub(r'''(?i)(["']?(?:password|access_?token|refresh_?token|api_key)["']?\s*[:=]\s*)("[^"]*"|'[^']*'|[^ ,;]+)''',r'\1[REDACTED]',text)
  return text[:2000]
 def main():
- p=argparse.ArgumentParser();p.add_argument('--report',default='artifacts/api-tests/latest/results.json');p.add_argument('--project',default='project-c9bd3d0e-266f-47bf-852');a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--report',default='artifacts/api-tests/latest/results.json');p.add_argument('--project',default='project-c9bd3d0e-266f-47bf-852');p.add_argument('--max-entries',type=int,default=5000);p.add_argument('--max-pages',type=int,default=10);a=p.parse_args()
  if not re.fullmatch(r'[a-z][a-z0-9-]{4,61}[a-z0-9]',a.project):raise ValueError('Invalid project')
  report_path=Path(a.report);report=json.loads(report_path.read_text());out=report_path.parent
  tested=[row for suite in report['suites'] for row in suite['requests'] if re.fullmatch(r'[a-f0-9]{32}',row.get('traceId',''))]
@@ -19,7 +33,8 @@ def main():
  clauses=' OR '.join('trace="projects/'+a.project+'/traces/'+trace+'"' for trace in traces)
  for attempt in range(3):
   try:
-   data=request('https://logging.googleapis.com/v2/entries:list',{'resourceNames':['projects/'+a.project],'filter':'('+clauses+')','orderBy':'timestamp desc','pageSize':1000},headers={'Authorization':'Bearer '+token})
+   query={'resourceNames':['projects/'+a.project],'filter':'('+clauses+')','orderBy':'timestamp desc','pageSize':1000}
+   data=collect_entries(lambda body:request('https://logging.googleapis.com/v2/entries:list',body,headers={'Authorization':'Bearer '+token}),query,a.max_entries,a.max_pages)
    observed={entry.get('trace','').split('/')[-1] for entry in data.get('entries',[])}
    if set(traces)<=observed:break
   except AssertionError:
@@ -40,7 +55,7 @@ def main():
    'message':clean(payload.get('message') or payload.get('msg') or body.get('message') or body.get('stringValue') or entry.get('textPayload') or ''),
    'httpStatus':entry.get('httpRequest',{}).get('status')})
  observed={r['traceId'] for r in rows}
- result={'status':'COLLECTED','testedTraceCount':len(traces),'observedTraceCount':len(observed),'logEntries':len(rows),'limited':bool(data.get('nextPageToken')),'scope':'At most 1000 stored entries from actual tested trace IDs; absence is reported, not counted as proof of stored logs.','requests':[{'name':r['name'],'traceId':r['traceId'],'logStatus':'FOUND' if r['traceId'] in observed else 'NO_LOGS_OBSERVED','links':r['links']} for r in tested],'entries':rows}
+ result={'status':'COLLECTED','testedTraceCount':len(traces),'observedTraceCount':len(observed),'logEntries':len(rows),'limited':data['limited'],'pagesRead':data['pagesRead'],'scope':f'At most {a.max_entries} stored entries / {a.max_pages} pages from actual tested trace IDs; absence is reported, not counted as proof of stored logs.','requests':[{'name':r['name'],'traceId':r['traceId'],'logStatus':'FOUND' if r['traceId'] in observed else 'NO_LOGS_OBSERVED','links':r['links']} for r in tested],'entries':rows}
  (out/'api-logs.json').write_text(json.dumps(result,indent=2))
  lines=['# Stored API log evidence','',f'{len(rows)} sanitized stored entries; {len(observed)}/{len(traces)} tested traces observed. Limited: {result["limited"]}.','',result['scope'],'','| Request | Stored logs | Links |','| --- | --- | --- |']
  for r in result['requests']:lines.append(f'| {r["name"]} | {r["logStatus"]} | [Logs]({r["links"].get("logs","")}) · [Trace]({r["links"].get("trace","")}) |')
