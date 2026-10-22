@@ -12,6 +12,13 @@ def sandbox_login(frontend,user):
     request(frontend+'/api/v1/auth/register',user,expected=(200,201),timeout=190)
     return request(frontend+'/api/v1/auth/login',{'username':user['username'],'password':user['password']},timeout=190)
 
+def recorded_check(name,fn,results,path):
+    try:
+        value=fn();results.append({'check':name,'status':'PASS'});return value
+    except Exception as error:
+        results.append({'check':name,'status':'FAIL','reason':type(error).__name__});raise
+    finally:path.write_text(json.dumps(results,indent=2))
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--project',default='project-c9bd3d0e-266f-47bf-852');a=p.parse_args()
     root=Path('artifacts/extended-observability');root.mkdir(parents=True,exist_ok=True);results=[]
@@ -19,9 +26,7 @@ def main():
     frontend=discover('payment-frontend');validate_config({'project':a.project,'apiUrl':frontend})
     token=subprocess.check_output(['gcloud','auth','print-access-token'],text=True).strip();google={'Authorization':'Bearer '+token}
     def check(name,fn):
-        try:fn();results.append({'check':name,'status':'PASS'})
-        except Exception as error:results.append({'check':name,'status':'FAIL','reason':type(error).__name__});raise
-        finally:(root/'results.json').write_text(json.dumps(results,indent=2))
+        return recorded_check(name,fn,results,root/'results.json')
     def rum():
         for name,value in [('PAGE_VIEW',1),('LCP',100),('CLS',.01),('JS_ERROR',1)]:
             request(frontend+'/api/v1/telemetry/rum',{'name':name,'value':value},{'Origin':frontend},(204,))
