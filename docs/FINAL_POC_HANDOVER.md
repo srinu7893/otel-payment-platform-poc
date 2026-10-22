@@ -79,6 +79,26 @@ gcloud projects add-iam-policy-binding project-c9bd3d0e-266f-47bf-852 \
 
 Use the selected observability identity instead of the default deployer if configured. This command changes IAM; it is not executed by any new script/workflow. [Official notification-channel commands](https://docs.cloud.google.com/sdk/gcloud/reference/beta/monitoring/channels/list).
 
+The 22 October readiness inventory found **no notification channels**, and missing `monitoring.alertPolicies.create` / `monitoring.alertPolicies.update`. If you want email alerts, run this once in Cloud Shell using the address you choose. It creates a notification channel, so avoid repeating it if one already exists:
+
+```bash
+read -r -p 'Email address for POC alerts: ' POC_ALERT_EMAIL
+gcloud beta monitoring channels create \
+  --project=project-c9bd3d0e-266f-47bf-852 \
+  --display-name='OTel Payment POC' --type=email --enabled \
+  --channel-labels="email_address=${POC_ALERT_EMAIL}" \
+  --format='value(name)'
+unset POC_ALERT_EMAIL
+```
+
+Paste only the returned `projects/.../notificationChannels/...` resource name. Complete any verification requested by Cloud Monitoring. Creating a channel alone does not publish policies or prove notification delivery. [Official create command](https://cloud.google.com/sdk/gcloud/reference/beta/monitoring/channels/create).
+
 **Optional, not prerequisites for the basic POC:** persistent external collector host/disk/TLS/secret; extra always-on warm instances and their ongoing cost; production SLO/on-call/retention/capacity/security requirements. Existing Cloud Run queues are bounded in memory, so outage/replacement can lose unexported telemetry. [Activation and durability details](OTEL_REMAINING_FEATURES.md). No new host, IAM grant, notification recipient or always-on instance is silently enabled.
 
 The POC is ready to demonstrate when the repeatable checks pass. Do not describe cloud alert delivery or external durable storage as completed until separately activated and proven.
+
+## Known non-blocking environment warning
+
+The 22 October bounded log review found a Flyway compatibility warning: the Neon database reports PostgreSQL 18.6, while the packaged Flyway build reports tested support through PostgreSQL 17. Database-backed acceptance paths passed, so this was not an observed migration failure. Treat a tested Flyway/PostgreSQL support alignment as dependency maintenance before production use; it is not fixed by hiding the warning. SpringDoc's enabled-endpoint notice is expected for this POC's intentional API documentation. Private-invoker 401/403 and negative-input 400 responses are also deliberately exercised by acceptance tests.
+
+The extended acceptance client now permits 190 seconds for one cold registration/login attempt, matching the deployed 180-second request boundary plus network overhead. It records the registration phase explicitly and never blindly replays an uncertain registration POST. Cold starts are still possible; this is not a low-latency guarantee.

@@ -6,6 +6,12 @@ from pathlib import Path
 from urllib.parse import urlencode
 from cloud_acceptance import request,eventually,validate_config
 
+def sandbox_login(frontend,user):
+    # A cold registration crosses several services. Wait beyond the 180s
+    # application boundary; do not replay a POST with an uncertain outcome.
+    request(frontend+'/api/v1/auth/register',user,expected=(200,201),timeout=190)
+    return request(frontend+'/api/v1/auth/login',{'username':user['username'],'password':user['password']},timeout=190)
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--project',default='project-c9bd3d0e-266f-47bf-852');a=p.parse_args()
     root=Path('artifacts/extended-observability');root.mkdir(parents=True,exist_ok=True);results=[]
@@ -24,8 +30,7 @@ def main():
     check('Bounded RUM intake accepts metrics and rejects extra fields/origins',rum)
     suffix=uuid.uuid4().hex[:16];password=uuid.uuid4().hex+'Aa9!'
     user={'username':'otel_'+suffix,'password':password,'name':'OTel Verification','email':'otel_'+suffix+'@example.com'}
-    request(frontend+'/api/v1/auth/register',user,expected=(200,201))
-    login=request(frontend+'/api/v1/auth/login',{'username':user['username'],'password':password})
+    login=check('Isolated sandbox registration and login',lambda:sandbox_login(frontend,user))
     headers={'Authorization':'Bearer '+login['accessToken']};trace=uuid.uuid4().hex
     def wallet():
         before=request(frontend+'/api/v1/wallet',headers={**headers,'traceparent':'00-'+trace+'-1234567890abcdef-01'})

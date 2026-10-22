@@ -33,11 +33,12 @@ def google_failure(status,raw):
         'reasons':sorted({row['reason'] for row in details if row.get('reason')}),
         'permissions':sorted(set(re.findall(r'\b(?:monitoring|logging|cloudtrace)\.(?:dashboards|timeSeries|metricDescriptors|logEntries|entries|traces)\.[A-Za-z]+\b',error.get('message',''))))}
 
-def request(url, body=None, headers=None, expected=(200,), response_headers=None):
+def request(url, body=None, headers=None, expected=(200,), response_headers=None, timeout=90):
+    if not 0<timeout<=240:raise ValueError('Request timeout must be bounded to 240 seconds')
     req=urllib.request.Request(url,data=None if body is None else json.dumps(body).encode(),
         headers={'Content-Type':'application/json',**(headers or {})})
     try:
-        with urllib.request.urlopen(req,timeout=90) as response:
+        with urllib.request.urlopen(req,timeout=timeout) as response:
             status,raw=response.status,response.read()
             if response_headers is not None:response_headers.update({k.lower():v for k,v in response.headers.items()})
     except urllib.error.HTTPError as error:
